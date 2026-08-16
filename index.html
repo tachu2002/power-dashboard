@@ -120,6 +120,34 @@
     color: var(--text-secondary);
     margin-right: auto;
   }
+  .autorefresh-status {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: var(--page-plane);
+    border: 1px solid var(--border);
+  }
+  .autorefresh-status .pulse {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: #0ca30c;
+    flex: none;
+    animation: autorefresh-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes autorefresh-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+  .autorefresh-status.just-updated {
+    color: #0ca30c;
+    border-color: #0ca30c;
+  }
   .dot {
     display: inline-block;
     width: 8px; height: 8px;
@@ -364,6 +392,7 @@
     <div class="header-toolbars">
       <div class="toolbar">
         <div class="status" id="statusText"><span class="dot pending" id="statusDot"></span>読み込み中…</div>
+        <div class="autorefresh-status" id="autoRefreshInfo">自動更新: 待機中…</div>
         <button id="refreshBtn">最新データを再読み込み</button>
         <button id="tableBtn">表で表示</button>
         <a class="btn" id="csvLink" href="data/history.csv" download="mishima_power_history.csv">CSV全履歴をダウンロード</a>
@@ -388,7 +417,7 @@
 
   <footer>
     このダッシュボードはサーバー(GitHub Actions)側で5分間隔(ベストエフォート)に全拠点のデータを自動取得し、そのままGitHub Pagesで公開しています。ブラウザを開いていなくてもサーバー側で記録が続くため、どのパソコン・スマートフォンからこのページを開いても同じ最新データ・同じ履歴を確認できます。<br>
-    画面は約1分ごとに自動でサーバーの最新データを再取得して表示を更新します。「最新データを再読み込み」ボタンで手動更新もできます(いずれもサーバー側の取得自体を今すぐ実行するものではありません)。<br>
+    画面は開いたままにしておくだけで、約1分ごとに自動でサーバーの最新データを再取得して表示を更新します(ツールバーの「自動更新」表示で動作中かご確認いただけます)。他のタブを見ていて戻ってきたときも自動的に最新化されます。「最新データを再読み込み」ボタンで手動更新もできます(いずれもサーバー側の取得自体を今すぐ実行するものではありません)。<br>
     グラフは直近24時間分のみを表示します。全期間の記録は「表で表示」、または「CSV全履歴をダウンロード」からご確認いただけます。<br>
     バッテリー電圧グラフの破線は定格電圧(12.5V)の目安線です。<br>
     各拠点カード下段・右側に表示される小さな画像は、取得元ページ下部の読取画像です(クリックで拡大表示)。取得元のページ構造が想定と異なる場合は表示されないことがあります。<br>
@@ -944,11 +973,46 @@
       });
   }
 
+  // ---- 自動更新の可視化(ページを開きっぱなしにしていても動いていると分かるように) ----
+  var autoRefreshInfoEl = document.getElementById("autoRefreshInfo");
+  var nextRefreshAt = Date.now() + CLIENT_REFRESH_MS;
+  var flashTimer = null;
+
+  function updateAutoRefreshLabel() {
+    if (!autoRefreshInfoEl) return;
+    if (autoRefreshInfoEl.classList.contains("just-updated")) return; // 更新直後のメッセージ表示中は上書きしない
+    var secLeft = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
+    autoRefreshInfoEl.innerHTML = '<span class="pulse"></span>自動更新: 次回まで約' + secLeft + '秒';
+  }
+
+  function flashJustUpdated() {
+    if (!autoRefreshInfoEl) return;
+    autoRefreshInfoEl.classList.add("just-updated");
+    autoRefreshInfoEl.innerHTML = '<span class="pulse"></span>' + fmtClock(new Date()) + ' に自動更新しました';
+    if (flashTimer) clearTimeout(flashTimer);
+    flashTimer = setTimeout(function () {
+      autoRefreshInfoEl.classList.remove("just-updated");
+      updateAutoRefreshLabel();
+    }, 2500);
+  }
+
+  setInterval(updateAutoRefreshLabel, 1000);
+  updateAutoRefreshLabel();
+
   function refreshFromServer() {
-    Promise.all([loadLatestJson(), loadRecentCsv()]).catch(function (err) {
+    nextRefreshAt = Date.now() + CLIENT_REFRESH_MS;
+    Promise.all([loadLatestJson(), loadRecentCsv()]).then(function () {
+      flashJustUpdated();
+    }).catch(function (err) {
       showError("サーバーのデータ取得に失敗しました: " + (err && err.message ? err.message : String(err)) + "（初回公開直後は data/ 配下のファイルがまだ存在しないことがあります。GitHub Actionsの初回実行完了後に再読み込みしてください）");
+      updateAutoRefreshLabel();
     });
   }
+
+  // タブを離れて戻ってきたときは、次の定期実行を待たずにすぐ最新化する
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) refreshFromServer();
+  });
 
   function loadFullHistoryForTable() {
     return fetch(DATA_HISTORY_URL, { cache: "no-store" })
