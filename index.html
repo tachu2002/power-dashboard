@@ -948,8 +948,17 @@
     updateGlobalStatus(latest.generatedAt ? new Date(latest.generatedAt) : null);
   }
 
+  // GitHub PagesはCDN(Fastly)経由で配信されており、fetchの cache:"no-store" は
+  // ブラウザ自身のキャッシュ利用を止めるだけでCDN側のキャッシュには効かない。
+  // そのため、新しいコミットが反映された後もCDNの保持期間(数分程度)が過ぎるまで
+  // 古い内容が返り続け、拠点の取得時刻やグラフが更新されないように見えていた。
+  // リクエストURLに毎回異なるクエリ文字列を付与し、CDNキャッシュを確実に回避する。
+  function withCacheBuster(url) {
+    return url + (url.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
+  }
+
   function loadRecentCsv() {
-    return fetch(DATA_RECENT_URL, { cache: "no-store" })
+    return fetch(withCacheBuster(DATA_RECENT_URL), { cache: "no-store" })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.text();
@@ -962,7 +971,7 @@
   }
 
   function loadLatestJson() {
-    return fetch(DATA_LATEST_URL, { cache: "no-store" })
+    return fetch(withCacheBuster(DATA_LATEST_URL), { cache: "no-store" })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.json();
@@ -1015,7 +1024,7 @@
   });
 
   function loadFullHistoryForTable() {
-    return fetch(DATA_HISTORY_URL, { cache: "no-store" })
+    return fetch(withCacheBuster(DATA_HISTORY_URL), { cache: "no-store" })
       .then(function (res) {
         if (!res.ok) throw new Error("HTTP " + res.status);
         return res.text();
@@ -1036,6 +1045,14 @@
     this.textContent = showing ? "表を隠す" : "表で表示";
     if (showing) loadFullHistoryForTable();
   });
+
+  // ダウンロードリンクもCDNキャッシュを避けるため、クリック直前にURLを毎回更新する
+  var csvLinkEl = document.getElementById("csvLink");
+  if (csvLinkEl) {
+    csvLinkEl.addEventListener("click", function () {
+      csvLinkEl.href = withCacheBuster(DATA_HISTORY_URL);
+    });
+  }
 
   if (window.matchMedia) {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
