@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>三島カメラ 電源監視ダッシュボード（Web版）</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface-1:      #f3fafd;
+    --page-plane:     #dcf0f7;
+    --text-primary:   #0b1c24;
+    --text-secondary: #4c6672;
+    --text-muted:     #7d99a3;
+    --gridline:       #cfe6ee;
+    --baseline:       #a9cbd6;
+    --border:         rgba(13,60,80,0.12);
+    --series-pv:      #2a78d6;
+    --series-bat:     #eb6834;
+    --danger-bg:      #fbe9e7;
+    --danger-text:    #8a2c1f;
+    --warn-border:    #c98a00;
+    --warn-bg:        #fff6e0;
+    --critical-border:#d03b3b;
+    --critical-bg:    #fbe9e7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) {
+      color-scheme: dark;
+      --surface-1:      #0f2733;
+      --page-plane:     #071620;
+      --text-primary:   #eaf6fb;
+      --text-secondary: #a9c3cf;
+      --text-muted:     #7e97a2;
+      --gridline:       #1c3641;
+      --baseline:       #2c4a56;
+      --border:         rgba(255,255,255,0.12);
+      --series-pv:      #3987e5;
+      --series-bat:     #d95926;
+      --danger-bg:      #3a1f1a;
+      --danger-text:    #f3b5a8;
+      --warn-border:    #eda100;
+      --warn-bg:        #3a2f0f;
+      --critical-border:#e05c5c;
+      --critical-bg:    #3a1f1a;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface-1:      #0f2733;
+    --page-plane:     #071620;
+    --text-primary:   #eaf6fb;
+    --text-secondary: #a9c3cf;
+    --text-muted:     #7e97a2;
+    --gridline:       #1c3641;
+    --baseline:       #2c4a56;
+    --border:         rgba(255,255,255,0.12);
+    --series-pv:      #3987e5;
+    --series-bat:     #d95926;
+    --danger-bg:      #3a1f1a;
+    --danger-text:    #f3b5a8;
+    --warn-border:    #eda100;
+    --warn-bg:        #3a2f0f;
+    --critical-border:#e05c5c;
+    --critical-bg:    #3a1f1a;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--page-plane);
+    color: var(--text-primary);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  body { padding: 24px; }
+  .wrap { max-width: 1920px; margin: 0 auto; }
+
+  .header-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+    margin-bottom: 12px;
+  }
+  .header-title { flex: 0 1 auto; min-width: 0; }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin: 0;
+  }
+  .header-toolbars {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1 1 500px;
+    max-width: 1150px;
+    min-width: 0;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 0;
+    padding: 12px 14px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  .toolbar .status {
+    font-size: 13px;
+    color: var(--text-secondary);
+    margin-right: auto;
+  }
+  .dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-muted);
+    margin-right: 6px;
+    vertical-align: middle;
+    flex: none;
+  }
+  .dot.ok { background: #0ca30c; }
+  .dot.err { background: #d03b3b; }
+  .dot.pending { background: #eda100; }
+
+  button, a.btn {
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    background: var(--page-plane);
+    color: var(--text-primary);
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-block;
+  }
+  button:hover, a.btn:hover { filter: brightness(0.97); }
+  @media (prefers-color-scheme: dark) {
+    button:hover, a.btn:hover { filter: brightness(1.15); }
+  }
+
+  .error-banner {
+    display: none;
+    background: var(--danger-bg);
+    color: var(--danger-text);
+    border-radius: 10px;
+    padding: 10px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .error-banner.show { display: block; }
+
+  .sites-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  @media (max-width: 1900px) { .sites-grid { grid-template-columns: repeat(5, 1fr); } }
+  @media (max-width: 1400px) { .sites-grid { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 900px) { .sites-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .sites-grid { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px 10px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .card.state-warn {
+    border: 3px solid var(--warn-border);
+    background: var(--warn-bg);
+    padding: 8px 10px 8px;
+  }
+  .card.state-critical {
+    border: 3px solid var(--critical-border);
+    background: var(--critical-bg);
+    padding: 8px 10px 8px;
+  }
+  .bat-alert-line {
+    display: none;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    font-weight: 600;
+    margin-top: 6px;
+    padding: 4px 8px;
+    border-radius: 6px;
+    line-height: 1.3;
+  }
+  .card.state-warn .bat-alert-line {
+    display: flex;
+    color: var(--warn-border);
+    background: rgba(237,161,0,0.16);
+  }
+  .card.state-critical .bat-alert-line {
+    display: flex;
+    color: var(--critical-border);
+    background: rgba(208,59,59,0.16);
+  }
+  .site-card-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 3px;
+    min-width: 0;
+  }
+  .site-card-header .site-title-wrap {
+    min-width: 0;
+  }
+  .site-card-header h2 {
+    font-size: 13px;
+    font-weight: 600;
+    margin: 0;
+  }
+  .site-card-header a.site-link {
+    font-size: 10px;
+    color: var(--text-muted);
+    text-decoration: none;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 220px;
+  }
+  .site-card-header a.site-link:hover { text-decoration: underline; }
+  .site-status {
+    font-size: 11px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    min-width: 0;
+    flex: 0 1 auto;
+    justify-content: flex-end;
+  }
+  .site-status .status-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 12px;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .chart-legend .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    white-space: nowrap;
+    flex: 0 1 auto;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chart-legend .legend-line { width: 12px; height: 2px; display: inline-block; border-radius: 1px; flex: none; }
+
+  .chart-box { position: relative; height: 150px; min-width: 0; }
+
+  .mini-stats {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-top: 4px;
+    margin-bottom: 6px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--gridline);
+  }
+  .mini-stats .site-thumb {
+    margin-left: auto;
+    max-width: 100px;
+    max-height: 100px;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.18);
+    cursor: pointer;
+    opacity: 0.96;
+  }
+  .mini-stats .site-thumb:hover { opacity: 1; }
+  .mini-stats .stat-label {
+    font-size: 10px;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .mini-stats .swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
+  .mini-stats .stat-value {
+    font-size: 16px;
+    font-weight: 600;
+    margin-top: 1px;
+    font-variant-numeric: proportional-nums;
+  }
+  .mini-stats .stat-value .unit { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
+  .mini-stats .stat-delta { font-size: 10px; color: var(--text-secondary); }
+
+  .table-section { display: none; }
+  .table-section.show { display: block; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  thead th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--text-secondary);
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--gridline);
+    position: sticky; top: 0;
+    background: var(--surface-1);
+  }
+  tbody td {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--gridline);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+  .table-scroll { max-height: 360px; overflow-y: auto; border-radius: 10px; margin-bottom: 16px; }
+
+  footer {
+    color: var(--text-muted);
+    font-size: 12px;
+    margin-top: 8px;
+    line-height: 1.7;
+  }
+</style>
+</head>
+<body>
+<div class="viz-root wrap">
+
+  <div class="header-row">
+    <div class="header-title">
+      <h1>三島カメラ 電源監視ダッシュボード</h1>
+      <p class="subtitle" id="subtitleText">読み込み中…</p>
+    </div>
+    <div class="header-toolbars">
+      <div class="toolbar">
+        <div class="status" id="statusText"><span class="dot pending" id="statusDot"></span>読み込み中…</div>
+        <button id="refreshBtn">最新データを再読み込み</button>
+        <button id="tableBtn">表で表示</button>
+        <a class="btn" id="csvLink" href="data/history.csv" download="mishima_power_history.csv">CSV全履歴をダウンロード</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="error-banner" id="errorBanner"></div>
+
+  <div class="sites-grid" id="sitesGrid"></div>
+
+  <div class="table-section" id="tableSection">
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>拠点</th><th>取得時刻</th><th>機器の計測時刻</th><th>PV (V)</th><th>BAT (V)</th><th>取得方法</th></tr>
+        </thead>
+        <tbody id="tableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <footer>
+    このダッシュボードはサーバー(GitHub Actions)側で5分間隔(ベストエフォート)に全拠点のデータを自動取得し、そのままGitHub Pagesで公開しています。ブラウザを開いていなくてもサーバー側で記録が続くため、どのパソコン・スマートフォンからこのページを開いても同じ最新データ・同じ履歴を確認できます。<br>
+    画面は約1分ごとに自動でサーバーの最新データを再取得して表示を更新します。「最新データを再読み込み」ボタンで手動更新もできます(いずれもサーバー側の取得自体を今すぐ実行するものではありません)。<br>
+    グラフは直近24時間分のみを表示します。全期間の記録は「表で表示」、または「CSV全履歴をダウンロード」からご確認いただけます。<br>
+    バッテリー電圧グラフの破線は定格電圧(12.5V)の目安線です。<br>
+    各拠点カード下段・右側に表示される小さな画像は、取得元ページ下部の読取画像です(クリックで拡大表示)。取得元のページ構造が想定と異なる場合は表示されないことがあります。<br>
+    バッテリー電圧が12.0V以下になった拠点は黄色の枠(注意)、11.5V以下になった拠点は赤色の枠(緊急・機器が動作停止する恐れのある電圧域)で強調表示されます。
+  </footer>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var SITES = [
+    { id: "cam01", name: "三島カメラ01", url: "https://matsuhisa.info/mishima-cam01/test.cgi" },
+    { id: "cam02", name: "三島カメラ02", url: "https://matsuhisa.info/mishima-cam02/test.cgi" },
+    { id: "cam03", name: "三島カメラ03", url: "https://matsuhisa.info/mishima-cam03/test.cgi" },
+    { id: "cam04", name: "三島カメラ04", url: "https://matsuhisa.info/mishima-cam04/test.cgi" },
+    { id: "cam08", name: "三島カメラ08", url: "https://matsuhisa.info/mishima-cam08/test.cgi" },
+    { id: "cam09", name: "三島カメラ09", url: "https://matsuhisa.info/mishima-cam09/test.cgi" },
+    { id: "cam11", name: "三島カメラ11", url: "https://matsuhisa.info/mishima-cam11/test.cgi" },
+    { id: "cam12", name: "三島カメラ12", url: "https://matsuhisa.info/mishima-cam12/test.cgi" },
+    { id: "cam13", name: "三島カメラ13", url: "https://matsuhisa.info/mishima-cam13/test.cgi" },
+    { id: "cam14", name: "三島カメラ14", url: "https://matsuhisa.info/mishima-cam14/test.cgi" },
+    { id: "cam36", name: "三島カメラ36", url: "https://matsuhisa.info/mishima-cam36/test.cgi" },
+    { id: "cam40", name: "三島カメラ40", url: "https://matsuhisa.info/mishima-cam40/test.cgi" },
+    { id: "cam42", name: "三島カメラ42", url: "https://matsuhisa.info/mishima-cam42/test.cgi" },
+    { id: "cam43", name: "三島カメラ43", url: "https://matsuhisa.info/mishima-cam43/test.cgi" },
+    { id: "cam46", name: "三島カメラ46", url: "https://matsuhisa.info/mishima-cam46/test.cgi" },
+    { id: "cam47", name: "三島カメラ47", url: "https://matsuhisa.info/mishima-cam47/test.cgi" },
+    { id: "cam52", name: "三島カメラ52", url: "https://matsuhisa.info/mishima-cam52/test.cgi" },
+    { id: "cam53", name: "三島カメラ53", url: "https://matsuhisa.info/mishima-cam53/test.cgi" },
+    { id: "cam54", name: "三島カメラ54", url: "https://matsuhisa.info/mishima-cam54/test.cgi" },
+    { id: "cam55", name: "三島カメラ55", url: "https://matsuhisa.info/mishima-cam55/test.cgi" }
+  ];
+  var RATED_BAT_VOLTAGE = 12.5;
+  var WARN_BAT_VOLTAGE = 12.0;
+  var CRITICAL_BAT_VOLTAGE = 11.5;
+
+  var CLIENT_REFRESH_MS = 60 * 1000;         // 画面の自動再読み込み間隔(サーバー側の実際の取得間隔とは別)
+  var MAX_CHART_POINTS = 288;
+  var CHART_WINDOW_MS = 24 * 60 * 60 * 1000; // グラフ表示は直近24時間分のみ
+  var MAX_STORED_POINTS = 4032;              // ブラウザのメモリ上に保持する上限(14日分・表示用の安全上限。サーバー側の全期間記録には影響しません)
+
+  var DATA_LATEST_URL = "data/latest.json";
+  var DATA_RECENT_URL = "data/recent.csv";
+  var DATA_HISTORY_URL = "data/history.csv";
+
+  function isDark() {
+    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+
+  function palette() {
+    return isDark() ? {
+      textPrimary: "#eaf6fb", textSecondary: "#a9c3cf", textMuted: "#7e97a2",
+      gridline: "#1c3641", baseline: "#2c4a56", surface: "#0f2733",
+      pv: "#3987e5", bat: "#d95926", rated: "#e66767"
+    } : {
+      textPrimary: "#0b1c24", textSecondary: "#4c6672", textMuted: "#7d99a3",
+      gridline: "#cfe6ee", baseline: "#a9cbd6", surface: "#f3fafd",
+      pv: "#2a78d6", bat: "#eb6834", rated: "#d63b3b"
+    };
+  }
+
+  // ---- チャート描画(外部ライブラリ不使用・素のSVGで自前実装、PV/BAT統合表示) ----
+  function createCombinedChart(containerId, ratedValue, ratedLabel) {
+    var svgNS = "http://www.w3.org/2000/svg";
+    var container = document.getElementById(containerId);
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", "100%");
+    svg.style.display = "block";
+    container.appendChild(svg);
+
+    var tooltip = document.createElement("div");
+    tooltip.style.cssText = "position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;" +
+      "background:var(--surface-1);border:1px solid var(--gridline);border-radius:8px;padding:6px 10px;" +
+      "font-size:18px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.12);z-index:2;";
+    container.appendChild(tooltip);
+
+    var W = 600, H = 220;
+    var marginLeft = 85, marginRight = 100, marginTop = 12, marginBottom = 26;
+    var plotW = W - marginLeft - marginRight;
+    var plotH = H - marginTop - marginBottom;
+    var lastPoints = [];
+
+    function niceScale(dataMin, dataMax) {
+      if (dataMin === dataMax) { dataMin -= 1; dataMax += 1; }
+      var range = dataMax - dataMin;
+      var pad = range * 0.15;
+      var lo = dataMin - pad, hi = dataMax + pad;
+      var rawStep = (hi - lo) / 4;
+      var mag = Math.pow(10, Math.floor(Math.log(rawStep) / Math.LN10));
+      var norm = rawStep / mag;
+      var niceNorm = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+      var step = niceNorm * mag;
+      var niceLo = Math.floor(lo / step) * step;
+      var niceHi = Math.ceil(hi / step) * step;
+      var ticks = [];
+      for (var v = niceLo; v <= niceHi + step / 1000; v += step) ticks.push(Math.round(v * 1000) / 1000);
+      return { min: niceLo, max: niceHi, ticks: ticks };
+    }
+
+    function el(tag, attrs) {
+      var e = document.createElementNS(svgNS, tag);
+      for (var k in attrs) e.setAttribute(k, attrs[k]);
+      return e;
+    }
+
+    function drawSeriesEndLabel(svg, pal, x, y, text, dyNudge) {
+      var approxWidth = text.length * 9.75 + 12;
+      var boxX = Math.min(x + 8, W - approxWidth - 4);
+      var boxY = y - 13.5 + (dyNudge || 0);
+      svg.appendChild(el("rect", { x: boxX - 4, y: boxY, width: approxWidth, height: 27, rx: 4, fill: pal.surface, opacity: 0.9 }));
+      var t = el("text", { x: boxX, y: boxY + 13.5, "dominant-baseline": "middle", fill: pal.textPrimary, "font-size": 18, "font-weight": 600, "font-family": "system-ui, -apple-system, sans-serif" });
+      t.textContent = text;
+      svg.appendChild(t);
+    }
+
+    function render(points) {
+      lastPoints = points;
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+      svg.setAttribute("preserveAspectRatio", "none");
+      tooltip.style.opacity = 0;
+      if (!points.length) return;
+
+      var pal = palette();
+      var n = points.length;
+      var pvVals = points.map(function (p) { return p.pv; });
+      var batVals = points.map(function (p) { return p.bat; });
+      var allVals = pvVals.concat(batVals);
+      if (typeof ratedValue === "number") allVals = allVals.concat([ratedValue]);
+      var scale = niceScale(Math.min.apply(null, allVals), Math.max.apply(null, allVals));
+
+      function xAt(i) { return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW; }
+      function yAt(v) { return marginTop + plotH - ((v - scale.min) / (scale.max - scale.min)) * plotH; }
+
+      var tickStep = scale.ticks.length > 1 ? (scale.ticks[1] - scale.ticks[0]) : 1;
+      scale.ticks.forEach(function (t) {
+        var y = yAt(t);
+        svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: y, y2: y, stroke: pal.gridline, "stroke-width": 1 }));
+        var nearRated = typeof ratedValue === "number" && Math.abs(t - ratedValue) <= tickStep * 0.9;
+        if (!nearRated) {
+          var label = el("text", { x: marginLeft - 8, y: y, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 16.5, "font-family": "system-ui, -apple-system, sans-serif" });
+          label.textContent = t.toFixed(1);
+          svg.appendChild(label);
+        }
+      });
+
+      var labelCount = Math.min(6, n);
+      for (var k = 0; k < labelCount; k++) {
+        var idx = labelCount === 1 ? 0 : Math.round((k / (labelCount - 1)) * (n - 1));
+        var lbl = el("text", { x: xAt(idx), y: H - 6, "text-anchor": "middle", fill: pal.textMuted, "font-size": 16.5, "font-family": "system-ui, -apple-system, sans-serif" });
+        lbl.textContent = points[idx].label;
+        svg.appendChild(lbl);
+      }
+
+      var ratedLabelInfo = null;
+      if (typeof ratedValue === "number" && ratedValue >= scale.min && ratedValue <= scale.max) {
+        var ry = yAt(ratedValue);
+        svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: ry, y2: ry, stroke: pal.rated, "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
+        ratedLabelInfo = { y: ry, text: ratedLabel || (ratedValue + "V") };
+      }
+
+      function pathFor(values, color) {
+        var d = values.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
+        svg.appendChild(el("path", { d: d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+      }
+      pathFor(pvVals, pal.pv);
+      pathFor(batVals, pal.bat);
+
+      if (ratedLabelInfo) {
+        var rlabelWidth = ratedLabelInfo.text.length * 8.4 + 9;
+        var rlabelX = Math.max(2, marginLeft - rlabelWidth - 6);
+        svg.appendChild(el("rect", { x: rlabelX, y: ratedLabelInfo.y - 21, width: rlabelWidth, height: 21, fill: pal.surface, opacity: 0.85 }));
+        var rlabel = el("text", { x: rlabelX + 3, y: ratedLabelInfo.y - 10.5, "text-anchor": "start", "dominant-baseline": "middle", fill: pal.rated, "font-size": 15, "font-family": "system-ui, -apple-system, sans-serif" });
+        rlabel.textContent = ratedLabelInfo.text;
+        svg.appendChild(rlabel);
+      }
+
+      var lastIdx = n - 1;
+      var exPv = xAt(lastIdx), eyPv = yAt(pvVals[lastIdx]);
+      var exBat = xAt(lastIdx), eyBat = yAt(batVals[lastIdx]);
+      svg.appendChild(el("circle", { cx: exPv, cy: eyPv, r: 5, fill: pal.pv, stroke: pal.surface, "stroke-width": 2 }));
+      svg.appendChild(el("circle", { cx: exBat, cy: eyBat, r: 5, fill: pal.bat, stroke: pal.surface, "stroke-width": 2 }));
+
+      var nudgePv = 0, nudgeBat = 0;
+      if (Math.abs(eyPv - eyBat) < 24) {
+        if (eyPv <= eyBat) { nudgePv = -13.5; nudgeBat = 13.5; } else { nudgePv = 13.5; nudgeBat = -13.5; }
+      }
+      drawSeriesEndLabel(svg, pal, exPv, eyPv, pvVals[lastIdx].toFixed(1) + " V", nudgePv);
+      drawSeriesEndLabel(svg, pal, exBat, eyBat, batVals[lastIdx].toFixed(1) + " V", nudgeBat);
+
+      var hoverGroup = el("g", { opacity: 0 });
+      var crosshair = el("line", { x1: 0, x2: 0, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1 });
+      var hoverDotPv = el("circle", { r: 5, fill: pal.pv, stroke: pal.surface, "stroke-width": 2 });
+      var hoverDotBat = el("circle", { r: 5, fill: pal.bat, stroke: pal.surface, "stroke-width": 2 });
+      hoverGroup.appendChild(crosshair);
+      hoverGroup.appendChild(hoverDotPv);
+      hoverGroup.appendChild(hoverDotBat);
+      svg.appendChild(hoverGroup);
+
+      var hitRect = el("rect", { x: marginLeft, y: marginTop, width: plotW, height: plotH, fill: "transparent" });
+      hitRect.style.cursor = "crosshair";
+      svg.appendChild(hitRect);
+
+      function pointerMove(evt) {
+        var rect = svg.getBoundingClientRect();
+        var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+        var relX = (clientX - rect.left) / rect.width * W;
+        var idx2 = Math.round(((relX - marginLeft) / plotW) * (n - 1));
+        idx2 = Math.max(0, Math.min(n - 1, idx2));
+        var px = xAt(idx2);
+        var pyPv = yAt(pvVals[idx2]), pyBat = yAt(batVals[idx2]);
+        crosshair.setAttribute("x1", px); crosshair.setAttribute("x2", px);
+        hoverDotPv.setAttribute("cx", px); hoverDotPv.setAttribute("cy", pyPv);
+        hoverDotBat.setAttribute("cx", px); hoverDotBat.setAttribute("cy", pyBat);
+        hoverGroup.setAttribute("opacity", 1);
+
+        while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
+        var line0 = document.createElement("div");
+        line0.style.cssText = "color:var(--text-secondary);";
+        line0.textContent = points[idx2].label;
+        tooltip.appendChild(line0);
+
+        [["PV", pal.pv, pvVals[idx2]], ["BAT", pal.bat, batVals[idx2]]].forEach(function (row) {
+          var line = document.createElement("div");
+          line.style.cssText = "color:var(--text-primary);font-weight:600;display:flex;align-items:center;gap:6px;margin-top:2px;";
+          var swatch = document.createElement("span");
+          swatch.style.cssText = "display:inline-block;width:10px;height:2px;background:" + row[1] + ";";
+          var valSpan = document.createElement("span");
+          valSpan.textContent = row[0] + " " + row[2].toFixed(1) + " V";
+          line.appendChild(swatch);
+          line.appendChild(valSpan);
+          tooltip.appendChild(line);
+        });
+
+        var containerRect = container.getBoundingClientRect();
+        var tipX = (px / W) * containerRect.width;
+        var tipY = (Math.min(pyPv, pyBat) / H) * containerRect.height;
+        tooltip.style.left = Math.max(4, Math.min(tipX + 12, containerRect.width - 140)) + "px";
+        tooltip.style.top = Math.max(tipY - 54, 4) + "px";
+        tooltip.style.opacity = 1;
+      }
+      function pointerLeave() {
+        hoverGroup.setAttribute("opacity", 0);
+        tooltip.style.opacity = 0;
+      }
+      hitRect.addEventListener("pointermove", pointerMove);
+      hitRect.addEventListener("pointerleave", pointerLeave);
+    }
+
+    return {
+      setData: function (points) { render(points); },
+      redraw: function () { render(lastPoints); }
+    };
+  }
+
+  // ---- サイトごとのカードDOM生成 ----
+  var sitesGrid = document.getElementById("sitesGrid");
+  var siteStates = {};
+
+  function el2(tag, attrs, html) {
+    var e = document.createElement(tag);
+    for (var k in attrs) {
+      if (k === "class") e.className = attrs[k];
+      else e.setAttribute(k, attrs[k]);
+    }
+    if (html !== undefined) e.innerHTML = html;
+    return e;
+  }
+
+  var subtitleEl = document.getElementById("subtitleText");
+  if (subtitleEl) {
+    subtitleEl.textContent = SITES.length + "拠点をサーバー側で5分間隔(ベストエフォート)に自動取得・記録しています";
+  }
+
+  SITES.forEach(function (site) {
+    var card = el2("div", { class: "card" });
+
+    var header = el2("div", { class: "site-card-header" });
+    var titleWrap = el2("div", { class: "site-title-wrap" });
+    var h2 = document.createElement("h2");
+    h2.textContent = site.name;
+    titleWrap.appendChild(h2);
+    var link = el2("a", { class: "site-link", href: site.url, target: "_blank", rel: "noopener" });
+    link.textContent = site.url;
+    titleWrap.appendChild(link);
+    header.appendChild(titleWrap);
+    var statusEl = el2("div", { class: "site-status" }, '<span class="dot pending"></span><span class="status-text">読み込み中…</span>');
+    header.appendChild(statusEl);
+    card.appendChild(header);
+
+    var mini = el2("div", { class: "mini-stats" });
+    var pvStat = el2("div", {},
+      '<div class="stat-label"><span class="swatch" style="background:var(--series-pv)"></span>PV</div>' +
+      '<div class="stat-value pv-value">–<span class="unit">V</span></div>' +
+      '<div class="stat-delta pv-delta">&nbsp;</div>');
+    var batStat = el2("div", {},
+      '<div class="stat-label"><span class="swatch" style="background:var(--series-bat)"></span>BAT</div>' +
+      '<div class="stat-value bat-value">–<span class="unit">V</span></div>' +
+      '<div class="stat-delta bat-delta">&nbsp;</div>');
+    mini.appendChild(pvStat);
+    mini.appendChild(batStat);
+    card.appendChild(mini);
+
+    var batAlertLine = el2("div", { class: "bat-alert-line" });
+    card.appendChild(batAlertLine);
+
+    var legend = el2("div", { class: "chart-legend" },
+      '<span class="legend-item"><span class="legend-line" style="background:var(--series-pv)"></span>PV（発電電圧）</span>' +
+      '<span class="legend-item"><span class="legend-line" style="background:var(--series-bat)"></span>BAT（バッテリー電圧）</span>');
+    card.appendChild(legend);
+
+    var chartBox = el2("div", { class: "chart-box", id: "chart-" + site.id });
+    card.appendChild(chartBox);
+
+    sitesGrid.appendChild(card);
+
+    siteStates[site.id] = {
+      site: site,
+      points: [],
+      chart: createCombinedChart("chart-" + site.id, RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(1) + "V"),
+      cardEl: card,
+      statusDotEl: statusEl.querySelector(".dot"),
+      statusTextEl: statusEl.querySelector(".status-text"),
+      pvValueEl: pvStat.querySelector(".pv-value"),
+      batValueEl: batStat.querySelector(".bat-value"),
+      pvDeltaEl: pvStat.querySelector(".pv-delta"),
+      batDeltaEl: batStat.querySelector(".bat-delta"),
+      batAlertLineEl: batAlertLine,
+      thumbSlot: mini,
+      thumbEl: null,
+      lastState: null
+    };
+  });
+
+  // ---- 共通UI ----
+  var statusDot = document.getElementById("statusDot");
+  var statusText = document.getElementById("statusText");
+  var errorBanner = document.getElementById("errorBanner");
+  var tableBody = document.getElementById("tableBody");
+  var tableSection = document.getElementById("tableSection");
+
+  function fmtTime(d) {
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
+  function fmtClock(d) {
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
+
+  function showError(message) {
+    errorBanner.textContent = message;
+    errorBanner.classList.add("show");
+  }
+  function hideError() {
+    errorBanner.classList.remove("show");
+  }
+
+  function updateGlobalStatus(generatedAt) {
+    var states = SITES.map(function (s) { return siteStates[s.id].lastState; });
+    var errCount = states.filter(function (s) { return s === "err"; }).length;
+    var okCount = states.filter(function (s) { return s === "ok"; }).length;
+    var pendingCount = states.filter(function (s) { return s === "pending"; }).length;
+    var dotClass = errCount ? "err" : (pendingCount ? "pending" : (okCount ? "ok" : "pending"));
+    var text = SITES.length + "拠点中 正常" + okCount + "件";
+    if (errCount) text += " / 取得失敗" + errCount + "件";
+    if (generatedAt) text += "（サーバー最終取得: " + fmtClock(generatedAt) + "）";
+    statusDot.className = "dot " + dotClass;
+    statusText.textContent = text;
+  }
+
+  function setSiteStatus(site, state, text) {
+    var s = siteStates[site.id];
+    s.lastState = state;
+    s.statusDotEl.className = "dot " + state;
+    s.statusTextEl.textContent = text;
+    s.statusTextEl.title = text;
+  }
+
+  function updateBatAlertState(site, batVoltage) {
+    var s = siteStates[site.id];
+    var isCritical = typeof batVoltage === "number" && batVoltage <= CRITICAL_BAT_VOLTAGE;
+    var isWarn = !isCritical && typeof batVoltage === "number" && batVoltage <= WARN_BAT_VOLTAGE;
+    s.cardEl.classList.toggle("state-critical", isCritical);
+    s.cardEl.classList.toggle("state-warn", isWarn);
+    if (isCritical) {
+      s.batAlertLineEl.textContent = "⛔ 緊急: バッテリー電圧が" + CRITICAL_BAT_VOLTAGE.toFixed(1) + "V以下(動作停止の恐れ)";
+    } else if (isWarn) {
+      s.batAlertLineEl.textContent = "⚠ 注意: バッテリー電圧が" + WARN_BAT_VOLTAGE.toFixed(1) + "V以下に低下";
+    } else {
+      s.batAlertLineEl.textContent = "";
+    }
+  }
+
+  function updateSiteTiles(site) {
+    var s = siteStates[site.id];
+    if (!s.points.length) return;
+    var last = s.points[s.points.length - 1];
+    var prev = s.points.length > 1 ? s.points[s.points.length - 2] : null;
+    s.pvValueEl.innerHTML = last.pv.toFixed(1) + '<span class="unit">V</span>';
+    s.batValueEl.innerHTML = last.bat.toFixed(1) + '<span class="unit">V</span>';
+    if (prev) {
+      var dPv = last.pv - prev.pv;
+      var dBat = last.bat - prev.bat;
+      s.pvDeltaEl.textContent = (dPv >= 0 ? "▲ " : "▼ ") + Math.abs(dPv).toFixed(1) + " V";
+      s.batDeltaEl.textContent = (dBat >= 0 ? "▲ " : "▼ ") + Math.abs(dBat).toFixed(1) + " V";
+    }
+    updateBatAlertState(site, last.bat);
+  }
+
+  function updateSiteChart(site) {
+    var s = siteStates[site.id];
+    var cutoff = Date.now() - CHART_WINDOW_MS;
+    var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff; });
+    if (recent.length > MAX_CHART_POINTS) recent = recent.slice(-MAX_CHART_POINTS);
+    s.chart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), pv: p.pv, bat: p.bat }; }));
+  }
+
+  function updateSiteImage(site, imageUrl) {
+    var s = siteStates[site.id];
+    if (!imageUrl) return;
+    var src = imageUrl + (imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
+    if (!s.thumbEl) {
+      var img = document.createElement("img");
+      img.className = "site-thumb";
+      img.referrerPolicy = "no-referrer";
+      img.alt = site.name + " 読取画像";
+      img.title = "クリックで拡大表示";
+      img.addEventListener("click", function () { window.open(imageUrl, "_blank", "noopener"); });
+      img.addEventListener("error", function () {
+        if (img.parentNode) img.parentNode.removeChild(img);
+        s.thumbEl = null;
+      });
+      s.thumbSlot.appendChild(img);
+      s.thumbEl = img;
+    }
+    s.thumbEl.src = src;
+  }
+
+  function rebuildTable() {
+    var rows = [];
+    SITES.forEach(function (site) {
+      siteStates[site.id].points.forEach(function (p) { rows.push({ site: site, p: p }); });
+    });
+    rows.sort(function (a, b) { return b.p.fetchedAt - a.p.fetchedAt; });
+    var html = rows.map(function (r) {
+      var p = r.p;
+      return "<tr>" +
+        "<td>" + r.site.name + "</td>" +
+        "<td>" + fmtTime(p.fetchedAt) + "</td>" +
+        "<td>" + (p.measureTime || "–") + "</td>" +
+        "<td>" + p.pv.toFixed(1) + "</td>" +
+        "<td>" + p.bat.toFixed(1) + "</td>" +
+        "<td>" + p.via + "</td>" +
+        "</tr>";
+    }).join("");
+    tableBody.innerHTML = html;
+  }
+
+  // ---- CSV解析(サーバー側 data/recent.csv, data/history.csv 共通フォーマット) ----
+  function parseCsvRows(text) {
+    var lines = text.split(/\r?\n/).filter(function (l) { return l.trim().length; });
+    if (!lines.length) return [];
+    var startIdx = lines[0].indexOf("拠点") === 0 ? 1 : 0;
+    var out = [];
+    for (var i = startIdx; i < lines.length; i++) {
+      var cols = lines[i].split(",");
+      if (cols.length < 5) continue;
+      var siteId = cols[0];
+      var fetchedAt = new Date(cols[1]);
+      var pv = parseFloat(cols[3]);
+      var bat = parseFloat(cols[4]);
+      if (isNaN(fetchedAt.getTime()) || isNaN(pv) || isNaN(bat)) continue;
+      out.push({
+        siteId: siteId,
+        fetchedAt: fetchedAt,
+        measureTime: cols[2] || null,
+        pv: pv,
+        bat: bat,
+        via: cols[5] || ""
+      });
+    }
+    return out;
+  }
+
+  function mergeAndDedupe(newPoints) {
+    var bySite = {};
+    SITES.forEach(function (site) { bySite[site.id] = {}; });
+    SITES.forEach(function (site) {
+      siteStates[site.id].points.forEach(function (p) { bySite[site.id][p.fetchedAt.getTime()] = p; });
+    });
+    newPoints.forEach(function (np) {
+      if (!bySite[np.siteId]) return;
+      bySite[np.siteId][np.fetchedAt.getTime()] = {
+        fetchedAt: np.fetchedAt, measureTime: np.measureTime, pv: np.pv, bat: np.bat, via: np.via
+      };
+    });
+    SITES.forEach(function (site) {
+      var merged = Object.keys(bySite[site.id]).map(function (k) { return bySite[site.id][k]; });
+      merged.sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+      if (merged.length > MAX_STORED_POINTS) merged = merged.slice(merged.length - MAX_STORED_POINTS);
+      siteStates[site.id].points = merged;
+      updateSiteTiles(site);
+      updateSiteChart(site);
+    });
+  }
+
+  // ---- latest.json / recent.csv をサーバーから取得して画面へ反映 ----
+  function applyLatestJson(latest) {
+    if (!latest || !latest.sites) return;
+    SITES.forEach(function (site) {
+      var info = latest.sites[site.id];
+      if (!info) {
+        setSiteStatus(site, "pending", "サーバーでの取得待ちです");
+        return;
+      }
+      if (info.imageUrl) updateSiteImage(site, info.imageUrl);
+      if (info.lastFetchOk) {
+        setSiteStatus(site, "ok", "最終取得 " + fmtClock(new Date(info.lastFetchAt)) + "（" + (info.via || "サーバー") + "）");
+      } else {
+        var lastOkText = info.lastSuccessAt ? "（前回成功: " + fmtClock(new Date(info.lastSuccessAt)) + "）" : "";
+        setSiteStatus(site, "err", "取得失敗 " + fmtClock(new Date(info.lastFetchAt)) + ": " + info.lastError + lastOkText);
+      }
+    });
+    updateGlobalStatus(latest.generatedAt ? new Date(latest.generatedAt) : null);
+  }
+
+  function loadRecentCsv() {
+    return fetch(DATA_RECENT_URL, { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (text) {
+        var points = parseCsvRows(text);
+        mergeAndDedupe(points);
+        if (tableSection.classList.contains("show")) rebuildTable();
+      });
+  }
+
+  function loadLatestJson() {
+    return fetch(DATA_LATEST_URL, { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .then(function (latest) {
+        applyLatestJson(latest);
+        hideError();
+      });
+  }
+
+  function refreshFromServer() {
+    Promise.all([loadLatestJson(), loadRecentCsv()]).catch(function (err) {
+      showError("サーバーのデータ取得に失敗しました: " + (err && err.message ? err.message : String(err)) + "（初回公開直後は data/ 配下のファイルがまだ存在しないことがあります。GitHub Actionsの初回実行完了後に再読み込みしてください）");
+    });
+  }
+
+  function loadFullHistoryForTable() {
+    return fetch(DATA_HISTORY_URL, { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (text) {
+        var points = parseCsvRows(text);
+        mergeAndDedupe(points);
+        rebuildTable();
+      })
+      .catch(function (err) {
+        showError("全履歴の取得に失敗しました: " + (err && err.message ? err.message : String(err)));
+      });
+  }
+
+  document.getElementById("refreshBtn").addEventListener("click", refreshFromServer);
+  document.getElementById("tableBtn").addEventListener("click", function () {
+    var showing = tableSection.classList.toggle("show");
+    this.textContent = showing ? "表を隠す" : "表で表示";
+    if (showing) loadFullHistoryForTable();
+  });
+
+  if (window.matchMedia) {
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+      SITES.forEach(function (site) { siteStates[site.id].chart.redraw(); });
+    });
+  }
+
+  // 初回読み込み + 以後は約1分ごとにサーバーの最新データを再取得
+  refreshFromServer();
+  setInterval(refreshFromServer, CLIENT_REFRESH_MS);
+})();
+</script>
+</body>
+</html>
