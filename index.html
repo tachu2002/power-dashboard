@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>三島カメラ 電源監視ダッシュボード（Web版）</title>
+<title>水位・電源監視ダッシュボード（Web版）</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root {
     color-scheme: light;
@@ -74,94 +75,9 @@
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   body { padding: 24px; }
-  .wrap { max-width: 1920px; margin: 0 auto; }
+  .wrap { max-width: 2200px; margin: 0 auto; }
 
-  .header-row {
-    display: flex;
-    align-items: flex-start;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px 16px;
-    margin-bottom: 12px;
-  }
-  .header-title { flex: 0 1 auto; min-width: 0; }
-  h1 {
-    font-size: 20px;
-    font-weight: 600;
-    margin: 0 0 4px;
-  }
-  .subtitle {
-    color: var(--text-secondary);
-    font-size: 13px;
-    margin: 0;
-  }
-  .header-toolbars {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex: 1 1 500px;
-    max-width: 1150px;
-    min-width: 0;
-  }
-
-  .toolbar {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 0;
-    padding: 12px 14px;
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-  }
-  .toolbar .status {
-    font-size: 13px;
-    color: var(--text-secondary);
-    margin-right: auto;
-  }
-  .autorefresh-status {
-    font-size: 12px;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    white-space: nowrap;
-    padding: 3px 9px;
-    border-radius: 999px;
-    background: var(--page-plane);
-    border: 1px solid var(--border);
-  }
-  .autorefresh-status .pulse {
-    display: inline-block;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    background: #0ca30c;
-    flex: none;
-    animation: autorefresh-pulse 1.6s ease-in-out infinite;
-  }
-  @keyframes autorefresh-pulse {
-    0%, 100% { opacity: 0.35; transform: scale(0.85); }
-    50% { opacity: 1; transform: scale(1); }
-  }
-  .autorefresh-status.just-updated {
-    color: #0ca30c;
-    border-color: #0ca30c;
-  }
-  .dot {
-    display: inline-block;
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--text-muted);
-    margin-right: 6px;
-    vertical-align: middle;
-    flex: none;
-  }
-  .dot.ok { background: #0ca30c; }
-  .dot.err { background: #d03b3b; }
-  .dot.pending { background: #eda100; }
-
-  button, a.btn {
+  button {
     font: inherit;
     font-size: 13px;
     padding: 7px 12px;
@@ -170,13 +86,28 @@
     background: var(--page-plane);
     color: var(--text-primary);
     cursor: pointer;
-    text-decoration: none;
-    display: inline-block;
   }
-  button:hover, a.btn:hover { filter: brightness(0.97); }
-  @media (prefers-color-scheme: dark) {
-    button:hover, a.btn:hover { filter: brightness(1.15); }
+  button:hover { filter: brightness(0.97); }
+  @media (prefers-color-scheme: dark) { button:hover { filter: brightness(1.15); } }
+
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--text-muted); margin-right: 6px; vertical-align: middle; flex: none; }
+  .dot.ok { background: #0ca30c; }
+  .dot.err { background: #d03b3b; }
+  .dot.pending { background: #eda100; }
+
+  .autorefresh-status {
+    font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; white-space: nowrap;
+    padding: 3px 9px; border-radius: 999px; background: var(--page-plane); border: 1px solid var(--border);
   }
+  .autorefresh-status .pulse {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #0ca30c; flex: none;
+    animation: autorefresh-pulse 1.6s ease-in-out infinite;
+  }
+  @keyframes autorefresh-pulse {
+    0%, 100% { opacity: 0.35; transform: scale(0.85); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+  .autorefresh-status.just-updated { color: #0ca30c; border-color: #0ca30c; }
 
   .error-banner {
     display: none;
@@ -189,353 +120,742 @@
   }
   .error-banner.show { display: block; }
 
-  .sites-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 10px;
+  /* ===================== 全体レイアウト: 上部ヘッダー + 左サイドバー + メインコンテンツ ===================== */
+  .top-header {
+    padding: 4px 8px 16px;
+    border-bottom: 1px solid var(--border);
     margin-bottom: 16px;
   }
-  @media (max-width: 1900px) { .sites-grid { grid-template-columns: repeat(5, 1fr); } }
-  @media (max-width: 1400px) { .sites-grid { grid-template-columns: repeat(3, 1fr); } }
-  @media (max-width: 900px) { .sites-grid { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 640px) { .sites-grid { grid-template-columns: 1fr; } }
+  .top-header h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
+  .top-header .subtitle { color: var(--text-secondary); font-size: 12px; margin: 0; line-height: 1.5; }
 
-  .card {
+  .app-layout { display: flex; align-items: flex-start; gap: 16px; }
+
+  .sidebar {
+    flex: 0 0 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     background: var(--surface-1);
     border: 1px solid var(--border);
     border-radius: 10px;
-    padding: 10px 12px 10px;
-    min-width: 0;
-    overflow: hidden;
+    padding: 12px 10px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    position: sticky;
+    top: 24px;
   }
-  .card.state-warn {
-    border: 3px solid var(--warn-border);
-    background: var(--warn-bg);
-    padding: 8px 10px 8px;
+  .sidebar-title { padding: 2px 8px 12px; }
+  .sidebar-title h1 { font-size: 18px; font-weight: 700; margin: 0 0 4px; }
+  .sidebar-title .subtitle { color: var(--text-secondary); font-size: 12px; margin: 0; line-height: 1.5; }
+
+  .river-menu-title { font-size: 12px; font-weight: 600; color: var(--text-secondary); padding: 8px 8px 6px; }
+  .river-menu-group { display: flex; flex-direction: column; }
+  .river-menu-btn {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    width: 100%; text-align: left; font: inherit; font-size: 13px;
+    padding: 9px 10px; border-radius: 8px; border: 1px solid transparent;
+    background: transparent; color: var(--text-primary); cursor: pointer;
   }
-  .card.state-critical {
-    border: 3px solid var(--critical-border);
-    background: var(--critical-bg);
-    padding: 8px 10px 8px;
+  .river-menu-btn:hover { background: var(--page-plane); }
+  .river-menu-btn.active { background: var(--series-pv); color: #fff; font-weight: 600; }
+  .river-menu-count { font-size: 11px; color: var(--text-muted); flex: none; }
+  .river-menu-btn.active .river-menu-count { color: rgba(255,255,255,0.85); }
+  .all-sites-menu-btn { font-weight: 700; margin-bottom: 4px; }
+  .river-menu-sep { height: 1px; background: var(--border); margin: 6px 4px 8px; }
+
+  .river-menu-sites {
+    display: flex; flex-direction: column; gap: 1px;
+    margin: 2px 0 6px 10px; padding-left: 8px; border-left: 2px solid var(--border);
   }
-  .bat-alert-line {
-    display: none;
-    align-items: center;
-    gap: 5px;
-    font-size: 11px;
-    font-weight: 600;
-    margin-top: 6px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    line-height: 1.3;
+  .river-menu-site-btn {
+    display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+    font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid transparent; background: transparent; color: var(--text-secondary);
+    cursor: pointer; line-height: 1.3;
   }
-  .card.state-warn .bat-alert-line {
-    display: flex;
-    color: var(--warn-border);
-    background: rgba(237,161,0,0.16);
+  .river-menu-site-btn:hover { background: var(--page-plane); color: var(--text-primary); }
+  .river-menu-site-btn.selected { background: var(--page-plane); color: var(--series-bat); font-weight: 700; }
+
+  /* データダウンロード配下のサブメニュー(河川ツリーの拠点ボタンと同じ見た目、常時展開) */
+  .download-menu-sites {
+    display: flex; flex-direction: column; gap: 1px;
+    margin: 2px 0 6px 10px; padding-left: 8px; border-left: 2px solid var(--border);
   }
-  .card.state-critical .bat-alert-line {
-    display: flex;
-    color: var(--critical-border);
-    background: rgba(208,59,59,0.16);
+  .download-menu-btn {
+    display: flex; align-items: center; gap: 6px; width: 100%; text-align: left;
+    font: inherit; font-size: 12px; padding: 6px 8px; border-radius: 6px;
+    border: 1px solid transparent; background: transparent; color: var(--text-secondary);
+    cursor: pointer; line-height: 1.3;
   }
-  .site-card-header {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: 8px;
-    margin-bottom: 3px;
-    min-width: 0;
+  .download-menu-btn:hover { background: var(--page-plane); color: var(--text-primary); }
+  .download-menu-btn.selected { background: var(--page-plane); color: var(--series-bat); font-weight: 700; }
+
+  .app-content { flex: 1 1 auto; min-width: 0; }
+  .view-section { display: none; }
+  .view-section.show { display: block; }
+
+  .header-row { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: 10px 16px; margin-bottom: 12px; }
+  .header-title { flex: 0 1 auto; min-width: 0; }
+  h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px; }
+  h2.view-title { font-size: 20px; font-weight: 600; margin: 0 0 8px; }
+  .subtitle { color: var(--text-secondary); font-size: 13px; margin: 0; }
+  .header-toolbars { display: flex; flex-direction: column; gap: 8px; flex: 1 1 600px; max-width: 1650px; min-width: 0; }
+
+  .toolbar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 10px;
+    padding: 12px 14px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
   }
-  .site-card-header .site-title-wrap {
-    min-width: 0;
-  }
-  .site-card-header h2 {
-    font-size: 13px;
-    font-weight: 600;
-    margin: 0;
-  }
-  .site-card-header a.site-link {
-    font-size: 10px;
-    color: var(--text-muted);
-    text-decoration: none;
-    display: block;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 220px;
-  }
-  .site-card-header a.site-link:hover { text-decoration: underline; }
-  .site-status {
-    font-size: 11px;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    min-width: 0;
-    flex: 0 1 auto;
-    justify-content: flex-end;
-  }
-  .site-status .status-text {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    min-width: 0;
+  .toolbar .status { font-size: 13px; color: var(--text-secondary); margin-right: auto; }
+  .toolbar .checkbox-label { font-size: 13px; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+
+  .notice-banner {
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--text-primary);
+    border-radius: 10px; padding: 10px 14px; font-size: 12px; line-height: 1.7; margin-bottom: 16px;
   }
 
-  .chart-legend {
-    display: flex;
-    gap: 12px;
-    font-size: 11px;
-    color: var(--text-secondary);
-    margin-bottom: 2px;
-    min-width: 0;
-    overflow: hidden;
+  footer { color: var(--text-muted); font-size: 12px; margin-top: 8px; line-height: 1.7; }
+
+  /* ===================== 電源監視グリッド ===================== */
+  .grid-power {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 16px;
   }
-  .chart-legend .legend-item {
-    display: flex;
-    align-items: center;
-    gap: 5px;
-    white-space: nowrap;
-    flex: 0 1 auto;
-    overflow: hidden;
-    text-overflow: ellipsis;
+  @media (max-width: 1500px) { .grid-power { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 1000px) { .grid-power { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 640px) { .grid-power { grid-template-columns: 1fr; } }
+
+  .card {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
+    padding: 10px 12px 10px; min-width: 0; overflow: hidden;
   }
+  .card.state-warn { border: 3px solid var(--warn-border); background: var(--warn-bg); padding: 8px 10px 8px; }
+  .card.state-critical { border: 3px solid var(--critical-border); background: var(--critical-bg); padding: 8px 10px 8px; }
+  .bat-alert-line {
+    display: none; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
+    margin-top: 6px; padding: 4px 8px; border-radius: 6px; line-height: 1.3;
+  }
+  .card.state-warn .bat-alert-line { display: flex; color: var(--warn-border); background: rgba(237,161,0,0.16); }
+  .card.state-critical .bat-alert-line { display: flex; color: var(--critical-border); background: rgba(208,59,59,0.16); }
+
+  .site-card-header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 3px; min-width: 0; }
+  .site-card-header .site-title-wrap { min-width: 0; }
+  .site-card-header h2 { font-size: 13px; font-weight: 600; margin: 0; }
+  .site-card-header a.site-link {
+    font-size: 10px; color: var(--text-muted); text-decoration: none; display: block;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
+  }
+  .site-card-header a.site-link:hover { text-decoration: underline; }
+  .site-status { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; justify-content: flex-end; }
+  .site-status .status-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+
+  .chart-legend { display: flex; gap: 12px; font-size: 11px; color: var(--text-secondary); margin-bottom: 2px; min-width: 0; overflow: hidden; }
+  .chart-legend .legend-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
   .chart-legend .legend-line { width: 12px; height: 2px; display: inline-block; border-radius: 1px; flex: none; }
 
   .chart-box { position: relative; height: 150px; min-width: 0; }
 
-  .mini-stats {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    margin-top: 4px;
-    margin-bottom: 6px;
-    padding-bottom: 6px;
-    border-bottom: 1px solid var(--gridline);
-  }
+  .mini-stats { display: flex; align-items: center; gap: 16px; margin-top: 4px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--gridline); }
   .mini-stats .site-thumb {
-    margin-left: auto;
-    max-width: 100px;
-    max-height: 100px;
-    width: auto;
-    height: auto;
-    object-fit: contain;
-    border-radius: 6px;
-    border: 1px solid var(--border);
-    box-shadow: 0 2px 6px rgba(0,0,0,0.18);
-    cursor: pointer;
-    opacity: 0.96;
+    margin-left: auto; max-width: 100px; max-height: 100px; width: auto; height: auto;
+    object-fit: contain; border-radius: 6px; border: 1px solid var(--border);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.18); cursor: pointer; opacity: 0.96;
   }
   .mini-stats .site-thumb:hover { opacity: 1; }
-  .mini-stats .stat-label {
-    font-size: 10px;
-    color: var(--text-secondary);
-    display: flex;
-    align-items: center;
-    gap: 4px;
-  }
+  .mini-stats .stat-label { font-size: 10px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
   .mini-stats .swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
-  .mini-stats .stat-value {
-    font-size: 16px;
-    font-weight: 600;
-    margin-top: 1px;
-    font-variant-numeric: proportional-nums;
-  }
+  .mini-stats .stat-value { font-size: 16px; font-weight: 600; margin-top: 1px; font-variant-numeric: proportional-nums; }
   .mini-stats .stat-value .unit { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
   .mini-stats .stat-delta { font-size: 10px; color: var(--text-secondary); }
 
   .table-section { display: none; }
   .table-section.show { display: block; }
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    font-size: 13px;
-    background: var(--surface-1);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    overflow: hidden;
-  }
-  thead th {
-    text-align: left;
-    font-weight: 600;
-    color: var(--text-secondary);
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--gridline);
-    position: sticky; top: 0;
-    background: var(--surface-1);
-  }
-  tbody td {
-    padding: 6px 12px;
-    border-bottom: 1px solid var(--gridline);
-    font-variant-numeric: tabular-nums;
-    color: var(--text-primary);
-  }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  thead th { text-align: left; font-weight: 600; color: var(--text-secondary); padding: 8px 12px; border-bottom: 1px solid var(--gridline); position: sticky; top: 0; background: var(--surface-1); }
+  tbody td { padding: 6px 12px; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; color: var(--text-primary); }
   .table-scroll { max-height: 360px; overflow-y: auto; border-radius: 10px; margin-bottom: 16px; }
 
-  footer {
-    color: var(--text-muted);
-    font-size: 12px;
-    margin-top: 8px;
-    line-height: 1.7;
+  /* ===================== 全拠点マップ / 河川パネル ===================== */
+  .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px; min-width: 0; }
+  .panel-title { font-size: 20px; font-weight: 600; margin: 0 0 8px; color: var(--text-primary); }
+  .panel-sub { font-size: 12px; color: var(--text-secondary); margin: -4px 0 10px; }
+  .map-box { width: 100%; height: 320px; border-radius: 8px; overflow: hidden; }
+  .map-box.all-sites-map { height: 70vh; min-height: 480px; }
+
+  .all-sites-map-panel { display: flex; flex-direction: column; height: calc(100vh - 130px); min-height: 560px; }
+  .all-sites-map-panel .map-box { flex: 1 1 auto; height: auto; }
+
+  .river-panels { display: flex; align-items: stretch; gap: 12px; }
+  .river-map-panel { flex: 0 0 380px; display: flex; flex-direction: column; height: calc(100vh - 170px); min-height: 560px; }
+  .river-map-panel .map-box { flex: 1 1 auto; height: auto; }
+  .river-list-panel { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; height: calc(100vh - 170px); min-height: 560px; }
+  .river-list-panel .site-order-list { flex: 1 1 auto; overflow-y: auto; padding-right: 4px; }
+
+  .site-marker-wrap { position: relative; width: 26px; height: 26px; }
+  .site-marker-badge {
+    position: absolute; inset: 0; border-radius: 50%; background: #2a78d6; color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700;
+    border: 2px solid #fff; box-shadow: 0 1px 4px rgba(0,0,0,0.35); z-index: 2;
   }
+  .site-marker-pulse { position: absolute; inset: -9px; border-radius: 50%; background: rgba(235,104,52,0.55); opacity: 0; transform: scale(0.55); z-index: 1; pointer-events: none; }
+  .site-marker-wrap.selected .site-marker-badge { background: var(--series-bat); box-shadow: 0 0 0 3px #fff, 0 2px 8px rgba(0,0,0,0.45); }
+  .site-marker-wrap.selected .site-marker-pulse { animation: site-marker-pulse-anim 1.5s ease-out infinite; }
+  @keyframes site-marker-pulse-anim {
+    0%   { opacity: 0.55; transform: scale(0.55); }
+    70%  { opacity: 0; transform: scale(1.7); }
+    100% { opacity: 0; transform: scale(1.7); }
+  }
+  .site-tooltip {
+    font-size: 10px; font-weight: 600; padding: 2px 6px; background: rgba(255,255,255,0.92);
+    border: 1px solid var(--border); color: #0b1c24; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+  }
+
+  .site-order-list { display: flex; flex-direction: column; gap: 10px; }
+  .site-order-item {
+    display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 12px;
+    border: 1px solid var(--border); border-radius: 10px; background: var(--page-plane);
+    outline: 0 solid transparent; outline-offset: 2px; transition: outline-color 0.2s, background 0.2s; cursor: pointer;
+  }
+  .site-order-item.jump-highlight { outline: 3px solid var(--series-bat); background: var(--surface-1); }
+  .site-order-badge { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--series-pv); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+  .site-order-body { flex: 1 1 170px; min-width: 150px; }
+  .site-order-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
+  .site-order-coords { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  .site-media-col { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+  .site-media-caption { font-size: 10px; color: var(--text-muted); }
+  .site-media { width: 106px; height: 62px; border-radius: 6px; overflow: hidden; background: #10222b; }
+  .site-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .mini-chart-box { width: 148px; height: 62px; border-radius: 6px; overflow: hidden; background: var(--surface-1); border: 1px solid var(--gridline); position: relative; }
+  .mini-chart-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--text-muted); text-align: center; padding: 4px; }
+
+  .site-order-link {
+    flex: none; font-size: 12px; font-weight: 600; color: var(--series-pv); text-decoration: none;
+    border: 1px solid var(--series-pv); border-radius: 8px; padding: 6px 10px; white-space: nowrap; background: none; cursor: pointer;
+  }
+  .site-order-link:hover { background: var(--series-pv); color: #fff; }
+  .flow-arrow { text-align: center; color: var(--text-muted); font-size: 13px; margin: -4px 0; }
+
+  @media (max-width: 1100px) {
+    .river-panels { flex-direction: column; }
+    .river-map-panel, .river-list-panel { flex: 0 0 auto; height: auto; min-height: 0; }
+    .river-map-panel .map-box { height: 320px; }
+    .river-list-panel .site-order-list { overflow-y: visible; }
+    .all-sites-map-panel { height: auto; min-height: 0; }
+    .all-sites-map-panel .map-box { height: 420px; }
+  }
+
+  /* ===================== 拠点詳細ビュー ===================== */
+  .top-row, .bottom-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .bottom-row { margin-top: 12px; }
+  .bottom-row .chart-panel { grid-column: span 2; }
+  .bottom-row .list-panel { grid-column: span 1; min-width: 0; }
+  @media (max-width: 1300px) {
+    .top-row { grid-template-columns: 1fr 1fr; }
+    .top-row .map-panel { grid-column: span 2; }
+    .bottom-row { grid-template-columns: 1fr; }
+    .bottom-row .chart-panel, .bottom-row .list-panel { grid-column: span 1; }
+  }
+  @media (max-width: 900px) {
+    .top-row { grid-template-columns: 1fr; }
+    .top-row .map-panel { grid-column: span 1; }
+  }
+  .image-frame { width: 100%; aspect-ratio: 16 / 9; background: #10222b; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+  .image-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .panel-caption { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+
+  .water-now { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--gridline); }
+  .water-now-label { font-size: 12px; color: var(--text-secondary); }
+  .water-now-value { font-size: 26px; font-weight: 700; font-variant-numeric: proportional-nums; }
+  .water-now-value .unit { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
+  .water-now-delta { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
+
+  .data-list-scroll { height: 220px; overflow-y: auto; border: 1px solid var(--gridline); border-radius: 8px; }
+  table.data-list-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  table.data-list-table thead th { position: sticky; top: 0; text-align: left; font-weight: 600; color: var(--text-secondary); background: var(--surface-1); padding: 6px 8px; border-bottom: 1px solid var(--gridline); }
+  table.data-list-table tbody td { padding: 5px 8px; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
+  table.data-list-table tbody tr:first-child td { font-weight: 700; color: var(--series-pv); }
+  .data-list-empty { padding: 12px 8px; font-size: 12px; color: var(--text-muted); }
+
+  /* ===================== ライブカメラ一覧 / 水位グラフ一覧 ===================== */
+  .grid-cam { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 1500px) { .grid-cam { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 1000px) { .grid-cam { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  { .grid-cam { grid-template-columns: 1fr; } }
+
+  .grid-graph { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-top: 16px; }
+  @media (max-width: 1700px) { .grid-graph { grid-template-columns: repeat(3, 1fr); } }
+  @media (max-width: 1200px) { .grid-graph { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px)  { .grid-graph { grid-template-columns: 1fr; } }
+
+  .simple-card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px 12px; min-width: 0; }
+  .simple-card .site-card-header { margin-bottom: 6px; }
+  .card-caption { display: block; text-decoration: none; color: var(--text-muted); font-size: 11px; margin-top: 6px; background: none; border: none; padding: 0; text-align: left; cursor: pointer; }
+  .graph-box { position: relative; height: 190px; min-width: 0; }
 </style>
 </head>
 <body>
-<div class="viz-root wrap">
-
-  <div class="header-row">
-    <div class="header-title">
-      <h1>三島カメラ 電源監視ダッシュボード</h1>
-      <p class="subtitle" id="subtitleText">読み込み中…</p>
-    </div>
-    <div class="header-toolbars">
-      <div class="toolbar">
-        <div class="status" id="statusText"><span class="dot pending" id="statusDot"></span>読み込み中…</div>
-        <div class="autorefresh-status" id="autoRefreshInfo">自動更新: 待機中…</div>
-        <button id="refreshBtn">最新データを再読み込み</button>
-        <button id="tableBtn">表で表示</button>
-        <a class="btn" id="csvLink" href="data/history.csv" download="mishima_power_history.csv">CSV全履歴をダウンロード</a>
+<div class="wrap">
+  <header class="top-header" id="topHeader">
+    <div class="header-row" style="margin-bottom:0;">
+      <div class="header-title">
+        <h1>水位・電源監視ダッシュボード（Web版）</h1>
+        <p class="subtitle" id="subtitleText">サーバー(GitHub Actions)が5分ごと(ベストエフォート)に全拠点の電源(PV/BAT)と水位を自動取得・記録しています</p>
+      </div>
+      <div class="header-toolbars">
+        <div class="toolbar">
+          <div class="status" id="globalStatusText"><span class="dot pending" id="globalStatusDot"></span>読み込み中…</div>
+          <div class="autorefresh-status" id="autoRefreshInfo">自動更新: 待機中…</div>
+          <button id="globalRefreshBtn">最新データを再読み込み</button>
+        </div>
       </div>
     </div>
+  </header>
+  <div class="app-layout">
+    <nav class="sidebar" id="sidebar">
+      <button type="button" class="river-menu-btn all-sites-menu-btn sidebar-toplevel" id="allSitesMenuBtn">🗺️ 全拠点（マップ）</button>
+      <button type="button" class="river-menu-btn all-sites-menu-btn sidebar-toplevel" id="powerMenuBtn">⚡ 電源監視</button>
+      <button type="button" class="river-menu-btn all-sites-menu-btn sidebar-toplevel" id="camlistMenuBtn">📷 ライブカメラ一覧</button>
+      <button type="button" class="river-menu-btn all-sites-menu-btn sidebar-toplevel" id="graphlistMenuBtn">📈 水位変化グラフ一覧</button>
+      <div class="river-menu-sep"></div>
+      <div class="river-menu-title sidebar-toplevel">河川別拠点一覧（上流→下流）</div>
+      <div id="riverTreeContainer"></div>
+      <div class="river-menu-sep"></div>
+      <div class="river-menu-title sidebar-toplevel">データダウンロード</div>
+      <div id="downloadTreeContainer">
+        <div class="download-menu-sites">
+          <button type="button" class="download-menu-btn" id="voltageDataMenuBtn">電圧データ</button>
+          <button type="button" class="download-menu-btn" id="waterDataMenuBtn">水位データ</button>
+          <button type="button" class="download-menu-btn" id="imageDataMenuBtn">画像データ</button>
+        </div>
+      </div>
+    </nav>
+
+    <main class="app-content" id="appContent">
+      <div class="error-banner" id="errorBanner"></div>
+
+      <!-- ============ 電源監視 ============ -->
+      <div class="view-section show" id="view-power">
+        <div class="header-row">
+          <div class="header-title">
+            <h1 class="view-title">⚡ 電源監視</h1>
+            <p class="subtitle" id="powerSubtitle">拠点をサーバー(GitHub Actions)が5分間隔(ベストエフォート)で自動取得・mV → V に換算（この画面は約1分ごとにサーバーの最新値を再取得します）</p>
+          </div>
+          <div class="header-toolbars">
+            <div class="toolbar">
+              <div class="status" id="statusText"><span class="dot pending" id="statusDot"></span>読み込み中…</div>
+              <button id="refreshBtn">全拠点を今すぐ更新</button>
+              <button id="tableBtn">表で表示</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid-power" id="sitesGrid"></div>
+
+        <div class="table-section" id="tableSection">
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr><th>拠点</th><th>取得時刻</th><th>機器の計測時刻</th><th>PV (V)</th><th>BAT (V)</th><th>水位 (m)</th><th>取得方法</th></tr>
+              </thead>
+              <tbody id="tableBody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <footer>
+          このダッシュボードはサーバー(GitHub Actions)側で5分間隔(ベストエフォート)に全27拠点のデータを自動取得し、そのままGitHub Pagesで公開しています。ブラウザを開いていなくてもサーバー側で記録が続くため、どのパソコン・スマートフォンからこのページを開いても同じ最新データ・同じ履歴を確認できます。<br>
+          画面は開いたままにしておくだけで、約1分ごとに自動でサーバーの最新データを再取得して表示を更新します(ヘッダーの「自動更新」表示で動作中かご確認いただけます)。他のタブを見ていて戻ってきたときも自動的に最新化されます。「全拠点を今すぐ更新」ボタンで手動更新もできます(いずれもサーバー側の取得自体を今すぐ実行するものではありません)。<br>
+          グラフは直近24時間分のみを表示します。全期間の記録は「表で表示」、または「データダウンロード → 電圧データ/水位データ」からご確認いただけます。<br>
+          バッテリー電圧が12.0V以下になった拠点は黄色の枠(注意)、11.5V以下になった拠点は赤色の枠(緊急・機器が動作停止する恐れのある電圧域)で強調表示されます。
+        </footer>
+      </div>
+
+      <!-- ============ 全拠点マップ ============ -->
+      <div class="view-section" id="view-allmap">
+        <div class="panel all-sites-map-panel">
+          <h2 class="panel-title">■ 全拠点マップ</h2>
+          <p class="panel-sub" id="allSitesMapSub">全拠点の位置を表示します。マーカーを押すと、その拠点の詳細へ移動します。</p>
+          <div class="map-box all-sites-map" id="allSitesMap"></div>
+        </div>
+      </div>
+
+      <!-- ============ 河川パネル ============ -->
+      <div class="view-section" id="view-river">
+        <div class="notice-banner">
+          ご注意: 上流→下流の並び順は、各拠点の緯度（北側＝上流方向、南側＝下流方向）から機械的に推定したものであり、実際の河川の流路・正式な水系データに基づくものではありません。地図上の拠点間の線も上流→下流の順に拠点を滑らかに結んだ参考線です。
+        </div>
+        <div class="river-panels">
+          <div class="panel river-map-panel">
+            <h2 class="panel-title" id="riverTitle">■ 河川を選択してください</h2>
+            <p class="panel-sub" id="riverSub"></p>
+            <div class="map-box" id="riverMap"></div>
+          </div>
+          <div class="panel river-list-panel">
+            <h2 class="panel-title">■ 上流 → 下流（拠点一覧）</h2>
+            <div class="site-order-list" id="siteOrderList"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ 拠点詳細 ============ -->
+      <div class="view-section" id="view-site">
+        <h2 class="panel-title" id="siteDetailTitle">■ 拠点詳細</h2>
+        <div class="top-row">
+          <div class="panel">
+            <h2 class="panel-title">■ ライブカメラ映像</h2>
+            <div class="image-frame"><img id="liveImg" alt="ライブカメラ映像"></div>
+            <div class="panel-caption" id="liveCaption">取得中…</div>
+          </div>
+          <div class="panel">
+            <h2 class="panel-title">■ 正常時映像</h2>
+            <div class="image-frame"><img id="normalImg" alt="正常時映像"></div>
+            <div class="panel-caption">水DXサイト（河川水位・画像情報一覧）掲載の参考画像です</div>
+          </div>
+          <div class="panel map-panel">
+            <h2 class="panel-title">■ 拠点位置（他拠点も表示・選択中を強調）</h2>
+            <div id="siteMap" class="map-box"></div>
+          </div>
+        </div>
+        <div class="bottom-row">
+          <div class="panel chart-panel">
+            <h2 class="panel-title">■ 水位変化グラフ（直近24時間）</h2>
+            <div class="water-now">
+              <div class="water-now-label">現在水位</div>
+              <div class="water-now-value" id="waterNowValue">–<span class="unit">m</span></div>
+              <div class="water-now-delta" id="waterNowDelta">&nbsp;</div>
+            </div>
+            <div class="chart-box" id="waterChart" style="height:220px"></div>
+          </div>
+          <div class="panel list-panel">
+            <h2 class="panel-title">■ 取得データ一覧（5分毎）</h2>
+            <div class="data-list-scroll">
+              <table class="data-list-table">
+                <thead><tr><th>日時</th><th>水位(m)</th></tr></thead>
+                <tbody id="dataListBody"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ============ ライブカメラ一覧 ============ -->
+      <div class="view-section" id="view-camlist">
+        <div class="header-row">
+          <div class="header-title">
+            <h1 class="view-title">📷 ライブカメラ一覧</h1>
+            <p class="subtitle" id="camlistSubtitle">全拠点のライブカメラ映像のみを一覧表示します（5分ごとに自動更新）。</p>
+          </div>
+          <div class="toolbar">
+            <span id="camlistStatusText">読み込み中…</span>
+            <button id="camlistRefreshBtn">全拠点を今すぐ更新</button>
+          </div>
+        </div>
+        <div class="grid-cam" id="camGrid"></div>
+      </div>
+
+      <!-- ============ 水位変化グラフ一覧 ============ -->
+      <div class="view-section" id="view-graphlist">
+        <div class="header-row">
+          <div class="header-title">
+            <h1 class="view-title">📈 水位変化グラフ一覧</h1>
+            <p class="subtitle" id="graphlistSubtitle">全拠点の水位変化グラフのみを一覧表示します（サーバーが5分間隔で自動取得。破線は基準(最低)水位です）。</p>
+          </div>
+          <div class="toolbar">
+            <span id="graphlistStatusText">読み込み中…</span>
+            <button id="graphlistRefreshBtn">全拠点を今すぐ更新</button>
+          </div>
+        </div>
+        <div class="notice-banner" id="forecastDisclaimer">
+          ご注意（予測表示について）: 各カードの「6時間後（参考）」「12時間後（参考）」は、AIによる予測ではなく、各拠点自身の直近水位の単純な統計的トレンド（最小二乗法による線形外挿）に、気象庁(JMA)公開のAMeDAS観測点の直近降水量から算出した簡易な補正係数を掛け合わせただけの参考値です。公式の予測・避難判断には使用しないでください。
+        </div>
+        <div class="grid-graph" id="graphGrid"></div>
+      </div>
+
+      <!-- ============ データダウンロード: 電圧データ ============ -->
+      <div class="view-section" id="view-voltagedata">
+        <div class="header-row">
+          <div class="header-title">
+            <h1 class="view-title">💾 電圧データ</h1>
+            <p class="subtitle">サーバー(GitHub Actions)が5分間隔(ベストエフォート)で記録したPV/BAT電圧の履歴です。全期間の記録はCSVで直接ダウンロードできます。</p>
+          </div>
+          <div class="header-toolbars">
+            <div class="toolbar">
+              <div class="status" id="voltageDataStatusText">直近の取得状況を表示しています。</div>
+              <button id="voltageTableBtn">表で表示（全履歴）</button>
+              <a class="btn" id="voltageCsvLink" href="data/history.csv" download="mishima_dashboard_history.csv">CSV全履歴をダウンロード</a>
+            </div>
+          </div>
+        </div>
+        <div class="table-section show" id="voltageTableSection">
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>拠点</th><th>取得時刻</th><th>機器の計測時刻</th><th>PV (V)</th><th>BAT (V)</th><th>取得方法</th></tr></thead>
+              <tbody id="voltageTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <footer>
+          このCSVはサーバー側(GitHub Actions)が全拠点分をまとめて自動的に記録した履歴ファイルそのものです。ブラウザ側でCSVを組み立て直す処理は行っていません。「表で表示」は直近の取得データに加え、押した時点で全期間の履歴(data/history.csv)を読み込んで一覧表示します。旧バージョンにあったFile System Access APIによるローカルの履歴ファイル連携機能は、この構成では不要になったため削除しています。
+        </footer>
+      </div>
+
+      <!-- ============ データダウンロード: 水位データ ============ -->
+      <div class="view-section" id="view-waterdata">
+        <div class="header-row">
+          <div class="header-title">
+            <h1 class="view-title">💧 水位データ</h1>
+            <p class="subtitle" id="waterDataSubtitle">サーバーが5分間隔(ベストエフォート)で蓄積した水位測定値の履歴です。全期間の記録はCSVで直接ダウンロードできます。</p>
+          </div>
+          <div class="toolbar">
+            <div class="status" id="waterDataStatusText">件数: 0件</div>
+            <button id="waterTableBtn">表で表示（全履歴）</button>
+            <a class="btn" id="waterCsvLink" href="data/history.csv" download="mishima_dashboard_history.csv">CSV全履歴をダウンロード</a>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr><th>拠点</th><th>取得時刻</th><th>機器の計測時刻</th><th>水位 (m)</th></tr>
+            </thead>
+            <tbody id="waterTableBody"></tbody>
+          </table>
+        </div>
+        <footer>
+          このデータは水位監視26拠点(電源専用のうるおい広場（大場川 / 東町）は対象外)を対象に、サーバー(GitHub Actions)が5分間隔(ベストエフォート)で取得したものです。CSVはサーバー側の履歴ファイル(data/history.csv、PV/BATと共通)をそのままダウンロードします。「表で表示（全履歴）」を押すと全期間の履歴を読み込んで一覧を更新します。
+        </footer>
+      </div>
+
+      <!-- ============ データダウンロード: 画像データ ============ -->
+      <div class="view-section" id="view-imagedata">
+        <div class="header-row">
+          <div class="header-title">
+            <h1 class="view-title">🖼️ 画像データ</h1>
+            <p class="subtitle">拠点と期間を指定し、このダッシュボードが実際に取得できたカメラ画像をまとめてダウンロードできます。</p>
+          </div>
+        </div>
+        <div class="notice-banner" id="imageDataDisclaimer">
+          ご注意: 各拠点のカメラURLは常にその時点の最新画像を返す仕組みのため、過去の任意時点の画像を後から取得することはできません。このアーカイブは、このダッシュボードのタブを開いてポーリングが実際に行われていた間に取得できた画像だけを、ブラウザのメモリ上に一時的に保存したものです（拠点ごと最大300枚、または直近48時間分のいずれか少ない方まで）。タブを閉じる/再読み込みすると失われ、正式な過去画像アーカイブの代わりにはなりません。
+        </div>
+        <div class="toolbar">
+          <label for="imageDataSiteSelect" style="font-size:13px;color:var(--text-secondary);">拠点:</label>
+          <select id="imageDataSiteSelect"></select>
+          <label for="imageDataStart" style="font-size:13px;color:var(--text-secondary);">開始日時:</label>
+          <input type="datetime-local" id="imageDataStart">
+          <label for="imageDataEnd" style="font-size:13px;color:var(--text-secondary);">終了日時:</label>
+          <input type="datetime-local" id="imageDataEnd">
+          <button id="imageDataDownloadBtn">ダウンロード</button>
+        </div>
+        <div class="toolbar">
+          <div class="status" id="imageDataStatusText">拠点を選択してください。</div>
+        </div>
+        <div id="imageDataMessage" style="font-size:12px;color:var(--text-secondary);margin-top:4px;min-height:1em;"></div>
+      </div>
+
+    </main>
   </div>
-
-  <div class="error-banner" id="errorBanner"></div>
-
-  <div class="sites-grid" id="sitesGrid"></div>
-
-  <div class="table-section" id="tableSection">
-    <div class="table-scroll">
-      <table>
-        <thead>
-          <tr><th>拠点</th><th>取得時刻</th><th>機器の計測時刻</th><th>PV (V)</th><th>BAT (V)</th><th>取得方法</th></tr>
-        </thead>
-        <tbody id="tableBody"></tbody>
-      </table>
-    </div>
-  </div>
-
-  <footer>
-    このダッシュボードはサーバー(GitHub Actions)側で5分間隔(ベストエフォート)に全拠点のデータを自動取得し、そのままGitHub Pagesで公開しています。ブラウザを開いていなくてもサーバー側で記録が続くため、どのパソコン・スマートフォンからこのページを開いても同じ最新データ・同じ履歴を確認できます。<br>
-    画面は開いたままにしておくだけで、約1分ごとに自動でサーバーの最新データを再取得して表示を更新します(ツールバーの「自動更新」表示で動作中かご確認いただけます)。他のタブを見ていて戻ってきたときも自動的に最新化されます。「最新データを再読み込み」ボタンで手動更新もできます(いずれもサーバー側の取得自体を今すぐ実行するものではありません)。<br>
-    グラフは直近24時間分のみを表示します。全期間の記録は「表で表示」、または「CSV全履歴をダウンロード」からご確認いただけます。<br>
-    バッテリー電圧グラフの破線は定格電圧(12.5V)の目安線です。<br>
-    各拠点カード下段・右側に表示される小さな画像は、取得元ページ下部の読取画像です(クリックで拡大表示)。取得元のページ構造が想定と異なる場合は表示されないことがあります。<br>
-    バッテリー電圧が12.0V以下になった拠点は黄色の枠(注意)、11.5V以下になった拠点は赤色の枠(緊急・機器が動作停止する恐れのある電圧域)で強調表示されます。
-  </footer>
-
 </div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script>
 (function () {
   "use strict";
 
-  var SITES = [
-    { id: "cam01", name: "三島カメラ01", url: "https://matsuhisa.info/mishima-cam01/test.cgi" },
-    { id: "cam02", name: "三島カメラ02", url: "https://matsuhisa.info/mishima-cam02/test.cgi" },
-    { id: "cam03", name: "三島カメラ03", url: "https://matsuhisa.info/mishima-cam03/test.cgi" },
-    { id: "cam04", name: "三島カメラ04", url: "https://matsuhisa.info/mishima-cam04/test.cgi" },
-    { id: "cam08", name: "三島カメラ08", url: "https://matsuhisa.info/mishima-cam08/test.cgi" },
-    { id: "cam09", name: "三島カメラ09", url: "https://matsuhisa.info/mishima-cam09/test.cgi" },
-    { id: "cam11", name: "三島カメラ11", url: "https://matsuhisa.info/mishima-cam11/test.cgi" },
-    { id: "cam12", name: "三島カメラ12", url: "https://matsuhisa.info/mishima-cam12/test.cgi" },
-    { id: "cam13", name: "三島カメラ13", url: "https://matsuhisa.info/mishima-cam13/test.cgi" },
-    { id: "cam14", name: "三島カメラ14", url: "https://matsuhisa.info/mishima-cam14/test.cgi" },
-    { id: "cam36", name: "三島カメラ36", url: "https://matsuhisa.info/mishima-cam36/test.cgi" },
-    { id: "cam40", name: "三島カメラ40", url: "https://matsuhisa.info/mishima-cam40/test.cgi" },
-    { id: "cam42", name: "三島カメラ42", url: "https://matsuhisa.info/mishima-cam42/test.cgi" },
-    { id: "cam43", name: "三島カメラ43", url: "https://matsuhisa.info/mishima-cam43/test.cgi" },
-    { id: "cam46", name: "三島カメラ46", url: "https://matsuhisa.info/mishima-cam46/test.cgi" },
-    { id: "cam47", name: "三島カメラ47", url: "https://matsuhisa.info/mishima-cam47/test.cgi" },
-    { id: "cam52", name: "三島カメラ52", url: "https://matsuhisa.info/mishima-cam52/test.cgi" },
-    { id: "cam53", name: "三島カメラ53", url: "https://matsuhisa.info/mishima-cam53/test.cgi" },
-    { id: "cam54", name: "三島カメラ54", url: "https://matsuhisa.info/mishima-cam54/test.cgi" },
-    { id: "cam55", name: "三島カメラ55", url: "https://matsuhisa.info/mishima-cam55/test.cgi" }
+  /* =====================================================================
+   * 1. 拠点カタログ (電源監視20拠点 + 水位監視26拠点 をマージ、計27拠点)
+   * ===================================================================== */
+  var WATER_SITES_RAW = [
+    { id: "cam02", name: "中郷第１樋管（大場川 / 御園）", lat: 35.076968, lon: 138.92336, correction: 5510, op: "-" },
+    { id: "cam03", name: "北沢アンダーパス（大場川 / 北沢）", lat: 35.104197, lon: 138.93567, correction: -4600, op: "+" },
+    { id: "cam04", name: "中郷第２樋管（大場川 / 安久）", lat: 35.080086, lon: 138.927194, correction: 5370, op: "-" },
+    { id: "cam11", name: "祇園大橋（大場川 / 大宮町）", lat: 35.128488, lon: 138.919897, correction: 14404, op: "-" },
+    { id: "cam12", name: "安間樋管（大場川 / 安久）", lat: 35.086723, lon: 138.935544, correction: 4605, op: "-" },
+    { id: "cam13", name: "上町樋管（大場川 / 大場）", lat: 35.091256929022705, lon: 138.93490398807066, correction: 4296, op: "-" },
+    { id: "cam14", name: "多呂樋管（大場川 / 多呂）", lat: 35.097909, lon: 138.93508, correction: 4807, op: "-" },
+    { id: "cam42", name: "桜川（大宮町）", lat: 35.122811, lon: 138.914822, correction: -30, op: "+" },
+    { id: "cam41", name: "こも池（桜川 / 大宮町）", lat: 35.124868, lon: 138.915501, correction: 2940, op: "-" },
+    { id: "cam43", name: "芝橋（源兵衛川 / 芝本町）", lat: 35.121895, lon: 138.912451, correction: 3630, op: "-" },
+    { id: "cam44", name: "ほたるの里（蓮沼川 / 泉町）", lat: 35.121932, lon: 138.911685, correction: 50, op: "+" },
+    { id: "cam46", name: "清住緑地（境川 / 清住町）", lat: 35.112959, lon: 138.905928, correction: 3960, op: "-" },
+    { id: "cam47", name: "中郷温水池（源兵衛川 / 富田町）", lat: 35.107445, lon: 138.917487, correction: 20, op: "+" },
+    { id: "cam40", name: "藤代橋（御殿川 / 藤代町）", lat: 35.106978, lon: 138.925618, correction: 2622, op: "-" },
+    { id: "cam45", name: "竹倉用水路（竹倉）", lat: 35.115677, lon: 138.942655, correction: 4230, op: "-" },
+    { id: "cam39", name: "大場ポンプ場流入水路（大場川 / 大場）", lat: 35.092981, lon: 138.935395, correction: 5010, op: "-" },
+    { id: "cam36", name: "梅名樋管1号（御殿川 / 梅名）", lat: 35.092307, lon: 138.932658, correction: 2544, op: "-" },
+    { id: "cam48", name: "伊豆島田浄水場（裾野市伊豆島田）", lat: 35.159549, lon: 138.906186, correction: -30000, op: "+" },
+    { id: "cam08", name: "宮川橋（観音川 / 大場）", lat: 35.09088, lon: 138.941, correction: 5610, op: "-" },
+    { id: "cam09", name: "梅名樋管2号（御殿川 / 梅名）", lat: 35.0941, lon: 138.9308, correction: 4220, op: "-" },
+    { id: "cam50", name: "徳倉都市下水路", lat: 35.141042, lon: 138.915697, correction: 4580, op: "-" },
+    { id: "cam51", name: "神川都市下水路", lat: 35.126626, lon: 138.923361, correction: 5100, op: "-" },
+    { id: "cam52", name: "中村橋（大場川 / 佐野）", lat: 35.16927, lon: 138.9242, correction: 5100, op: "-" },
+    { id: "cam53", name: "中島樋管1号（大場川 / 中島）", lat: 35.0967, lon: 138.934, correction: 3230, op: "-" },
+    { id: "cam55", name: "幸原山橋（大場川 / 徳倉）", lat: 35.137205, lon: 138.915409, correction: 8540, op: "-" },
+    { id: "cam54", name: "中島樋管３号（御殿川 / 中島）", lat: 35.094852, lon: 138.931886, correction: 3350, op: "-" }
   ];
+  // 電源監視ページ側の拠点順(20拠点)。cam01は水位側データが無い電源専用拠点。
+  var POWER_ORDER = ["cam01", "cam02", "cam03", "cam04", "cam08", "cam09", "cam11", "cam12", "cam13", "cam14",
+    "cam36", "cam40", "cam42", "cam43", "cam46", "cam47", "cam52", "cam53", "cam54", "cam55"];
+
+  var SITE_CATALOG = {};
+  WATER_SITES_RAW.forEach(function (s) {
+    SITE_CATALOG[s.id] = {
+      id: s.id, name: s.name, lat: s.lat, lon: s.lon, correction: s.correction, op: s.op,
+      url: "https://matsuhisa.info/mishima-" + s.id + "/test.cgi",
+      normalImageUrl: "https://mishima-waterdx.com/pic/normal/mishima-" + s.id + ".jpg",
+      hasWater: true, hasPower: false
+    };
+  });
+  // 水位側カタログに存在しない電源専用拠点の表示名(座標情報が無い場合はここに追加)。
+  var POWER_ONLY_NAMES = {
+    cam01: "うるおい広場（大場川 / 東町）"
+  };
+  // 水位センサーは無いが位置情報が判明している電源専用拠点(座標が分かり次第ここに追加)。
+  // マップ・河川ツリーにのみ反映し、水位センサーを前提とするビュー(水位データ/水位変化グラフ一覧)には含めない。
+  var POWER_ONLY_COORDS = {
+    cam01: { lat: 35.117832, lon: 138.927083 }
+  };
+  // 水位センサーは無いが正常時映像(参考画像)が存在する電源専用拠点。
+  // https://mishima-waterdx.com/disaster_prevention/detail.html?camtype=mishima-cam01 の実際の画像読み込み先を確認して設定(他拠点と同一のURLパターン)。
+  var POWER_ONLY_NORMAL_IMAGES = {
+    cam01: "https://mishima-waterdx.com/pic/normal/mishima-cam01.jpg"
+  };
+  POWER_ORDER.forEach(function (id) {
+    if (SITE_CATALOG[id]) {
+      SITE_CATALOG[id].hasPower = true;
+    } else {
+      var coords = POWER_ONLY_COORDS[id] || {};
+      SITE_CATALOG[id] = {
+        id: id, name: POWER_ONLY_NAMES[id] || ("三島カメラ" + id.replace("cam", "")),
+        lat: coords.lat, lon: coords.lon,
+        normalImageUrl: POWER_ONLY_NORMAL_IMAGES[id],
+        url: "https://matsuhisa.info/mishima-" + id + "/test.cgi",
+        hasWater: false, hasPower: true
+      };
+    }
+  });
+  var POWER_SITES = POWER_ORDER.map(function (id) { return SITE_CATALOG[id]; });          // 20拠点(電源監視の元順)
+  var WATER_SITES = WATER_SITES_RAW.map(function (s) { return SITE_CATALOG[s.id]; });     // 26拠点(水位監視の元順、水位センサーあり)
+  // 水位センサーは無いが座標のある電源専用拠点(現在はcam01)をマップ・河川ツリー専用に追加した拠点リスト。
+  var MAP_SITES = WATER_SITES.concat(POWER_SITES.filter(function (s) { return !s.hasWater && typeof s.lat === "number"; }));
+  var ALL_IDS = POWER_ORDER.concat(WATER_SITES_RAW.map(function (s) { return s.id; }).filter(function (id) { return POWER_ORDER.indexOf(id) < 0; }));
+  var ALL_SITES = ALL_IDS.map(function (id) { return SITE_CATALOG[id]; }); // 27拠点(重複なし) - 共有ポーリング対象
+
   var RATED_BAT_VOLTAGE = 12.5;
   var WARN_BAT_VOLTAGE = 12.0;
   var CRITICAL_BAT_VOLTAGE = 11.5;
 
-  var CLIENT_REFRESH_MS = 60 * 1000;         // 画面の自動再読み込み間隔(サーバー側の実際の取得間隔とは別)
+  var CLIENT_REFRESH_MS = 60 * 1000; // 画面の自動再読み込み間隔(サーバー側の実際の取得間隔=5分ベストエフォートとは別)
   var MAX_CHART_POINTS = 288;
-  var CHART_WINDOW_MS = 24 * 60 * 60 * 1000; // グラフ表示は直近24時間分のみ
-  var MAX_STORED_POINTS = 4032;              // ブラウザのメモリ上に保持する上限(14日分・表示用の安全上限。サーバー側の全期間記録には影響しません)
+  var CHART_WINDOW_MS = 24 * 60 * 60 * 1000;
+  var MAX_STORED_POINTS = 4032; // ブラウザのメモリ上に保持する上限(14日分・表示用の安全上限。サーバー側の全期間記録には影響しません)
 
   var DATA_LATEST_URL = "data/latest.json";
   var DATA_RECENT_URL = "data/recent.csv";
   var DATA_HISTORY_URL = "data/history.csv";
 
-  function isDark() {
-    return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches;
-  }
-
+  function isDark() { return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
   function palette() {
     return isDark() ? {
       textPrimary: "#eaf6fb", textSecondary: "#a9c3cf", textMuted: "#7e97a2",
       gridline: "#1c3641", baseline: "#2c4a56", surface: "#0f2733",
-      pv: "#3987e5", bat: "#d95926", rated: "#e66767"
+      pv: "#3987e5", bat: "#d95926", rated: "#e66767", water: "#3987e5"
     } : {
       textPrimary: "#0b1c24", textSecondary: "#4c6672", textMuted: "#7d99a3",
       gridline: "#cfe6ee", baseline: "#a9cbd6", surface: "#f3fafd",
-      pv: "#2a78d6", bat: "#eb6834", rated: "#d63b3b"
+      pv: "#2a78d6", bat: "#eb6834", rated: "#d63b3b", water: "#2a78d6"
     };
   }
 
-  // ---- チャート描画(外部ライブラリ不使用・素のSVGで自前実装、PV/BAT統合表示) ----
+  /* =====================================================================
+   * 2. サーバーデータ読み込み (取得・解析はサーバー(GitHub Actions)側のscripts/poll.mjsが
+   * 既に行っており、このダッシュボードは data/latest.json, data/recent.csv, data/history.csv を
+   * 読むだけでよい。CORSプロキシ経由のHTMLスクレイピングはここでは一切行わない。
+   * 例外は「画像データ」ビューのZIPアーカイブ用バイト取得(fetchImageBlobWithFallback)のみで、
+   * これは画像バイナリそのものを取りに行く必要があり、ブラウザから見ると引き続きクロスオリジンのため。
+   * ===================================================================== */
+
+  // GitHub PagesはCDN(Fastly)経由で配信されており、fetchの cache:"no-store" はブラウザ自身の
+  // キャッシュ利用を止めるだけでCDN側のキャッシュには効かない。そのため、新しいコミットが反映された後も
+  // CDNの保持期間(数分程度)が過ぎるまで古い内容が返り続け、拠点の取得時刻やグラフが更新されないように
+  // 見えることがある。リクエストURLに毎回異なるクエリ文字列を付与し、CDNキャッシュを確実に回避する。
+  function withCacheBuster(url) {
+    return url + (url.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
+  }
+
+  // 画像データビューのZIPアーカイブ専用: latest.jsonが返す解決済みの画像URLからバイト列(Blob)を
+  // 取得する。直接fetchを試し、失敗時のみ(ブラウザからはクロスオリジンのため起き得る)CORSプロキシに
+  // フォールバックする。数値・画像URLの抽出そのものはサーバー側で完了済みなので、HTMLスクレイピングは不要。
+  function fetchImageBlobWithFallback(url) {
+    var fallbackBuilders = [
+      function () { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(url) + "&_ts=" + Date.now(); },
+      function () { return "https://corsproxy.io/?url=" + encodeURIComponent(url) + "&_ts=" + Date.now(); }
+    ];
+    function attempt(u) {
+      return fetch(u, { cache: "no-store" }).then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.blob();
+      });
+    }
+    var p = attempt(url);
+    fallbackBuilders.forEach(function (build) {
+      p = p.catch(function () { return attempt(build()); });
+    });
+    return p;
+  }
+
+  function fmtClock(d) {
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
+  function fmtTime(d) {
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
+
+  /* =====================================================================
+   * 3. チャート実装 (SVG自前実装。3種類: PV/BAT二系列、水位単系列(基準線+tooltip)、ミニスパークライン)
+   * ===================================================================== */
   function createCombinedChart(containerId, ratedValue, ratedLabel) {
     var svgNS = "http://www.w3.org/2000/svg";
     var container = document.getElementById(containerId);
     var svg = document.createElementNS(svgNS, "svg");
-    svg.setAttribute("width", "100%");
-    svg.setAttribute("height", "100%");
-    svg.style.display = "block";
+    svg.setAttribute("width", "100%"); svg.setAttribute("height", "100%"); svg.style.display = "block";
     container.appendChild(svg);
-
     var tooltip = document.createElement("div");
     tooltip.style.cssText = "position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;" +
       "background:var(--surface-1);border:1px solid var(--gridline);border-radius:8px;padding:6px 10px;" +
-      "font-size:18px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.12);z-index:2;";
+      "font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.12);z-index:2;";
     container.appendChild(tooltip);
-
     var W = 600, H = 220;
-    var marginLeft = 85, marginRight = 100, marginTop = 12, marginBottom = 26;
-    var plotW = W - marginLeft - marginRight;
-    var plotH = H - marginTop - marginBottom;
+    var marginLeft = 60, marginRight = 70, marginTop = 12, marginBottom = 26;
+    var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
     var lastPoints = [];
-
     function niceScale(dataMin, dataMax) {
       if (dataMin === dataMax) { dataMin -= 1; dataMax += 1; }
-      var range = dataMax - dataMin;
-      var pad = range * 0.15;
+      var range = dataMax - dataMin, pad = range * 0.15;
       var lo = dataMin - pad, hi = dataMax + pad;
       var rawStep = (hi - lo) / 4;
       var mag = Math.pow(10, Math.floor(Math.log(rawStep) / Math.LN10));
       var norm = rawStep / mag;
       var niceNorm = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
       var step = niceNorm * mag;
-      var niceLo = Math.floor(lo / step) * step;
-      var niceHi = Math.ceil(hi / step) * step;
+      var niceLo = Math.floor(lo / step) * step, niceHi = Math.ceil(hi / step) * step;
       var ticks = [];
       for (var v = niceLo; v <= niceHi + step / 1000; v += step) ticks.push(Math.round(v * 1000) / 1000);
       return { min: niceLo, max: niceHi, ticks: ticks };
     }
-
-    function el(tag, attrs) {
-      var e = document.createElementNS(svgNS, tag);
-      for (var k in attrs) e.setAttribute(k, attrs[k]);
-      return e;
-    }
-
+    function el(tag, attrs) { var e = document.createElementNS(svgNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
     function drawSeriesEndLabel(svg, pal, x, y, text, dyNudge) {
-      var approxWidth = text.length * 9.75 + 12;
+      var approxWidth = text.length * 7 + 10;
       var boxX = Math.min(x + 8, W - approxWidth - 4);
-      var boxY = y - 13.5 + (dyNudge || 0);
-      svg.appendChild(el("rect", { x: boxX - 4, y: boxY, width: approxWidth, height: 27, rx: 4, fill: pal.surface, opacity: 0.9 }));
-      var t = el("text", { x: boxX, y: boxY + 13.5, "dominant-baseline": "middle", fill: pal.textPrimary, "font-size": 18, "font-weight": 600, "font-family": "system-ui, -apple-system, sans-serif" });
-      t.textContent = text;
-      svg.appendChild(t);
+      var boxY = y - 10 + (dyNudge || 0);
+      svg.appendChild(el("rect", { x: boxX - 4, y: boxY, width: approxWidth, height: 20, rx: 4, fill: pal.surface, opacity: 0.9 }));
+      var t = el("text", { x: boxX, y: boxY + 10, "dominant-baseline": "middle", fill: pal.textPrimary, "font-size": 13, "font-weight": 600, "font-family": "system-ui, -apple-system, sans-serif" });
+      t.textContent = text; svg.appendChild(t);
     }
-
     function render(points) {
       lastPoints = points;
       while (svg.firstChild) svg.removeChild(svg.firstChild);
@@ -543,7 +863,6 @@
       svg.setAttribute("preserveAspectRatio", "none");
       tooltip.style.opacity = 0;
       if (!points.length) return;
-
       var pal = palette();
       var n = points.length;
       var pvVals = points.map(function (p) { return p.pv; });
@@ -551,98 +870,76 @@
       var allVals = pvVals.concat(batVals);
       if (typeof ratedValue === "number") allVals = allVals.concat([ratedValue]);
       var scale = niceScale(Math.min.apply(null, allVals), Math.max.apply(null, allVals));
-
       function xAt(i) { return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW; }
       function yAt(v) { return marginTop + plotH - ((v - scale.min) / (scale.max - scale.min)) * plotH; }
-
       var tickStep = scale.ticks.length > 1 ? (scale.ticks[1] - scale.ticks[0]) : 1;
       scale.ticks.forEach(function (t) {
         var y = yAt(t);
         svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: y, y2: y, stroke: pal.gridline, "stroke-width": 1 }));
         var nearRated = typeof ratedValue === "number" && Math.abs(t - ratedValue) <= tickStep * 0.9;
         if (!nearRated) {
-          var label = el("text", { x: marginLeft - 8, y: y, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 16.5, "font-family": "system-ui, -apple-system, sans-serif" });
-          label.textContent = t.toFixed(1);
-          svg.appendChild(label);
+          var label = el("text", { x: marginLeft - 8, y: y, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
+          label.textContent = t.toFixed(1); svg.appendChild(label);
         }
       });
-
       var labelCount = Math.min(6, n);
       for (var k = 0; k < labelCount; k++) {
         var idx = labelCount === 1 ? 0 : Math.round((k / (labelCount - 1)) * (n - 1));
-        var lbl = el("text", { x: xAt(idx), y: H - 6, "text-anchor": "middle", fill: pal.textMuted, "font-size": 16.5, "font-family": "system-ui, -apple-system, sans-serif" });
-        lbl.textContent = points[idx].label;
-        svg.appendChild(lbl);
+        var lbl = el("text", { x: xAt(idx), y: H - 6, "text-anchor": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
+        lbl.textContent = points[idx].label; svg.appendChild(lbl);
       }
-
       var ratedLabelInfo = null;
       if (typeof ratedValue === "number" && ratedValue >= scale.min && ratedValue <= scale.max) {
         var ry = yAt(ratedValue);
         svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: ry, y2: ry, stroke: pal.rated, "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
         ratedLabelInfo = { y: ry, text: ratedLabel || (ratedValue + "V") };
       }
-
       function pathFor(values, color) {
         var d = values.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
         svg.appendChild(el("path", { d: d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
       }
-      pathFor(pvVals, pal.pv);
-      pathFor(batVals, pal.bat);
-
+      pathFor(pvVals, pal.pv); pathFor(batVals, pal.bat);
       if (ratedLabelInfo) {
-        var rlabelWidth = ratedLabelInfo.text.length * 8.4 + 9;
+        var rlabelWidth = ratedLabelInfo.text.length * 6.4 + 9;
         var rlabelX = Math.max(2, marginLeft - rlabelWidth - 6);
-        svg.appendChild(el("rect", { x: rlabelX, y: ratedLabelInfo.y - 21, width: rlabelWidth, height: 21, fill: pal.surface, opacity: 0.85 }));
-        var rlabel = el("text", { x: rlabelX + 3, y: ratedLabelInfo.y - 10.5, "text-anchor": "start", "dominant-baseline": "middle", fill: pal.rated, "font-size": 15, "font-family": "system-ui, -apple-system, sans-serif" });
-        rlabel.textContent = ratedLabelInfo.text;
-        svg.appendChild(rlabel);
+        svg.appendChild(el("rect", { x: rlabelX, y: ratedLabelInfo.y - 16, width: rlabelWidth, height: 16, fill: pal.surface, opacity: 0.85 }));
+        var rlabel = el("text", { x: rlabelX + 3, y: ratedLabelInfo.y - 8, "text-anchor": "start", "dominant-baseline": "middle", fill: pal.rated, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
+        rlabel.textContent = ratedLabelInfo.text; svg.appendChild(rlabel);
       }
-
       var lastIdx = n - 1;
       var exPv = xAt(lastIdx), eyPv = yAt(pvVals[lastIdx]);
       var exBat = xAt(lastIdx), eyBat = yAt(batVals[lastIdx]);
-      svg.appendChild(el("circle", { cx: exPv, cy: eyPv, r: 5, fill: pal.pv, stroke: pal.surface, "stroke-width": 2 }));
-      svg.appendChild(el("circle", { cx: exBat, cy: eyBat, r: 5, fill: pal.bat, stroke: pal.surface, "stroke-width": 2 }));
-
+      svg.appendChild(el("circle", { cx: exPv, cy: eyPv, r: 4, fill: pal.pv, stroke: pal.surface, "stroke-width": 2 }));
+      svg.appendChild(el("circle", { cx: exBat, cy: eyBat, r: 4, fill: pal.bat, stroke: pal.surface, "stroke-width": 2 }));
       var nudgePv = 0, nudgeBat = 0;
-      if (Math.abs(eyPv - eyBat) < 24) {
-        if (eyPv <= eyBat) { nudgePv = -13.5; nudgeBat = 13.5; } else { nudgePv = 13.5; nudgeBat = -13.5; }
+      if (Math.abs(eyPv - eyBat) < 20) {
+        if (eyPv <= eyBat) { nudgePv = -11; nudgeBat = 11; } else { nudgePv = 11; nudgeBat = -11; }
       }
       drawSeriesEndLabel(svg, pal, exPv, eyPv, pvVals[lastIdx].toFixed(1) + " V", nudgePv);
       drawSeriesEndLabel(svg, pal, exBat, eyBat, batVals[lastIdx].toFixed(1) + " V", nudgeBat);
-
       var hoverGroup = el("g", { opacity: 0 });
       var crosshair = el("line", { x1: 0, x2: 0, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1 });
-      var hoverDotPv = el("circle", { r: 5, fill: pal.pv, stroke: pal.surface, "stroke-width": 2 });
-      var hoverDotBat = el("circle", { r: 5, fill: pal.bat, stroke: pal.surface, "stroke-width": 2 });
-      hoverGroup.appendChild(crosshair);
-      hoverGroup.appendChild(hoverDotPv);
-      hoverGroup.appendChild(hoverDotBat);
+      var hoverDotPv = el("circle", { r: 4, fill: pal.pv, stroke: pal.surface, "stroke-width": 2 });
+      var hoverDotBat = el("circle", { r: 4, fill: pal.bat, stroke: pal.surface, "stroke-width": 2 });
+      hoverGroup.appendChild(crosshair); hoverGroup.appendChild(hoverDotPv); hoverGroup.appendChild(hoverDotBat);
       svg.appendChild(hoverGroup);
-
       var hitRect = el("rect", { x: marginLeft, y: marginTop, width: plotW, height: plotH, fill: "transparent" });
-      hitRect.style.cursor = "crosshair";
-      svg.appendChild(hitRect);
-
+      hitRect.style.cursor = "crosshair"; svg.appendChild(hitRect);
       function pointerMove(evt) {
         var rect = svg.getBoundingClientRect();
         var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
         var relX = (clientX - rect.left) / rect.width * W;
         var idx2 = Math.round(((relX - marginLeft) / plotW) * (n - 1));
         idx2 = Math.max(0, Math.min(n - 1, idx2));
-        var px = xAt(idx2);
-        var pyPv = yAt(pvVals[idx2]), pyBat = yAt(batVals[idx2]);
+        var px = xAt(idx2), pyPv = yAt(pvVals[idx2]), pyBat = yAt(batVals[idx2]);
         crosshair.setAttribute("x1", px); crosshair.setAttribute("x2", px);
         hoverDotPv.setAttribute("cx", px); hoverDotPv.setAttribute("cy", pyPv);
         hoverDotBat.setAttribute("cx", px); hoverDotBat.setAttribute("cy", pyBat);
         hoverGroup.setAttribute("opacity", 1);
-
         while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
         var line0 = document.createElement("div");
-        line0.style.cssText = "color:var(--text-secondary);";
-        line0.textContent = points[idx2].label;
+        line0.style.cssText = "color:var(--text-secondary);"; line0.textContent = points[idx2].label;
         tooltip.appendChild(line0);
-
         [["PV", pal.pv, pvVals[idx2]], ["BAT", pal.bat, batVals[idx2]]].forEach(function (row) {
           var line = document.createElement("div");
           line.style.cssText = "color:var(--text-primary);font-weight:600;display:flex;align-items:center;gap:6px;margin-top:2px;";
@@ -650,11 +947,8 @@
           swatch.style.cssText = "display:inline-block;width:10px;height:2px;background:" + row[1] + ";";
           var valSpan = document.createElement("span");
           valSpan.textContent = row[0] + " " + row[2].toFixed(1) + " V";
-          line.appendChild(swatch);
-          line.appendChild(valSpan);
-          tooltip.appendChild(line);
+          line.appendChild(swatch); line.appendChild(valSpan); tooltip.appendChild(line);
         });
-
         var containerRect = container.getBoundingClientRect();
         var tipX = (px / W) * containerRect.width;
         var tipY = (Math.min(pyPv, pyBat) / H) * containerRect.height;
@@ -662,66 +956,346 @@
         tooltip.style.top = Math.max(tipY - 54, 4) + "px";
         tooltip.style.opacity = 1;
       }
-      function pointerLeave() {
-        hoverGroup.setAttribute("opacity", 0);
-        tooltip.style.opacity = 0;
-      }
+      function pointerLeave() { hoverGroup.setAttribute("opacity", 0); tooltip.style.opacity = 0; }
       hitRect.addEventListener("pointermove", pointerMove);
       hitRect.addEventListener("pointerleave", pointerLeave);
     }
-
-    return {
-      setData: function (points) { render(points); },
-      redraw: function () { render(lastPoints); }
-    };
+    return { setData: function (points) { render(points); }, redraw: function () { render(lastPoints); } };
   }
 
-  // ---- サイトごとのカードDOM生成 ----
-  var sitesGrid = document.getElementById("sitesGrid");
-  var siteStates = {};
+  // 水位単系列チャート(基準線の破線 + ホバーツールチップ)。拠点詳細・水位グラフ一覧の両方で使用。
+  function createLevelChart(containerId) {
+    var svgNS = "http://www.w3.org/2000/svg";
+    var container = document.getElementById(containerId);
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("width", "100%"); svg.setAttribute("height", "100%"); svg.style.display = "block";
+    container.appendChild(svg);
+    var tooltip = document.createElement("div");
+    tooltip.style.cssText = "position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;" +
+      "background:var(--surface-1);border:1px solid var(--gridline);border-radius:8px;padding:6px 10px;" +
+      "font-size:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.12);z-index:2;";
+    container.appendChild(tooltip);
+    var H = 220;
+    var marginLeft = 54, marginRight = 60, marginTop = 12, marginBottom = 24;
+    var lastPoints = [], lastBaseline = null;
+    function currentW() {
+      var rect = container.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return H * (rect.width / rect.height);
+      return 600;
+    }
+    function niceScale(dataMin, dataMax, floorValue) {
+      if (dataMin === dataMax) { dataMin -= 0.1; dataMax += 0.1; }
+      var range = dataMax - dataMin;
+      var pad = Math.max(range * 0.15, 0.02);
+      var hasFloor = typeof floorValue === "number";
+      var lo = hasFloor ? Math.min(floorValue, dataMin) : dataMin - pad;
+      var hi = dataMax + pad;
+      var rawStep = (hi - lo) / 4;
+      var mag = Math.pow(10, Math.floor(Math.log(rawStep) / Math.LN10));
+      var norm = rawStep / mag;
+      var niceNorm = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+      var step = niceNorm * mag || 0.01;
+      var niceHi = Math.ceil(hi / step) * step;
+      var niceLo = hasFloor ? lo : Math.floor(lo / step) * step;
+      var ticks = [];
+      for (var v = niceLo; v <= niceHi + step / 1000; v += step) ticks.push(Math.round(v * 1000) / 1000);
+      return { min: niceLo, max: niceHi, ticks: ticks };
+    }
+    function el(tag, attrs) { var e = document.createElementNS(svgNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+    function render(points, baseline) {
+      lastPoints = points; lastBaseline = typeof baseline === "number" ? baseline : null;
+      var W = currentW();
+      var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+      svg.setAttribute("preserveAspectRatio", "none");
+      tooltip.style.opacity = 0;
+      if (!points.length) return;
+      var pal = palette();
+      var n = points.length;
+      var vals = points.map(function (p) { return p.value; });
+      var allVals = typeof lastBaseline === "number" ? vals.concat([lastBaseline]) : vals;
+      var scale = niceScale(Math.min.apply(null, allVals), Math.max.apply(null, allVals), lastBaseline);
+      function xAt(i) { return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW; }
+      function yAt(v) { return marginTop + plotH - ((v - scale.min) / (scale.max - scale.min)) * plotH; }
+      scale.ticks.forEach(function (t) {
+        var y = yAt(t);
+        svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: y, y2: y, stroke: pal.gridline, "stroke-width": 1 }));
+        var label = el("text", { x: marginLeft - 8, y: y, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
+        label.textContent = t.toFixed(2); svg.appendChild(label);
+      });
+      var labelCount = Math.min(6, n);
+      for (var k = 0; k < labelCount; k++) {
+        var idx = labelCount === 1 ? 0 : Math.round((k / (labelCount - 1)) * (n - 1));
+        var lbl = el("text", { x: xAt(idx), y: H - 6, "text-anchor": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
+        lbl.textContent = points[idx].label; svg.appendChild(lbl);
+      }
+      if (typeof lastBaseline === "number" && lastBaseline >= scale.min && lastBaseline <= scale.max) {
+        var by = yAt(lastBaseline);
+        svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: by, y2: by, stroke: pal.textMuted, "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
+        var baseLabelText = "基準(最低)水位 " + lastBaseline.toFixed(2) + " m";
+        var baseLabelWidth = baseLabelText.length * 6.2 + 10;
+        svg.appendChild(el("rect", { x: marginLeft + 4, y: by - 17, width: baseLabelWidth, height: 15, fill: pal.surface, opacity: 0.85 }));
+        var baseLabelEl = el("text", { x: marginLeft + 8, y: by - 10, "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 10, "font-family": "system-ui, -apple-system, sans-serif" });
+        baseLabelEl.textContent = baseLabelText; svg.appendChild(baseLabelEl);
+      }
+      var d = vals.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
+      svg.appendChild(el("path", { d: d, fill: "none", stroke: pal.water, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+      var lastIdx = n - 1;
+      var ex = xAt(lastIdx), ey = yAt(vals[lastIdx]);
+      svg.appendChild(el("circle", { cx: ex, cy: ey, r: 4, fill: pal.water, stroke: pal.surface, "stroke-width": 1.5 }));
+      var labelText = vals[lastIdx].toFixed(2) + " m";
+      var approxWidth = labelText.length * 7 + 10;
+      var boxX = Math.min(ex + 8, W - approxWidth - 4);
+      var boxY = ey - 10;
+      svg.appendChild(el("rect", { x: boxX - 4, y: boxY, width: approxWidth, height: 20, rx: 4, fill: pal.surface, opacity: 0.9 }));
+      var t = el("text", { x: boxX, y: boxY + 10, "dominant-baseline": "middle", fill: pal.textPrimary, "font-size": 13, "font-weight": 600, "font-family": "system-ui, -apple-system, sans-serif" });
+      t.textContent = labelText; svg.appendChild(t);
+      var hoverGroup = el("g", { opacity: 0 });
+      var crosshair = el("line", { x1: 0, x2: 0, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1 });
+      var hoverDot = el("circle", { r: 4, fill: pal.water, stroke: pal.surface, "stroke-width": 1.5 });
+      hoverGroup.appendChild(crosshair); hoverGroup.appendChild(hoverDot); svg.appendChild(hoverGroup);
+      var hitRect = el("rect", { x: marginLeft, y: marginTop, width: plotW, height: plotH, fill: "transparent" });
+      hitRect.style.cursor = "crosshair"; svg.appendChild(hitRect);
+      function pointerMove(evt) {
+        var rect = svg.getBoundingClientRect();
+        var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
+        var relX = (clientX - rect.left) / rect.width * W;
+        var idx2 = Math.round(((relX - marginLeft) / plotW) * (n - 1));
+        idx2 = Math.max(0, Math.min(n - 1, idx2));
+        var px = xAt(idx2), py = yAt(vals[idx2]);
+        crosshair.setAttribute("x1", px); crosshair.setAttribute("x2", px);
+        hoverDot.setAttribute("cx", px); hoverDot.setAttribute("cy", py);
+        hoverGroup.setAttribute("opacity", 1);
+        while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
+        var line0 = document.createElement("div");
+        line0.style.cssText = "color:var(--text-secondary);"; line0.textContent = points[idx2].label;
+        tooltip.appendChild(line0);
+        var line1 = document.createElement("div");
+        line1.style.cssText = "color:var(--text-primary);font-weight:600;";
+        line1.textContent = "水位 " + vals[idx2].toFixed(2) + " m";
+        tooltip.appendChild(line1);
+        var containerRect = container.getBoundingClientRect();
+        var tipX = (px / W) * containerRect.width;
+        var tipY = (py / H) * containerRect.height;
+        tooltip.style.left = Math.max(4, Math.min(tipX + 12, containerRect.width - 120)) + "px";
+        tooltip.style.top = Math.max(tipY - 46, 4) + "px";
+        tooltip.style.opacity = 1;
+      }
+      function pointerLeave() { hoverGroup.setAttribute("opacity", 0); tooltip.style.opacity = 0; }
+      hitRect.addEventListener("pointermove", pointerMove);
+      hitRect.addEventListener("pointerleave", pointerLeave);
+    }
+    return { setData: function (points, baseline) { render(points, baseline); }, redraw: function () { render(lastPoints, lastBaseline); } };
+  }
 
+  // ミニスパークライン(河川パネルの拠点カード用)
+  function createMiniChart(container) {
+    var svgNS = "http://www.w3.org/2000/svg";
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("width", "100%"); svg.setAttribute("height", "100%"); svg.style.display = "block";
+    container.appendChild(svg);
+    var H = 62, marginLeft = 4, marginRight = 4, marginTop = 6, marginBottom = 6;
+    function currentW() {
+      var rect = container.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return H * (rect.width / rect.height);
+      return 148;
+    }
+    function el(tag, attrs) { var e = document.createElementNS(svgNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+    var lastPoints = [];
+    function render(points) {
+      lastPoints = points;
+      var W = currentW();
+      var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+      svg.setAttribute("preserveAspectRatio", "none");
+      if (!points.length) return;
+      var pal = palette();
+      var n = points.length;
+      var vals = points.map(function (p) { return p.value; });
+      var vMin = Math.min.apply(null, vals), vMax = Math.max.apply(null, vals);
+      if (vMin === vMax) { vMin -= 0.05; vMax += 0.05; }
+      var pad = (vMax - vMin) * 0.2; vMin -= pad; vMax += pad;
+      function xAt(i) { return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW; }
+      function yAt(v) { return marginTop + plotH - ((v - vMin) / (vMax - vMin)) * plotH; }
+      var d = vals.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
+      svg.appendChild(el("path", { d: d, fill: "none", stroke: pal.water, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+      var lastIdx = n - 1;
+      svg.appendChild(el("circle", { cx: xAt(lastIdx), cy: yAt(vals[lastIdx]), r: 3, fill: pal.water, stroke: pal.surface, "stroke-width": 1.5 }));
+      var lbl = el("text", { x: W - marginRight, y: marginTop + 8, "text-anchor": "end", fill: pal.textPrimary, "font-size": 11, "font-weight": 700, "font-family": "system-ui, -apple-system, sans-serif" });
+      lbl.textContent = vals[lastIdx].toFixed(2) + "m"; svg.appendChild(lbl);
+    }
+    return { setData: function (points) { render(points); }, redraw: function () { render(lastPoints); } };
+  }
+
+  /* =====================================================================
+   * 4. 共有状態: siteData(最新値キャッシュ) + siteStates(履歴ポイント)
+   * ===================================================================== */
+  var siteData = {};   // id -> {pv,bat,measureTime,imageUrl,waterLevelM,lastState,lastFetchedAt,via}
+  var siteStates = {}; // id -> {points:[], baselineLevelM, cardRefs...}
+  ALL_SITES.forEach(function (site) {
+    siteData[site.id] = { pv: null, bat: null, measureTime: null, imageUrl: null, waterLevelM: null, lastState: "pending", lastFetchedAt: null, via: null };
+    siteStates[site.id] = { site: site, points: [], baselineLevelM: null };
+  });
+
+  /* =====================================================================
+   * 5. 河川グルーピング (MAP_SITES対象: 水位センサー拠点+座標のある電源専用拠点)
+   * ===================================================================== */
+  function riverGroupOf(site) {
+    var m = site.name.match(/[（(]([^）)]*)[）)]/);
+    if (m) {
+      var inner = m[1];
+      var slashIdx = inner.indexOf("／");
+      if (slashIdx < 0) slashIdx = inner.indexOf("/");
+      if (slashIdx >= 0) return inner.slice(0, slashIdx).trim();
+    }
+    var baseName = site.name.replace(/[（(][^）)]*[）)]/, "").trim();
+    return baseName || site.name;
+  }
+  var riverGroups = {};
+  MAP_SITES.forEach(function (site) {
+    var river = riverGroupOf(site);
+    if (!riverGroups[river]) riverGroups[river] = [];
+    riverGroups[river].push(site);
+  });
+  var riverNames = Object.keys(riverGroups).sort(function (a, b) {
+    if (riverGroups[b].length !== riverGroups[a].length) return riverGroups[b].length - riverGroups[a].length;
+    return a.localeCompare(b, "ja");
+  });
+  // 上流(北=緯度大)→下流(南=緯度小)の順。ご指摘いただいた「北が上流」に基づく参考順序。
+  riverNames.forEach(function (name) { riverGroups[name].sort(function (a, b) { return b.lat - a.lat; }); });
+  // 「河川別拠点一覧」と同じ表示順(河川の並び→各河川内は上流→下流)のID配列。
+  // ライブカメラ一覧・水位変化グラフ一覧の並び順をこれに揃えるために使用する。
+  var RIVER_ORDER_SITES = [];
+  riverNames.forEach(function (name) { riverGroups[name].forEach(function (site) { RIVER_ORDER_SITES.push(site); }); });
+
+  /* =====================================================================
+   * 6. サイドバー: 電源監視/全拠点マップ/河川ツリー/カメラ一覧/グラフ一覧
+   * ===================================================================== */
+  var sidebar = document.getElementById("sidebar");
+  var riverTreeContainer = document.getElementById("riverTreeContainer");
+  var powerMenuBtn = document.getElementById("powerMenuBtn");
+  var allSitesMenuBtn = document.getElementById("allSitesMenuBtn");
+  var camlistMenuBtn = document.getElementById("camlistMenuBtn");
+  var graphlistMenuBtn = document.getElementById("graphlistMenuBtn");
+  var voltageDataMenuBtn = document.getElementById("voltageDataMenuBtn");
+  var waterDataMenuBtn = document.getElementById("waterDataMenuBtn");
+  var imageDataMenuBtn = document.getElementById("imageDataMenuBtn");
+
+  riverNames.forEach(function (name) {
+    var wrap = document.createElement("div");
+    wrap.className = "river-menu-group";
+    var btn = document.createElement("button");
+    btn.type = "button"; btn.className = "river-menu-btn"; btn.dataset.river = name;
+    var label = document.createElement("span"); label.textContent = name;
+    var count = document.createElement("span"); count.className = "river-menu-count";
+    count.textContent = riverGroups[name].length + "拠点";
+    btn.appendChild(label); btn.appendChild(count);
+    btn.addEventListener("click", function () { showView("river"); setActiveRiver(name); });
+    wrap.appendChild(btn);
+
+    var sitesBox = document.createElement("div");
+    sitesBox.className = "river-menu-sites"; sitesBox.dataset.river = name;
+    riverGroups[name].forEach(function (site) {
+      var siteBtn = document.createElement("button");
+      siteBtn.type = "button"; siteBtn.className = "river-menu-site-btn"; siteBtn.dataset.siteId = site.id;
+      var dot = document.createElement("span"); dot.className = "dot pending";
+      siteBtn.appendChild(dot);
+      siteBtn.appendChild(document.createTextNode(site.name));
+      siteBtn.addEventListener("click", function () { showView("site"); openSiteDetail(site.id); });
+      sitesBox.appendChild(siteBtn);
+      siteStates[site.id].menuDotEl = dot;
+      siteStates[site.id].menuBtnEl = siteBtn;
+    });
+    wrap.appendChild(sitesBox);
+    riverTreeContainer.appendChild(wrap);
+  });
+
+  function clearSidebarActive() {
+    Array.prototype.forEach.call(sidebar.querySelectorAll(".river-menu-btn"), function (btn) { btn.classList.remove("active"); });
+    Array.prototype.forEach.call(sidebar.querySelectorAll(".download-menu-btn"), function (btn) { btn.classList.remove("selected"); });
+  }
+  function clearSidebarSelectedSite() {
+    Array.prototype.forEach.call(sidebar.querySelectorAll(".river-menu-site-btn"), function (btn) { btn.classList.remove("selected"); });
+  }
+
+  /* =====================================================================
+   * 7. ビュー切り替え
+   * ===================================================================== */
+  var viewIds = ["power", "allmap", "river", "site", "camlist", "graphlist", "voltagedata", "waterdata", "imagedata"];
+  var currentView = "power";
+  function showView(name) {
+    currentView = name;
+    viewIds.forEach(function (id) {
+      var el = document.getElementById("view-" + id);
+      if (el) el.classList.toggle("show", id === name);
+    });
+    clearSidebarActive();
+    if (name === "power") powerMenuBtn.classList.add("active");
+    if (name === "allmap") { allSitesMenuBtn.classList.add("active"); ensureAllSitesMap(); clearSidebarSelectedSite(); }
+    if (name === "camlist") camlistMenuBtn.classList.add("active");
+    if (name === "graphlist") graphlistMenuBtn.classList.add("active");
+    if (name === "voltagedata") { voltageDataMenuBtn.classList.add("selected"); rebuildVoltageTable(); }
+    if (name === "waterdata") { waterDataMenuBtn.classList.add("selected"); rebuildWaterTable(); }
+    if (name === "imagedata") { imageDataMenuBtn.classList.add("selected"); updateImageDataStatus(); }
+    if (name === "river") {
+      var btn = sidebar.querySelector('.river-menu-btn[data-river="' + (activeRiver || "").replace(/"/g, '\\"') + '"]');
+      if (btn) btn.classList.add("active");
+      ensureRiverMap();
+      clearSidebarSelectedSite();
+      setTimeout(function () { if (riverMapReady) riverMap.invalidateSize(); }, 50);
+    }
+    if (name === "site") {
+      ensureSiteDetailMap();
+      setTimeout(function () { if (siteMapReady) siteMap.invalidateSize(); }, 50);
+    }
+    if (name === "power" || name === "camlist" || name === "graphlist") {
+      // display:none中に描画されたSVGは幅0でレンダリングされている可能性があるため、
+      // 表示切り替え時に再描画して実際のコンテナ幅に合わせる。
+      ALL_SITES.forEach(function (site) {
+        var s = siteStates[site.id];
+        if (name === "power" && s.powerChart) s.powerChart.redraw();
+        if (name === "graphlist" && s.graphChart) s.graphChart.redraw();
+      });
+    }
+  }
+  powerMenuBtn.addEventListener("click", function () { showView("power"); });
+  allSitesMenuBtn.addEventListener("click", function () { showView("allmap"); });
+  camlistMenuBtn.addEventListener("click", function () { showView("camlist"); });
+  graphlistMenuBtn.addEventListener("click", function () { showView("graphlist"); });
+  voltageDataMenuBtn.addEventListener("click", function () { showView("voltagedata"); });
+  waterDataMenuBtn.addEventListener("click", function () { showView("waterdata"); });
+  imageDataMenuBtn.addEventListener("click", function () { showView("imagedata"); });
+
+  /* =====================================================================
+   * 8. 電源監視ビュー
+   * ===================================================================== */
+  var sitesGrid = document.getElementById("sitesGrid");
   function el2(tag, attrs, html) {
     var e = document.createElement(tag);
-    for (var k in attrs) {
-      if (k === "class") e.className = attrs[k];
-      else e.setAttribute(k, attrs[k]);
-    }
+    for (var k in attrs) { if (k === "class") e.className = attrs[k]; else e.setAttribute(k, attrs[k]); }
     if (html !== undefined) e.innerHTML = html;
     return e;
   }
+  document.getElementById("powerSubtitle").textContent = POWER_SITES.length + "拠点をサーバー(GitHub Actions)が5分間隔(ベストエフォート)で自動取得・mV → V に換算（この画面は約1分ごとにサーバーの最新値を再取得します）";
 
-  var subtitleEl = document.getElementById("subtitleText");
-  if (subtitleEl) {
-    subtitleEl.textContent = SITES.length + "拠点をサーバー側で5分間隔(ベストエフォート)に自動取得・記録しています";
-  }
-
-  SITES.forEach(function (site) {
+  POWER_SITES.forEach(function (site) {
     var card = el2("div", { class: "card" });
-
     var header = el2("div", { class: "site-card-header" });
     var titleWrap = el2("div", { class: "site-title-wrap" });
-    var h2 = document.createElement("h2");
-    h2.textContent = site.name;
-    titleWrap.appendChild(h2);
+    var h2 = document.createElement("h2"); h2.textContent = site.name; titleWrap.appendChild(h2);
     var link = el2("a", { class: "site-link", href: site.url, target: "_blank", rel: "noopener" });
-    link.textContent = site.url;
-    titleWrap.appendChild(link);
+    link.textContent = site.url; titleWrap.appendChild(link);
     header.appendChild(titleWrap);
     var statusEl = el2("div", { class: "site-status" }, '<span class="dot pending"></span><span class="status-text">読み込み中…</span>');
     header.appendChild(statusEl);
     card.appendChild(header);
 
     var mini = el2("div", { class: "mini-stats" });
-    var pvStat = el2("div", {},
-      '<div class="stat-label"><span class="swatch" style="background:var(--series-pv)"></span>PV</div>' +
-      '<div class="stat-value pv-value">–<span class="unit">V</span></div>' +
-      '<div class="stat-delta pv-delta">&nbsp;</div>');
-    var batStat = el2("div", {},
-      '<div class="stat-label"><span class="swatch" style="background:var(--series-bat)"></span>BAT</div>' +
-      '<div class="stat-value bat-value">–<span class="unit">V</span></div>' +
-      '<div class="stat-delta bat-delta">&nbsp;</div>');
-    mini.appendChild(pvStat);
-    mini.appendChild(batStat);
+    var pvStat = el2("div", {}, '<div class="stat-label"><span class="swatch" style="background:var(--series-pv)"></span>PV</div><div class="stat-value pv-value">–<span class="unit">V</span></div><div class="stat-delta pv-delta">&nbsp;</div>');
+    var batStat = el2("div", {}, '<div class="stat-label"><span class="swatch" style="background:var(--series-bat)"></span>BAT</div><div class="stat-value bat-value">–<span class="unit">V</span></div><div class="stat-delta bat-delta">&nbsp;</div>');
+    mini.appendChild(pvStat); mini.appendChild(batStat);
     card.appendChild(mini);
 
     var batAlertLine = el2("div", { class: "bat-alert-line" });
@@ -732,242 +1306,620 @@
       '<span class="legend-item"><span class="legend-line" style="background:var(--series-bat)"></span>BAT（バッテリー電圧）</span>');
     card.appendChild(legend);
 
-    var chartBox = el2("div", { class: "chart-box", id: "chart-" + site.id });
+    var chartBox = el2("div", { class: "chart-box", id: "pchart-" + site.id });
     card.appendChild(chartBox);
-
     sitesGrid.appendChild(card);
 
-    siteStates[site.id] = {
-      site: site,
-      points: [],
-      chart: createCombinedChart("chart-" + site.id, RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(1) + "V"),
-      cardEl: card,
-      statusDotEl: statusEl.querySelector(".dot"),
-      statusTextEl: statusEl.querySelector(".status-text"),
-      pvValueEl: pvStat.querySelector(".pv-value"),
-      batValueEl: batStat.querySelector(".bat-value"),
-      pvDeltaEl: pvStat.querySelector(".pv-delta"),
-      batDeltaEl: batStat.querySelector(".bat-delta"),
-      batAlertLineEl: batAlertLine,
-      thumbSlot: mini,
-      thumbEl: null,
-      lastState: null
-    };
+    var s = siteStates[site.id];
+    s.powerChart = createCombinedChart("pchart-" + site.id, RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(1) + "V");
+    s.powerCardEl = card;
+    s.powerStatusDotEl = statusEl.querySelector(".dot");
+    s.powerStatusTextEl = statusEl.querySelector(".status-text");
+    s.pvValueEl = pvStat.querySelector(".pv-value");
+    s.batValueEl = batStat.querySelector(".bat-value");
+    s.pvDeltaEl = pvStat.querySelector(".pv-delta");
+    s.batDeltaEl = batStat.querySelector(".bat-delta");
+    s.batAlertLineEl = batAlertLine;
+    s.thumbSlot = mini;
+    s.thumbEl = null;
   });
 
-  // ---- 共通UI ----
   var statusDot = document.getElementById("statusDot");
   var statusText = document.getElementById("statusText");
   var errorBanner = document.getElementById("errorBanner");
   var tableBody = document.getElementById("tableBody");
   var tableSection = document.getElementById("tableSection");
+  var globalStatusDot = document.getElementById("globalStatusDot");
+  var globalStatusText = document.getElementById("globalStatusText");
 
-  function fmtTime(d) {
-    var p = function (n) { return String(n).padStart(2, "0"); };
-    return p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
-  }
-  function fmtClock(d) {
-    var p = function (n) { return String(n).padStart(2, "0"); };
-    return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
-  }
+  function showError(message) { errorBanner.textContent = message; errorBanner.classList.add("show"); }
+  function hideError() { errorBanner.classList.remove("show"); }
 
-  function showError(message) {
-    errorBanner.textContent = message;
-    errorBanner.classList.add("show");
-  }
-  function hideError() {
-    errorBanner.classList.remove("show");
-  }
-
-  function updateGlobalStatus(generatedAt) {
-    var states = SITES.map(function (s) { return siteStates[s.id].lastState; });
+  // 電源監視ビュー自身のステータス行(POWER_SITES=20拠点のみが対象、従来どおり)。
+  function updateGlobalStatus() {
+    var states = POWER_SITES.map(function (s) { return siteData[s.id].lastState; });
     var errCount = states.filter(function (s) { return s === "err"; }).length;
-    var okCount = states.filter(function (s) { return s === "ok"; }).length;
     var pendingCount = states.filter(function (s) { return s === "pending"; }).length;
+    var okCount = states.filter(function (s) { return s === "ok"; }).length;
     var dotClass = errCount ? "err" : (pendingCount ? "pending" : (okCount ? "ok" : "pending"));
-    var text = SITES.length + "拠点中 正常" + okCount + "件";
-    if (errCount) text += " / 取得失敗" + errCount + "件";
-    if (generatedAt) text += "（サーバー最終取得: " + fmtClock(generatedAt) + "）";
+    var text = POWER_SITES.length + "拠点中 正常" + okCount + "件";
+    if (errCount) text += " / 失敗" + errCount + "件";
+    if (pendingCount) text += " / 取得中" + pendingCount + "件";
     statusDot.className = "dot " + dotClass;
     statusText.textContent = text;
   }
 
-  function setSiteStatus(site, state, text) {
-    var s = siteStates[site.id];
-    s.lastState = state;
-    s.statusDotEl.className = "dot " + state;
-    s.statusTextEl.textContent = text;
-    s.statusTextEl.title = text;
+  // ヘッダーの全体ステータス行(ALL_SITES=27拠点対象)。サーバーの最終取得時刻も表示する。
+  function updateHeaderStatus(generatedAt) {
+    if (!globalStatusDot) return;
+    var states = ALL_SITES.map(function (s) { return siteData[s.id].lastState; });
+    var errCount = states.filter(function (s) { return s === "err"; }).length;
+    var pendingCount = states.filter(function (s) { return s === "pending"; }).length;
+    var okCount = states.filter(function (s) { return s === "ok"; }).length;
+    var dotClass = errCount ? "err" : (pendingCount ? "pending" : (okCount ? "ok" : "pending"));
+    var text = ALL_SITES.length + "拠点中 正常" + okCount + "件";
+    if (errCount) text += " / 取得失敗" + errCount + "件";
+    if (generatedAt) text += "（サーバー最終取得: " + fmtClock(generatedAt) + "）";
+    globalStatusDot.className = "dot " + dotClass;
+    globalStatusText.textContent = text;
   }
 
   function updateBatAlertState(site, batVoltage) {
     var s = siteStates[site.id];
-    var isCritical = typeof batVoltage === "number" && batVoltage <= CRITICAL_BAT_VOLTAGE;
-    var isWarn = !isCritical && typeof batVoltage === "number" && batVoltage <= WARN_BAT_VOLTAGE;
-    s.cardEl.classList.toggle("state-critical", isCritical);
-    s.cardEl.classList.toggle("state-warn", isWarn);
-    if (isCritical) {
-      s.batAlertLineEl.textContent = "⛔ 緊急: バッテリー電圧が" + CRITICAL_BAT_VOLTAGE.toFixed(1) + "V以下(動作停止の恐れ)";
-    } else if (isWarn) {
-      s.batAlertLineEl.textContent = "⚠ 注意: バッテリー電圧が" + WARN_BAT_VOLTAGE.toFixed(1) + "V以下に低下";
-    } else {
-      s.batAlertLineEl.textContent = "";
-    }
+    var isCritical = batVoltage <= CRITICAL_BAT_VOLTAGE;
+    var isWarn = !isCritical && batVoltage <= WARN_BAT_VOLTAGE;
+    s.powerCardEl.classList.toggle("state-critical", isCritical);
+    s.powerCardEl.classList.toggle("state-warn", isWarn);
+    if (isCritical) s.batAlertLineEl.textContent = "⛔ 緊急: バッテリー電圧が" + CRITICAL_BAT_VOLTAGE.toFixed(1) + "V以下(動作停止の恐れ)";
+    else if (isWarn) s.batAlertLineEl.textContent = "⚠ 注意: バッテリー電圧が" + WARN_BAT_VOLTAGE.toFixed(1) + "V以下に低下";
+    else s.batAlertLineEl.textContent = "";
   }
 
-  function updateSiteTiles(site) {
+  function refreshPowerCard(site) {
     var s = siteStates[site.id];
+    if (!site.hasPower || !s.powerCardEl) return;
     if (!s.points.length) return;
     var last = s.points[s.points.length - 1];
     var prev = s.points.length > 1 ? s.points[s.points.length - 2] : null;
+    if (typeof last.pv !== "number" || typeof last.bat !== "number") return;
     s.pvValueEl.innerHTML = last.pv.toFixed(1) + '<span class="unit">V</span>';
     s.batValueEl.innerHTML = last.bat.toFixed(1) + '<span class="unit">V</span>';
-    if (prev) {
-      var dPv = last.pv - prev.pv;
-      var dBat = last.bat - prev.bat;
+    if (prev && typeof prev.pv === "number" && typeof prev.bat === "number") {
+      var dPv = last.pv - prev.pv, dBat = last.bat - prev.bat;
       s.pvDeltaEl.textContent = (dPv >= 0 ? "▲ " : "▼ ") + Math.abs(dPv).toFixed(1) + " V";
       s.batDeltaEl.textContent = (dBat >= 0 ? "▲ " : "▼ ") + Math.abs(dBat).toFixed(1) + " V";
     }
     updateBatAlertState(site, last.bat);
-  }
-
-  function updateSiteChart(site) {
-    var s = siteStates[site.id];
     var cutoff = Date.now() - CHART_WINDOW_MS;
-    var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff; });
+    var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && typeof p.pv === "number" && typeof p.bat === "number"; });
     if (recent.length > MAX_CHART_POINTS) recent = recent.slice(-MAX_CHART_POINTS);
-    s.chart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), pv: p.pv, bat: p.bat }; }));
+    s.powerChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), pv: p.pv, bat: p.bat }; }));
   }
 
   function updateSiteImage(site, imageUrl) {
     var s = siteStates[site.id];
-    if (!imageUrl) return;
+    if (!site.hasPower || !s.powerCardEl || !imageUrl) return;
     var src = imageUrl + (imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
     if (!s.thumbEl) {
       var img = document.createElement("img");
-      img.className = "site-thumb";
-      img.referrerPolicy = "no-referrer";
-      img.alt = site.name + " 読取画像";
-      img.title = "クリックで拡大表示";
+      img.className = "site-thumb"; img.referrerPolicy = "no-referrer";
+      img.alt = site.name + " 読取画像"; img.title = "クリックで拡大表示";
       img.addEventListener("click", function () { window.open(imageUrl, "_blank", "noopener"); });
-      img.addEventListener("error", function () {
-        if (img.parentNode) img.parentNode.removeChild(img);
-        s.thumbEl = null;
-      });
+      img.addEventListener("error", function () { if (img.parentNode) img.parentNode.removeChild(img); s.thumbEl = null; });
       s.thumbSlot.appendChild(img);
       s.thumbEl = img;
     }
     s.thumbEl.src = src;
   }
 
+  function setSiteStatus(site, state, text) {
+    var s = siteStates[site.id];
+    siteData[site.id].lastState = state;
+    if (site.hasPower && s.powerStatusDotEl) {
+      s.powerStatusDotEl.className = "dot " + state;
+      s.powerStatusTextEl.textContent = text;
+      s.powerStatusTextEl.title = text;
+    }
+    updateGlobalStatus();
+  }
+
   function rebuildTable() {
     var rows = [];
-    SITES.forEach(function (site) {
-      siteStates[site.id].points.forEach(function (p) { rows.push({ site: site, p: p }); });
-    });
+    POWER_SITES.forEach(function (site) { siteStates[site.id].points.forEach(function (p) { rows.push({ site: site, p: p }); }); });
     rows.sort(function (a, b) { return b.p.fetchedAt - a.p.fetchedAt; });
     var html = rows.map(function (r) {
       var p = r.p;
-      return "<tr>" +
-        "<td>" + r.site.name + "</td>" +
-        "<td>" + fmtTime(p.fetchedAt) + "</td>" +
-        "<td>" + (p.measureTime || "–") + "</td>" +
-        "<td>" + p.pv.toFixed(1) + "</td>" +
-        "<td>" + p.bat.toFixed(1) + "</td>" +
-        "<td>" + p.via + "</td>" +
-        "</tr>";
+      return "<tr><td>" + r.site.name + "</td><td>" + fmtTime(p.fetchedAt) + "</td><td>" + (p.measureTime || "–") + "</td>" +
+        "<td>" + (typeof p.pv === "number" ? p.pv.toFixed(1) : "–") + "</td><td>" + (typeof p.bat === "number" ? p.bat.toFixed(1) : "–") + "</td>" +
+        "<td>" + (typeof p.waterLevelM === "number" ? p.waterLevelM.toFixed(2) : "–") + "</td><td>" + p.via + "</td></tr>";
     }).join("");
     tableBody.innerHTML = html;
   }
 
-  // ---- CSV解析(サーバー側 data/recent.csv, data/history.csv 共通フォーマット) ----
-  function parseCsvRows(text) {
-    var lines = text.split(/\r?\n/).filter(function (l) { return l.trim().length; });
-    if (!lines.length) return [];
-    var startIdx = lines[0].indexOf("拠点") === 0 ? 1 : 0;
-    var out = [];
-    for (var i = startIdx; i < lines.length; i++) {
-      var cols = lines[i].split(",");
-      if (cols.length < 5) continue;
-      var siteId = cols[0];
-      var fetchedAt = new Date(cols[1]);
-      var pv = parseFloat(cols[3]);
-      var bat = parseFloat(cols[4]);
-      if (isNaN(fetchedAt.getTime()) || isNaN(pv) || isNaN(bat)) continue;
-      out.push({
-        siteId: siteId,
-        fetchedAt: fetchedAt,
-        measureTime: cols[2] || null,
-        pv: pv,
-        bat: bat,
-        via: cols[5] || ""
-      });
+  /* =====================================================================
+   * 9. 河川パネルビュー
+   * ===================================================================== */
+  var riverTitle = document.getElementById("riverTitle");
+  var riverSub = document.getElementById("riverSub");
+  var siteOrderList = document.getElementById("siteOrderList");
+  var activeRiver = riverNames[0];
+
+  var riverMapReady = false, riverMap, riverMapLayer = null, currentRiverMarkers = {};
+  var selectedSiteIdOnMap = null;
+
+  function catmullRomSpline(points, samplesPerSegment) {
+    if (points.length < 3) return points.slice();
+    var pts = [points[0]].concat(points, [points[points.length - 1]]);
+    var result = [];
+    for (var i = 1; i < pts.length - 2; i++) {
+      var p0 = pts[i - 1], p1 = pts[i], p2 = pts[i + 1], p3 = pts[i + 2];
+      for (var t = 0; t < samplesPerSegment; t++) {
+        var tt = t / samplesPerSegment, tt2 = tt * tt, tt3 = tt2 * tt;
+        var x = 0.5 * ((2 * p1[0]) + (-p0[0] + p2[0]) * tt + (2 * p0[0] - 5 * p1[0] + 4 * p2[0] - p3[0]) * tt2 + (-p0[0] + 3 * p1[0] - 3 * p2[0] + p3[0]) * tt3);
+        var y = 0.5 * ((2 * p1[1]) + (-p0[1] + p2[1]) * tt + (2 * p0[1] - 5 * p1[1] + 4 * p2[1] - p3[1]) * tt2 + (-p0[1] + 3 * p1[1] - 3 * p2[1] + p3[1]) * tt3);
+        result.push([x, y]);
+      }
     }
-    return out;
+    result.push(points[points.length - 1]);
+    return result;
   }
-
-  function mergeAndDedupe(newPoints) {
-    var bySite = {};
-    SITES.forEach(function (site) { bySite[site.id] = {}; });
-    SITES.forEach(function (site) {
-      siteStates[site.id].points.forEach(function (p) { bySite[site.id][p.fetchedAt.getTime()] = p; });
-    });
-    newPoints.forEach(function (np) {
-      if (!bySite[np.siteId]) return;
-      bySite[np.siteId][np.fetchedAt.getTime()] = {
-        fetchedAt: np.fetchedAt, measureTime: np.measureTime, pv: np.pv, bat: np.bat, via: np.via
-      };
-    });
-    SITES.forEach(function (site) {
-      var merged = Object.keys(bySite[site.id]).map(function (k) { return bySite[site.id][k]; });
-      merged.sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
-      if (merged.length > MAX_STORED_POINTS) merged = merged.slice(merged.length - MAX_STORED_POINTS);
-      siteStates[site.id].points = merged;
-      updateSiteTiles(site);
-      updateSiteChart(site);
+  var RIVER_LINE_COLOR = "#ff3b30", RIVER_LINE_HALO = "#ffffff";
+  function buildMarkerIcon(number, isSelected) {
+    return L.divIcon({
+      className: "",
+      html: '<div class="site-marker-wrap' + (isSelected ? " selected" : "") + '"><div class="site-marker-pulse"></div><div class="site-marker-badge">' + number + '</div></div>',
+      iconSize: [26, 26], iconAnchor: [13, 13]
     });
   }
+  function updateRiverMapMarkerSelection() {
+    Object.keys(currentRiverMarkers).forEach(function (id) {
+      var entry = currentRiverMarkers[id];
+      entry.marker.setIcon(buildMarkerIcon(entry.idx + 1, id === selectedSiteIdOnMap));
+    });
+  }
+  function showMapLoadError(elId, label) {
+    var box = document.getElementById(elId);
+    box.style.display = "flex"; box.style.alignItems = "center"; box.style.justifyContent = "center";
+    box.style.background = "var(--page-plane)"; box.style.color = "var(--text-muted)";
+    box.style.fontSize = "12px"; box.style.textAlign = "center"; box.style.padding = "12px";
+    box.textContent = "地図を読み込めませんでした（ネットワーク環境をご確認ください）。";
+    console.warn(label + "の初期化に失敗しました");
+  }
+  function ensureRiverMap() {
+    if (riverMapReady) return;
+    try {
+      if (typeof L === "undefined") throw new Error("Leafletライブラリの読み込みに失敗しました");
+      riverMap = L.map("riverMap", { zoomControl: true, attributionControl: true, scrollWheelZoom: true });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(riverMap);
+      riverMapReady = true;
+      renderRiverMap(riverGroups[activeRiver] || []);
+    } catch (mapErr) { showMapLoadError("riverMap", "河川マップ"); }
+  }
+  function renderRiverMap(sites) {
+    if (!riverMapReady) return;
+    if (riverMapLayer) { riverMap.removeLayer(riverMapLayer); riverMapLayer = null; }
+    currentRiverMarkers = {};
+    var group = L.layerGroup();
+    var latlngs = sites.map(function (s) { return [s.lat, s.lon]; });
+    if (latlngs.length > 1) {
+      var smoothed = catmullRomSpline(latlngs, 12);
+      L.polyline(smoothed, { color: RIVER_LINE_HALO, weight: 7, opacity: 0.9, lineCap: "round", lineJoin: "round" }).addTo(group);
+      L.polyline(smoothed, { color: RIVER_LINE_COLOR, weight: 4, opacity: 0.95, dashArray: "1 9", lineCap: "round", lineJoin: "round" }).addTo(group);
+    }
+    sites.forEach(function (site, idx) {
+      var icon = buildMarkerIcon(idx + 1, site.id === selectedSiteIdOnMap);
+      var marker = L.marker([site.lat, site.lon], { icon: icon }).addTo(group).bindPopup((idx + 1) + ". " + site.name);
+      marker.on("click", function () { selectSiteInRiverPanel(site.id, { scroll: true }); });
+      currentRiverMarkers[site.id] = { marker: marker, idx: idx };
+    });
+    group.addTo(riverMap);
+    riverMapLayer = group;
+    if (latlngs.length === 1) riverMap.setView(latlngs[0], 16);
+    else riverMap.fitBounds(L.latLngBounds(latlngs), { padding: [30, 30] });
+    setTimeout(function () { riverMap.invalidateSize(); }, 50);
+  }
+  function refreshRiverCard(site) {
+    var s = siteStates[site.id];
+    if (!s.riverCardRefs) return;
+    var refs = s.riverCardRefs;
+    if (siteData[site.id].imageUrl) {
+      refs.liveImgEl.src = siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
+    }
+    if (!site.hasWater) {
+      refs.placeholderEl.style.display = "";
+      refs.placeholderEl.textContent = "水位センサー非搭載";
+      return;
+    }
+    var waterPoints = s.points.filter(function (p) { return typeof p.waterLevelM === "number"; });
+    if (waterPoints.length) {
+      refs.placeholderEl.style.display = "none";
+      refs.chart.setData(waterPoints.map(function (p) { return { value: p.waterLevelM }; }));
+    } else if (siteData[site.id].lastState === "err") {
+      refs.placeholderEl.style.display = "";
+      refs.placeholderEl.textContent = "取得失敗";
+    }
+  }
+  function setActiveRiver(name) {
+    if (!riverGroups[name]) return;
+    var previousSites = riverGroups[activeRiver] || [];
+    activeRiver = name;
+    clearSidebarActive();
+    var btn = sidebar.querySelector('.river-menu-btn[data-river="' + name.replace(/"/g, '\\"') + '"]');
+    if (btn) btn.classList.add("active");
+    previousSites.forEach(function (s) { siteStates[s.id].riverCardRefs = null; });
 
-  // ---- latest.json / recent.csv をサーバーから取得して画面へ反映 ----
-  function applyLatestJson(latest) {
-    if (!latest || !latest.sites) return;
-    SITES.forEach(function (site) {
-      var info = latest.sites[site.id];
-      if (!info) {
-        setSiteStatus(site, "pending", "サーバーでの取得待ちです");
-        return;
+    var sites = riverGroups[name];
+    riverTitle.textContent = "■ " + name;
+    riverSub.textContent = "上流 → 下流の推定順で " + sites.length + " 拠点（緯度に基づく参考順序）";
+    siteOrderList.innerHTML = "";
+    sites.forEach(function (site, idx) {
+      if (idx > 0) {
+        var arrow = document.createElement("div"); arrow.className = "flow-arrow"; arrow.textContent = "↓ 下流へ";
+        siteOrderList.appendChild(arrow);
       }
-      if (info.imageUrl) updateSiteImage(site, info.imageUrl);
-      if (info.lastFetchOk) {
-        setSiteStatus(site, "ok", "最終取得 " + fmtClock(new Date(info.lastFetchAt)) + "（" + (info.via || "サーバー") + "）");
-      } else {
-        var lastOkText = info.lastSuccessAt ? "（前回成功: " + fmtClock(new Date(info.lastSuccessAt)) + "）" : "";
-        setSiteStatus(site, "err", "取得失敗 " + fmtClock(new Date(info.lastFetchAt)) + ": " + info.lastError + lastOkText);
-      }
+      var item = document.createElement("div");
+      item.className = "site-order-item"; item.dataset.siteId = site.id;
+      var badge = document.createElement("div"); badge.className = "site-order-badge"; badge.textContent = String(idx + 1);
+      var body = document.createElement("div"); body.className = "site-order-body";
+      var nameEl = document.createElement("div"); nameEl.className = "site-order-name"; nameEl.textContent = site.name;
+      var coordsEl = document.createElement("div"); coordsEl.className = "site-order-coords";
+      coordsEl.textContent = "緯度 " + site.lat.toFixed(5) + " / 経度 " + site.lon.toFixed(5);
+      body.appendChild(nameEl); body.appendChild(coordsEl);
+
+      var liveCol = document.createElement("div"); liveCol.className = "site-media-col";
+      var liveCaption = document.createElement("div"); liveCaption.className = "site-media-caption"; liveCaption.textContent = "ライブ映像";
+      var liveBox = document.createElement("div"); liveBox.className = "site-media";
+      var liveImg = document.createElement("img"); liveImg.alt = "ライブカメラ映像"; liveBox.appendChild(liveImg);
+      liveCol.appendChild(liveCaption); liveCol.appendChild(liveBox);
+
+      var normalCol = document.createElement("div"); normalCol.className = "site-media-col";
+      var normalCaption = document.createElement("div"); normalCaption.className = "site-media-caption"; normalCaption.textContent = "正常時映像";
+      var normalBox = document.createElement("div"); normalBox.className = "site-media";
+      var normalImg = document.createElement("img"); normalImg.alt = "正常時映像";
+      if (site.normalImageUrl) normalImg.src = site.normalImageUrl;
+      normalBox.appendChild(normalImg); normalCol.appendChild(normalCaption); normalCol.appendChild(normalBox);
+
+      var chartCol = document.createElement("div"); chartCol.className = "site-media-col";
+      var chartCaption = document.createElement("div"); chartCaption.className = "site-media-caption"; chartCaption.textContent = "水位変化";
+      var chartBox = document.createElement("div"); chartBox.className = "mini-chart-box";
+      var placeholder = document.createElement("div"); placeholder.className = "mini-chart-placeholder";
+      placeholder.textContent = site.hasWater ? "取得中…" : "水位センサー非搭載";
+      chartBox.appendChild(placeholder);
+      var chart = createMiniChart(chartBox);
+      chartCol.appendChild(chartCaption); chartCol.appendChild(chartBox);
+
+      var link = document.createElement("button");
+      link.type = "button"; link.className = "site-order-link"; link.textContent = "詳細・水位を見る →";
+      link.addEventListener("click", function (e) { e.stopPropagation(); showView("site"); openSiteDetail(site.id); });
+
+      item.appendChild(badge); item.appendChild(body); item.appendChild(liveCol); item.appendChild(normalCol); item.appendChild(chartCol); item.appendChild(link);
+      item.addEventListener("click", function () { selectSiteInRiverPanel(site.id, { scroll: false }); });
+      siteOrderList.appendChild(item);
+
+      siteStates[site.id].riverCardRefs = { liveImgEl: liveImg, chart: chart, placeholderEl: placeholder };
+      refreshRiverCard(site);
     });
-    updateGlobalStatus(latest.generatedAt ? new Date(latest.generatedAt) : null);
+    renderRiverMap(sites);
+  }
+  function selectSiteInRiverPanel(siteId, opts) {
+    opts = opts || {};
+    selectedSiteIdOnMap = siteId;
+    var card = siteOrderList.querySelector('.site-order-item[data-site-id="' + siteId + '"]');
+    if (card) {
+      if (opts.scroll) card.scrollIntoView({ behavior: "smooth", block: "center" });
+      card.classList.add("jump-highlight");
+      setTimeout(function () { card.classList.remove("jump-highlight"); }, opts.scroll ? 2200 : 1400);
+    }
+    updateRiverMapMarkerSelection();
   }
 
-  // GitHub PagesはCDN(Fastly)経由で配信されており、fetchの cache:"no-store" は
-  // ブラウザ自身のキャッシュ利用を止めるだけでCDN側のキャッシュには効かない。
-  // そのため、新しいコミットが反映された後もCDNの保持期間(数分程度)が過ぎるまで
-  // 古い内容が返り続け、拠点の取得時刻やグラフが更新されないように見えていた。
-  // リクエストURLに毎回異なるクエリ文字列を付与し、CDNキャッシュを確実に回避する。
-  function withCacheBuster(url) {
-    return url + (url.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
+  /* =====================================================================
+   * 10. 全拠点マップビュー
+   * ===================================================================== */
+  var allSitesMapReady = false, allSitesMap, allSitesMarkers = {};
+  document.getElementById("allSitesMapSub").textContent = MAP_SITES.length + "拠点すべての位置を表示します。マーカーを押すと、その拠点の詳細へ移動します。";
+  function allSitesPopupHtml(site) {
+    if (!site.hasWater) {
+      return "<b>" + site.name + "</b><br>（水位センサー非搭載・電源監視のみ）<br><a href=\"#\" data-goto-site=\"" + site.id + "\">この拠点の詳細へ移動 →</a>";
+    }
+    var lvl = siteStates[site.id].points.filter(function (p) { return typeof p.waterLevelM === "number"; });
+    var levelText = lvl.length ? lvl[lvl.length - 1].waterLevelM.toFixed(2) + " m" : "取得中…";
+    return "<b>" + site.name + "</b><br>現在水位: " + levelText + '<br><a href="#" data-goto-site="' + site.id + '">この拠点の詳細へ移動 →</a>';
   }
-
-  function loadRecentCsv() {
-    return fetch(withCacheBuster(DATA_RECENT_URL), { cache: "no-store" })
-      .then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.text();
-      })
-      .then(function (text) {
-        var points = parseCsvRows(text);
-        mergeAndDedupe(points);
-        if (tableSection.classList.contains("show")) rebuildTable();
+  function ensureAllSitesMap() {
+    if (allSitesMapReady) { setTimeout(function () { allSitesMap.invalidateSize(); }, 50); return; }
+    try {
+      if (typeof L === "undefined") throw new Error("Leafletライブラリの読み込みに失敗しました");
+      allSitesMap = L.map("allSitesMap", { zoomControl: true, attributionControl: true, scrollWheelZoom: true });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(allSitesMap);
+      MAP_SITES.forEach(function (site, idx) {
+        var icon = L.divIcon({
+          className: "", html: '<div class="site-marker-wrap"><div class="site-marker-badge">' + (idx + 1) + '</div></div>',
+          iconSize: [26, 26], iconAnchor: [13, 13]
+        });
+        var marker = L.marker([site.lat, site.lon], { icon: icon })
+          .addTo(allSitesMap)
+          .bindTooltip(site.name, { permanent: true, direction: "top", offset: [0, -14], className: "site-tooltip" })
+          .bindPopup(function () { return allSitesPopupHtml(site); });
+        marker.on("popupopen", function (e) {
+          var popupEl = e.popup.getElement();
+          var linkEl = popupEl && popupEl.querySelector("[data-goto-site]");
+          if (linkEl) linkEl.addEventListener("click", function (evt) { evt.preventDefault(); showView("site"); openSiteDetail(site.id); });
+        });
+        allSitesMarkers[site.id] = marker;
       });
+      var allBounds = L.latLngBounds(MAP_SITES.map(function (s) { return [s.lat, s.lon]; }));
+      allSitesMap.fitBounds(allBounds, { padding: [24, 24] });
+      allSitesMapReady = true;
+      setTimeout(function () { allSitesMap.invalidateSize(); }, 200);
+    } catch (mapErr) { showMapLoadError("allSitesMap", "全拠点マップ"); }
+  }
+
+  /* =====================================================================
+   * 11. 拠点詳細ビュー
+   * ===================================================================== */
+  var liveImg = document.getElementById("liveImg");
+  var liveCaption = document.getElementById("liveCaption");
+  var normalImg = document.getElementById("normalImg");
+  var waterNowValue = document.getElementById("waterNowValue");
+  var waterNowDelta = document.getElementById("waterNowDelta");
+  var dataListBody = document.getElementById("dataListBody");
+  var siteDetailTitle = document.getElementById("siteDetailTitle");
+  var detailChart = createLevelChart("waterChart");
+  var activeDetailSiteId = null;
+
+  function siteMarkerStyle(isActive) {
+    return isActive ? { radius: 10, color: "#ffffff", weight: 3, fillColor: "#eb6834", fillOpacity: 1 }
+      : { radius: 6, color: "#ffffff", weight: 1.5, fillColor: "#2a78d6", fillOpacity: 0.85 };
+  }
+  var siteMapReady = false, siteMap, siteMapMarkers = {};
+  function ensureSiteDetailMap() {
+    if (siteMapReady) return;
+    try {
+      if (typeof L === "undefined") throw new Error("Leafletライブラリの読み込みに失敗しました");
+      siteMap = L.map("siteMap", { zoomControl: true, attributionControl: true, scrollWheelZoom: false });
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      }).addTo(siteMap);
+      MAP_SITES.forEach(function (site) {
+        var cm = L.circleMarker([site.lat, site.lon], siteMarkerStyle(site.id === activeDetailSiteId)).addTo(siteMap).bindPopup(site.name);
+        siteMapMarkers[site.id] = cm;
+      });
+      var bounds = L.latLngBounds(MAP_SITES.map(function (s) { return [s.lat, s.lon]; }));
+      siteMap.fitBounds(bounds, { padding: [20, 20] });
+      siteMapReady = true;
+      setTimeout(function () { siteMap.invalidateSize(); }, 200);
+      updateSiteDetailMapHighlight();
+    } catch (mapErr) { showMapLoadError("siteMap", "拠点位置マップ"); }
+  }
+  function updateSiteDetailMapHighlight() {
+    if (!siteMapReady || !activeDetailSiteId) return;
+    var activeSite = SITE_CATALOG[activeDetailSiteId];
+    if (!activeSite || typeof activeSite.lat !== "number") return;
+    Object.keys(siteMapMarkers).forEach(function (id) {
+      var cm = siteMapMarkers[id];
+      cm.setStyle(siteMarkerStyle(id === activeDetailSiteId));
+      if (id === activeDetailSiteId) cm.bringToFront();
+    });
+    siteMap.panTo([activeSite.lat, activeSite.lon]);
+  }
+
+  function updateDetailNow() {
+    var s = siteStates[activeDetailSiteId];
+    var waterPoints = s.points.filter(function (p) { return typeof p.waterLevelM === "number"; });
+    if (!waterPoints.length) { waterNowValue.innerHTML = '–<span class="unit">m</span>'; waterNowDelta.innerHTML = "&nbsp;"; return; }
+    var last = waterPoints[waterPoints.length - 1];
+    var prev = waterPoints.length > 1 ? waterPoints[waterPoints.length - 2] : null;
+    waterNowValue.innerHTML = last.waterLevelM.toFixed(2) + '<span class="unit">m</span>';
+    if (prev) {
+      var d = last.waterLevelM - prev.waterLevelM;
+      waterNowDelta.textContent = (d >= 0 ? "▲ " : "▼ ") + Math.abs(d).toFixed(2) + " m";
+    } else { waterNowDelta.innerHTML = "&nbsp;"; }
+  }
+  function updateDetailChart() {
+    var s = siteStates[activeDetailSiteId];
+    var cutoff = Date.now() - CHART_WINDOW_MS;
+    var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && typeof p.waterLevelM === "number"; });
+    if (recent.length > MAX_CHART_POINTS) recent = recent.slice(-MAX_CHART_POINTS);
+    detailChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.waterLevelM }; }), s.baselineLevelM);
+  }
+  function updateDetailDataList() {
+    var s = siteStates[activeDetailSiteId];
+    var cutoff = Date.now() - CHART_WINDOW_MS;
+    var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && typeof p.waterLevelM === "number"; });
+    var rows = recent.slice().reverse();
+    if (!rows.length) {
+      dataListBody.innerHTML = "";
+      var emptyRow = document.createElement("tr");
+      var activeSiteForEmpty = SITE_CATALOG[activeDetailSiteId];
+      var emptyCell = document.createElement("td"); emptyCell.colSpan = 2; emptyCell.className = "data-list-empty";
+      emptyCell.textContent = (activeSiteForEmpty && !activeSiteForEmpty.hasWater) ? "この拠点は水位センサーを搭載していません。" : "データ取得中…";
+      emptyRow.appendChild(emptyCell); dataListBody.appendChild(emptyRow);
+      return;
+    }
+    dataListBody.innerHTML = rows.map(function (p) { return "<tr><td>" + fmtTime(p.fetchedAt) + "</td><td>" + p.waterLevelM.toFixed(2) + "</td></tr>"; }).join("");
+  }
+  function renderSiteDetail() {
+    var site = SITE_CATALOG[activeDetailSiteId];
+    var s = siteStates[activeDetailSiteId];
+    siteDetailTitle.textContent = "■ " + site.name;
+    clearSidebarSelectedSite();
+    if (s.menuBtnEl) s.menuBtnEl.classList.add("selected");
+    normalImg.alt = "正常時映像";
+    normalImg.src = site.normalImageUrl || "";
+    liveImg.alt = "ライブカメラ映像";
+    if (siteData[site.id].imageUrl) liveImg.src = siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
+    else liveImg.removeAttribute("src");
+    liveCaption.textContent = siteData[site.id].lastFetchedAt ? "最終取得 " + fmtClock(siteData[site.id].lastFetchedAt) + "（" + (siteData[site.id].via || "") + "）" : "取得中…";
+    hideError();
+    updateDetailNow();
+    updateDetailChart();
+    updateDetailDataList();
+    updateSiteDetailMapHighlight();
+  }
+  function openSiteDetail(id) {
+    if (!SITE_CATALOG[id]) return;
+    activeDetailSiteId = id;
+    renderSiteDetail();
+  }
+  function refreshDetailIfActive(site) {
+    if (site.id === activeDetailSiteId && document.getElementById("view-site").classList.contains("show")) {
+      renderSiteDetail();
+    }
+  }
+  normalImg.addEventListener("error", function () { normalImg.alt = "正常時映像を取得できませんでした"; });
+  liveImg.addEventListener("error", function () { liveImg.alt = "ライブカメラ映像を取得できませんでした"; });
+
+  /* =====================================================================
+   * 12. ライブカメラ一覧ビュー
+   * ===================================================================== */
+  var camGrid = document.getElementById("camGrid");
+  var camlistStatusText = document.getElementById("camlistStatusText");
+  // ライブカメラ一覧ビューからのみ除外する拠点(河川ツリー・全拠点マップ・水位グラフ一覧など他ビューには影響しない)。
+  var CAMLIST_EXCLUDE_IDS = ["cam41", "cam44", "cam45", "cam48"];
+  // 水位センサーは無いがライブカメラ一覧には含める拠点(cam01=うるおい広場)。
+  var CAMLIST_INCLUDE_EXTRA_IDS = ["cam01"];
+  // 表示順は「河川別拠点一覧」と同じ(河川の並び→上流→下流)にする。
+  var CAMLIST_SITES = RIVER_ORDER_SITES.filter(function (site) {
+    return (site.hasWater || CAMLIST_INCLUDE_EXTRA_IDS.indexOf(site.id) >= 0) && CAMLIST_EXCLUDE_IDS.indexOf(site.id) < 0;
+  });
+  document.getElementById("camlistSubtitle").textContent = "全" + CAMLIST_SITES.length + "拠点のライブカメラ映像のみを一覧表示します（5分ごとに自動更新）。";
+  CAMLIST_SITES.forEach(function (site) {
+    var card = document.createElement("div"); card.className = "simple-card"; card.dataset.siteId = site.id;
+    var header = document.createElement("div"); header.className = "site-card-header";
+    var h2 = document.createElement("h2"); h2.textContent = site.name;
+    var status = document.createElement("span"); status.className = "site-status";
+    var dot = document.createElement("span"); dot.className = "dot pending";
+    var statusLabel = document.createElement("span"); statusLabel.textContent = "取得中…";
+    status.appendChild(dot); status.appendChild(statusLabel);
+    header.appendChild(h2); header.appendChild(status);
+    var frame = document.createElement("div"); frame.className = "image-frame";
+    var img = document.createElement("img"); img.alt = "ライブカメラ映像"; frame.appendChild(img);
+    var caption = document.createElement("button"); caption.type = "button"; caption.className = "card-caption"; caption.textContent = "詳細を見る →";
+    caption.addEventListener("click", function () { showView("site"); openSiteDetail(site.id); });
+    card.appendChild(header); card.appendChild(frame); card.appendChild(caption);
+    camGrid.appendChild(card);
+    siteStates[site.id].camDotEl = dot; siteStates[site.id].camLabelEl = statusLabel; siteStates[site.id].camImgEl = img;
+  });
+  function refreshCamlistCard(site) {
+    var s = siteStates[site.id];
+    if (!s.camImgEl) return;
+    if (siteData[site.id].imageUrl) {
+      s.camImgEl.src = siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
+      s.camLabelEl.textContent = "最終取得 " + fmtClock(new Date());
+    }
+  }
+  document.getElementById("camlistRefreshBtn").addEventListener("click", refreshFromServer);
+
+  /* =====================================================================
+   * 13. 水位変化グラフ一覧ビュー
+   * ===================================================================== */
+  var graphGrid = document.getElementById("graphGrid");
+  var graphlistStatusText = document.getElementById("graphlistStatusText");
+  // 表示順は「河川別拠点一覧」と同じ(河川の並び→上流→下流)にする。
+  var GRAPHLIST_SITES = RIVER_ORDER_SITES.filter(function (site) { return site.hasWater; });
+  document.getElementById("graphlistSubtitle").textContent = "全" + GRAPHLIST_SITES.length + "拠点の水位変化グラフのみを一覧表示します（5分ごとに自動取得。破線は基準(最低)水位です）。";
+  GRAPHLIST_SITES.forEach(function (site) {
+    var card = document.createElement("div"); card.className = "simple-card"; card.dataset.siteId = site.id;
+    var header = document.createElement("div"); header.className = "site-card-header";
+    var h2 = document.createElement("h2"); h2.textContent = site.name;
+    var status = document.createElement("span"); status.className = "site-status";
+    var dot = document.createElement("span"); dot.className = "dot pending";
+    var statusLabel = document.createElement("span"); statusLabel.textContent = "取得中…";
+    status.appendChild(dot); status.appendChild(statusLabel);
+    header.appendChild(h2); header.appendChild(status);
+
+    var nowRow = document.createElement("div"); nowRow.className = "water-now"; nowRow.style.marginBottom = "6px";
+    var nowLabel = document.createElement("span"); nowLabel.style.fontSize = "11px"; nowLabel.style.color = "var(--text-secondary)"; nowLabel.textContent = "現在水位";
+    var nowValue = document.createElement("span"); nowValue.className = "water-now-value"; nowValue.style.fontSize = "20px"; nowValue.innerHTML = '–<span class="unit">m</span>';
+    nowRow.appendChild(nowLabel); nowRow.appendChild(nowValue);
+
+    var graphBox = document.createElement("div"); graphBox.className = "graph-box"; graphBox.id = "gchart-" + site.id;
+
+    var forecastRow = document.createElement("div"); forecastRow.className = "forecast-row";
+    forecastRow.style.cssText = "display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:var(--text-secondary);margin-top:6px;";
+    var f6 = document.createElement("span"); f6.className = "forecast-6h"; f6.textContent = "6時間後（参考）: データ不足";
+    var f12 = document.createElement("span"); f12.className = "forecast-12h"; f12.textContent = "12時間後（参考）: データ不足";
+    forecastRow.appendChild(f6); forecastRow.appendChild(f12);
+
+    var caption = document.createElement("button"); caption.type = "button"; caption.className = "card-caption"; caption.textContent = "詳細を見る →";
+    caption.addEventListener("click", function () { showView("site"); openSiteDetail(site.id); });
+
+    card.appendChild(header); card.appendChild(nowRow); card.appendChild(graphBox); card.appendChild(forecastRow); card.appendChild(caption);
+    graphGrid.appendChild(card);
+
+    var s = siteStates[site.id];
+    s.graphChart = createLevelChart("gchart-" + site.id);
+    s.graphDotEl = dot; s.graphLabelEl = statusLabel; s.graphNowValueEl = nowValue;
+    s.forecast6El = f6; s.forecast12El = f12;
+  });
+  function refreshGraphlistCard(site) {
+    var s = siteStates[site.id];
+    if (!s.graphChart) return;
+    var waterPoints = s.points.filter(function (p) { return typeof p.waterLevelM === "number"; });
+    if (waterPoints.length) {
+      var last = waterPoints[waterPoints.length - 1];
+      s.graphNowValueEl.innerHTML = last.waterLevelM.toFixed(2) + '<span class="unit">m</span>';
+      s.graphLabelEl.textContent = "最終取得 " + fmtClock(new Date());
+      s.graphChart.setData(waterPoints.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.waterLevelM }; }), s.baselineLevelM);
+    }
+    updateForecastReadouts(site);
+  }
+  document.getElementById("graphlistRefreshBtn").addEventListener("click", refreshFromServer);
+
+  // latest.json中のある拠点の情報を、ステータス表示・画像表示など「今の状態」に関わるすべてのビューへ反映する。
+  // 数値の履歴(チャート・現在値タイル)は別途 recent.csv/history.csv 側(mergeAndDedupe)から反映する。
+  function applySiteStatus(site, info) {
+    var s = siteStates[site.id];
+    var d = siteData[site.id];
+    if (!info) { d.lastState = "pending"; return; }
+    d.via = info.via || d.via;
+    d.measureTime = info.measureTime || d.measureTime;
+    d.lastFetchedAt = info.lastFetchAt ? new Date(info.lastFetchAt) : d.lastFetchedAt;
+    d.lastFetchOk = !!info.lastFetchOk;
+    d.lastError = info.lastError || null;
+    d.lastSuccessAt = info.lastSuccessAt ? new Date(info.lastSuccessAt) : d.lastSuccessAt;
+    if (info.imageUrl) d.imageUrl = info.imageUrl;
+
+    var state = info.lastFetchOk ? "ok" : "err";
+    var text = info.lastFetchOk
+      ? ("最終取得 " + fmtClock(d.lastFetchedAt) + "（" + (info.via || "サーバー") + "）")
+      : ("取得失敗 " + (d.lastFetchedAt ? fmtClock(d.lastFetchedAt) : "") + ": " + (info.lastError || "不明なエラー") +
+         (d.lastSuccessAt ? "（前回成功: " + fmtClock(d.lastSuccessAt) + "）" : ""));
+
+    if (s.menuDotEl) s.menuDotEl.className = "dot " + state;
+    if (s.camDotEl) s.camDotEl.className = "dot " + state;
+    if (s.graphDotEl) s.graphDotEl.className = "dot " + state;
+    if (state === "err") {
+      if (s.camLabelEl) s.camLabelEl.textContent = "取得失敗";
+      if (s.graphLabelEl) s.graphLabelEl.textContent = "取得失敗";
+    }
+    setSiteStatus(site, state, text);
+
+    if (d.imageUrl) {
+      updateSiteImage(site, d.imageUrl);
+      refreshCamlistCard(site);
+      refreshRiverCard(site);
+      refreshDetailIfActive(site);
+    }
+  }
+
+  /* =====================================================================
+   * 14. サーバーからの読み込み (latest.json = 現在状態/画像/エラー、recent.csv/history.csv = 数値履歴)
+   * ===================================================================== */
+  var lastArchivedGeneratedAt = null; // 画像アーカイブの重複キャプチャ防止(サーバーのポーリング周期=generatedAtの値ごとに1回のみ)
+  function maybeArchiveImages(latest) {
+    if (!latest.generatedAt || latest.generatedAt === lastArchivedGeneratedAt) return;
+    lastArchivedGeneratedAt = latest.generatedAt;
+    var ts = new Date(latest.generatedAt);
+    ALL_SITES.forEach(function (site) {
+      var info = latest.sites[site.id];
+      if (info && info.lastFetchOk && info.imageUrl) archiveImageBlob(site, info.imageUrl, ts);
+    });
   }
 
   function loadLatestJson() {
@@ -977,8 +1929,43 @@
         return res.json();
       })
       .then(function (latest) {
-        applyLatestJson(latest);
+        if (!latest || !latest.sites) throw new Error("latest.jsonの形式が不正です");
+        ALL_SITES.forEach(function (site) { applySiteStatus(site, latest.sites[site.id]); });
+        var generatedAt = latest.generatedAt ? new Date(latest.generatedAt) : null;
+        updateHeaderStatus(generatedAt);
+        var genText = generatedAt ? fmtClock(generatedAt) : fmtClock(new Date());
+        camlistStatusText.textContent = "最終取得 " + genText + "（サーバー）";
+        graphlistStatusText.textContent = "最終取得 " + genText + "（サーバー）";
+        maybeArchiveImages(latest);
         hideError();
+      });
+  }
+
+  function loadRecentCsv() {
+    return fetch(withCacheBuster(DATA_RECENT_URL), { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (text) {
+        mergeAndDedupe(parseCsvRows(text));
+      });
+  }
+
+  function loadFullHistoryForTable() {
+    return fetch(withCacheBuster(DATA_HISTORY_URL), { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.text();
+      })
+      .then(function (text) {
+        mergeAndDedupe(parseCsvRows(text));
+        rebuildTable();
+        rebuildVoltageTable();
+        rebuildWaterTable();
+      })
+      .catch(function (err) {
+        showError("全履歴の取得に失敗しました: " + (err && err.message ? err.message : String(err)));
       });
   }
 
@@ -986,14 +1973,12 @@
   var autoRefreshInfoEl = document.getElementById("autoRefreshInfo");
   var nextRefreshAt = Date.now() + CLIENT_REFRESH_MS;
   var flashTimer = null;
-
   function updateAutoRefreshLabel() {
     if (!autoRefreshInfoEl) return;
-    if (autoRefreshInfoEl.classList.contains("just-updated")) return; // 更新直後のメッセージ表示中は上書きしない
+    if (autoRefreshInfoEl.classList.contains("just-updated")) return;
     var secLeft = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
     autoRefreshInfoEl.innerHTML = '<span class="pulse"></span>自動更新: 次回まで約' + secLeft + '秒';
   }
-
   function flashJustUpdated() {
     if (!autoRefreshInfoEl) return;
     autoRefreshInfoEl.classList.add("just-updated");
@@ -1004,16 +1989,16 @@
       updateAutoRefreshLabel();
     }, 2500);
   }
-
   setInterval(updateAutoRefreshLabel, 1000);
   updateAutoRefreshLabel();
 
   function refreshFromServer() {
     nextRefreshAt = Date.now() + CLIENT_REFRESH_MS;
-    Promise.all([loadLatestJson(), loadRecentCsv()]).then(function () {
+    return Promise.all([loadLatestJson(), loadRecentCsv()]).then(function () {
       flashJustUpdated();
     }).catch(function (err) {
-      showError("サーバーのデータ取得に失敗しました: " + (err && err.message ? err.message : String(err)) + "（初回公開直後は data/ 配下のファイルがまだ存在しないことがあります。GitHub Actionsの初回実行完了後に再読み込みしてください）");
+      showError("サーバーのデータ取得に失敗しました: " + (err && err.message ? err.message : String(err)) +
+        "（初回公開直後は data/ 配下のファイルがまだ存在しないことがあります。GitHub Actionsの初回実行完了後に再読み込みしてください）");
       updateAutoRefreshLabel();
     });
   }
@@ -1023,46 +2008,431 @@
     if (!document.hidden) refreshFromServer();
   });
 
-  function loadFullHistoryForTable() {
-    return fetch(withCacheBuster(DATA_HISTORY_URL), { cache: "no-store" })
-      .then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.text();
-      })
-      .then(function (text) {
-        var points = parseCsvRows(text);
-        mergeAndDedupe(points);
-        rebuildTable();
-      })
-      .catch(function (err) {
-        showError("全履歴の取得に失敗しました: " + (err && err.message ? err.message : String(err)));
-      });
+  document.getElementById("refreshBtn").addEventListener("click", refreshFromServer);
+  var globalRefreshBtnEl = document.getElementById("globalRefreshBtn");
+  if (globalRefreshBtnEl) globalRefreshBtnEl.addEventListener("click", refreshFromServer);
+
+  /* =====================================================================
+   * 15. CSV表示・ダウンロード (電源監視ビュー、POWER_SITESのみ対象。CSV自体はサーバーの
+   * history.csvへの直リンクであり、ブラウザ側での再構築は行わない)
+   * ===================================================================== */
+  // data/recent.csv, data/history.csv 共通の解析関数。サーバー側の履歴移行(6列→7列ヘッダー)により
+  // 同一ファイル内に6列(旧・水位列なし)行と7列(新・水位列あり)行が混在し得るため、各行ごとの実際の
+  // 列数(cols.length)で判定する(先頭のヘッダー行1行だけを見て決めるとファイル全体を誤判定するため)。
+  function parseCsvRows(text) {
+    var lines = text.split(/\r?\n/).filter(function (l) { return l.trim().length; });
+    var out = [];
+    for (var i = 0; i < lines.length; i++) {
+      var cols = lines[i].split(",");
+      if (cols[0] === "拠点") continue; // ヘッダー行(先頭以外に紛れ込んでいても安全にスキップ)
+      if (cols.length !== 6 && cols.length !== 7) continue;
+      var siteId = cols[0];
+      var fetchedAt = new Date(cols[1]);
+      if (isNaN(fetchedAt.getTime())) continue;
+      var pv = cols[3] !== "" ? parseFloat(cols[3]) : NaN;
+      var bat = cols[4] !== "" ? parseFloat(cols[4]) : NaN;
+      var waterLevelM = null, via;
+      if (cols.length === 7) {
+        waterLevelM = cols[5] !== "" ? parseFloat(cols[5]) : null;
+        if (waterLevelM !== null && isNaN(waterLevelM)) waterLevelM = null;
+        via = cols[6] || "";
+      } else {
+        via = cols[5] || ""; // 旧6列形式(水位列なし)
+      }
+      out.push({ siteId: siteId, fetchedAt: fetchedAt, measureTime: cols[2] || null, pv: isNaN(pv) ? null : pv, bat: isNaN(bat) ? null : bat, waterLevelM: waterLevelM, via: via });
+    }
+    return out;
+  }
+  function mergeAndDedupe(newPoints) {
+    var bySite = {};
+    ALL_SITES.forEach(function (site) { bySite[site.id] = {}; });
+    ALL_SITES.forEach(function (site) { siteStates[site.id].points.forEach(function (p) { bySite[site.id][p.fetchedAt.getTime()] = p; }); });
+    newPoints.forEach(function (np) {
+      if (!bySite[np.siteId]) return;
+      bySite[np.siteId][np.fetchedAt.getTime()] = { fetchedAt: np.fetchedAt, measureTime: np.measureTime, pv: np.pv, bat: np.bat, waterLevelM: typeof np.waterLevelM === "number" ? np.waterLevelM : null, via: np.via };
+    });
+    ALL_SITES.forEach(function (site) {
+      var s = siteStates[site.id];
+      var merged = Object.keys(bySite[site.id]).map(function (k) { return bySite[site.id][k]; });
+      merged.sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+      if (merged.length > MAX_STORED_POINTS) merged = merged.slice(merged.length - MAX_STORED_POINTS);
+      s.points = merged;
+      if (site.hasWater && s.baselineLevelM === null) {
+        for (var i = 0; i < merged.length; i++) {
+          if (typeof merged[i].waterLevelM === "number") { s.baselineLevelM = merged[i].waterLevelM; break; }
+        }
+      }
+      refreshPowerCard(site);
+      refreshGraphlistCard(site);
+      refreshRiverCard(site);
+      refreshDetailIfActive(site);
+    });
+    if (tableSection.classList.contains("show")) rebuildTable();
+    if (currentView === "voltagedata") rebuildVoltageTable();
+    if (currentView === "waterdata") rebuildWaterTable();
   }
 
-  document.getElementById("refreshBtn").addEventListener("click", refreshFromServer);
   document.getElementById("tableBtn").addEventListener("click", function () {
     var showing = tableSection.classList.toggle("show");
     this.textContent = showing ? "表を隠す" : "表で表示";
     if (showing) loadFullHistoryForTable();
   });
 
-  // ダウンロードリンクもCDNキャッシュを避けるため、クリック直前にURLを毎回更新する
-  var csvLinkEl = document.getElementById("csvLink");
-  if (csvLinkEl) {
-    csvLinkEl.addEventListener("click", function () {
-      csvLinkEl.href = withCacheBuster(DATA_HISTORY_URL);
+  var voltageTableBody = document.getElementById("voltageTableBody");
+  var voltageDataStatusText = document.getElementById("voltageDataStatusText");
+  function rebuildVoltageTable() {
+    if (!voltageTableBody) return;
+    var rows = [];
+    POWER_SITES.forEach(function (site) { siteStates[site.id].points.forEach(function (p) { rows.push({ site: site, p: p }); }); });
+    rows.sort(function (a, b) { return b.p.fetchedAt - a.p.fetchedAt; });
+    voltageTableBody.innerHTML = rows.map(function (r) {
+      var p = r.p;
+      return "<tr><td>" + r.site.name + "</td><td>" + fmtTime(p.fetchedAt) + "</td><td>" + (p.measureTime || "–") + "</td>" +
+        "<td>" + (typeof p.pv === "number" ? p.pv.toFixed(1) : "–") + "</td><td>" + (typeof p.bat === "number" ? p.bat.toFixed(1) : "–") + "</td>" +
+        "<td>" + p.via + "</td></tr>";
+    }).join("");
+    if (voltageDataStatusText) voltageDataStatusText.textContent = "件数: " + rows.length + "件";
+  }
+  document.getElementById("voltageTableBtn").addEventListener("click", loadFullHistoryForTable);
+
+  // ダウンロードリンクもCDNキャッシュを避けるため、クリック直前にURLを毎回更新する(サーバーのhistory.csv
+  // への直リンクであり、ブラウザ側でCSVを組み立て直す処理は行わない)。
+  ["voltageCsvLink", "waterCsvLink"].forEach(function (id) {
+    var linkEl = document.getElementById(id);
+    if (linkEl) linkEl.addEventListener("click", function () { linkEl.href = withCacheBuster(DATA_HISTORY_URL); });
+  });
+
+  /* =====================================================================
+   * 15b. データダウンロード: 水位データ (WATER_SITESのみ対象)
+   * ===================================================================== */
+  var waterTableBody = document.getElementById("waterTableBody");
+  var waterDataStatusText = document.getElementById("waterDataStatusText");
+  function waterPointsFlat() {
+    var out = [];
+    WATER_SITES.forEach(function (site) {
+      siteStates[site.id].points.forEach(function (p) {
+        if (typeof p.waterLevelM === "number") out.push({ site: site, p: p });
+      });
+    });
+    return out;
+  }
+  function rebuildWaterTable() {
+    if (!waterTableBody) return;
+    var rows = waterPointsFlat();
+    rows.sort(function (a, b) { return b.p.fetchedAt - a.p.fetchedAt; });
+    waterTableBody.innerHTML = rows.map(function (r) {
+      var p = r.p;
+      return "<tr><td>" + r.site.name + "</td><td>" + fmtTime(p.fetchedAt) + "</td><td>" + (p.measureTime || "–") + "</td>" +
+        "<td>" + p.waterLevelM.toFixed(2) + "</td></tr>";
+    }).join("");
+    if (waterDataStatusText) waterDataStatusText.textContent = "件数: " + rows.length + "件";
+  }
+  document.getElementById("waterTableBtn").addEventListener("click", loadFullHistoryForTable);
+
+  /* =====================================================================
+   * 15c. データダウンロード: 画像データ (実際に取得できた画像バイトのアーカイブ)
+   * -----------------------------------------------------------------------
+   * 各拠点のカメラURLは常にその時点の最新画像しか返さない(過去画像を後から取れる仕組みではない)ため、
+   * サーバー(latest.json)が新しい取得サイクル(generatedAt)を報告するたびに、そのサイクルで成功した
+   * 拠点分だけ画像バイトをその場でfetchしてブラウザメモリ上に貯めておく方式(maybeArchiveImages経由、
+   * generatedAtごとに1回のみ実行しdedupeする。クライアントの60秒ごとの再読み込みのたびに、まだ更新
+   * されていない同じ画像を何度も取得してしまうのを防ぐため)。
+   * メモリ圧迫を避けるため、拠点ごとに件数(IMAGE_ARCHIVE_MAX_PER_SITE)と経過時間(IMAGE_ARCHIVE_MAX_AGE_MS)
+   * の両方で上限を設け、超えた古いものから間引く。画像取得の失敗は本体のステータス表示の信頼性に
+   * 影響させないよう、必ずベストエフォート(catchで揉み消し)で行う。
+   * ===================================================================== */
+  var IMAGE_ARCHIVE_MAX_PER_SITE = 300;
+  var IMAGE_ARCHIVE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+  var IMAGE_SITES = ALL_SITES; // 全拠点のtest.cgiページに画像(imgタグ)が含まれるため、画像アーカイブは全拠点を対象とする
+  var imageArchive = {}; // id -> [{ts:Date, blob:Blob}, ...] 古い順
+  ALL_SITES.forEach(function (site) { imageArchive[site.id] = []; });
+
+  function pruneImageArchive(siteId) {
+    var arr = imageArchive[siteId];
+    var cutoff = Date.now() - IMAGE_ARCHIVE_MAX_AGE_MS;
+    var kept = arr.filter(function (e) { return e.ts.getTime() >= cutoff; });
+    if (kept.length > IMAGE_ARCHIVE_MAX_PER_SITE) kept = kept.slice(kept.length - IMAGE_ARCHIVE_MAX_PER_SITE);
+    imageArchive[siteId] = kept;
+  }
+
+  // 非同期・ノンブロッキングのベストエフォート処理。失敗しても本体の表示には一切影響しない。
+  // latest.jsonが返す解決済み画像URLからバイト列を取得するだけなので、HTMLスクレイピングは不要だが、
+  // ブラウザからは引き続きクロスオリジンのため、直接fetch失敗時はCORSプロキシにフォールバックする。
+  function archiveImageBlob(site, imageUrl, ts) {
+    fetchImageBlobWithFallback(imageUrl).then(function (blob) {
+      imageArchive[site.id].push({ ts: ts, blob: blob });
+      pruneImageArchive(site.id);
+      if (currentView === "imagedata" && imageDataSiteSelect && imageDataSiteSelect.value === site.id) updateImageDataStatus();
+    }).catch(function (err) {
+      console.warn("画像アーカイブへの保存に失敗しました(" + site.id + "):", err && err.message);
     });
   }
+
+  var imageDataSiteSelect = document.getElementById("imageDataSiteSelect");
+  var imageDataStartInput = document.getElementById("imageDataStart");
+  var imageDataEndInput = document.getElementById("imageDataEnd");
+  var imageDataStatusText = document.getElementById("imageDataStatusText");
+  var imageDataMessage = document.getElementById("imageDataMessage");
+  var imageDataDownloadBtn = document.getElementById("imageDataDownloadBtn");
+
+  IMAGE_SITES.forEach(function (site) {
+    var opt = document.createElement("option");
+    opt.value = site.id; opt.textContent = site.name;
+    imageDataSiteSelect.appendChild(opt);
+  });
+
+  function updateImageDataStatus() {
+    var siteId = imageDataSiteSelect.value;
+    var arr = imageArchive[siteId] || [];
+    if (!arr.length) { imageDataStatusText.textContent = "現在キャッシュされている画像: 0枚"; return; }
+    var oldest = arr[0].ts, newest = arr[arr.length - 1].ts;
+    imageDataStatusText.textContent = "現在キャッシュされている画像: " + arr.length + "枚（" + fmtTime(oldest) + " 〜 " + fmtTime(newest) + "）";
+  }
+  imageDataSiteSelect.addEventListener("change", updateImageDataStatus);
+  updateImageDataStatus();
+
+  function pad2(n) { return String(n).padStart(2, "0"); }
+  function tsFileName(d) { return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds()); }
+
+  function triggerBlobDownload(blob, filename) {
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a"); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  }
+
+  // ブラウザによる同時複数ダウンロードのブロックを避けるため、少し間隔をあけて順番にダウンロードする。
+  function downloadSequentialFallback(siteId, entries) {
+    imageDataMessage.textContent = "JSZipを読み込めなかったため、" + entries.length + "枚を個別ファイルとして順番にダウンロードします…";
+    var i = 0;
+    function next() {
+      if (i >= entries.length) { imageDataMessage.textContent = entries.length + "枚のダウンロードを開始しました(個別ファイル、JSZip未使用)。"; return; }
+      var e = entries[i++];
+      triggerBlobDownload(e.blob, siteId + "_" + tsFileName(e.ts) + ".jpg");
+      setTimeout(next, 300);
+    }
+    next();
+  }
+
+  function downloadImagesForRange() {
+    imageDataMessage.textContent = "";
+    var siteId = imageDataSiteSelect.value;
+    var arr = imageArchive[siteId] || [];
+    var startVal = imageDataStartInput.value, endVal = imageDataEndInput.value;
+    var startMs = startVal ? new Date(startVal).getTime() : -Infinity;
+    var endMs = endVal ? new Date(endVal).getTime() : Infinity;
+    if (isNaN(startMs)) startMs = -Infinity;
+    if (isNaN(endMs)) endMs = Infinity;
+    var matched = arr.filter(function (e) { var t = e.ts.getTime(); return t >= startMs && t <= endMs; });
+    if (!matched.length) {
+      imageDataMessage.textContent = "指定した期間に一致する画像がありません（0枚）。期間を広げるか、ダッシュボードを開いたまましばらく待ってから再度お試しください。";
+      return;
+    }
+    // JSZipはcdnjsから読み込む(Leafletと同様の防御的パターン)。読み込めていない場合は個別ダウンロードに
+    // フォールバックする(サンドボックス環境やCDN到達不可時でもページが壊れないようにするため)。
+    if (typeof JSZip === "undefined") { downloadSequentialFallback(siteId, matched); return; }
+    try {
+      var zip = new JSZip();
+      matched.forEach(function (e) { zip.file(siteId + "_" + tsFileName(e.ts) + ".jpg", e.blob); });
+      zip.generateAsync({ type: "blob" }).then(function (content) {
+        triggerBlobDownload(content, siteId + "_images_" + tsFileName(new Date()) + ".zip");
+        imageDataMessage.textContent = matched.length + "枚をZIPファイルとしてダウンロードしました。";
+      }).catch(function (err) {
+        console.warn("ZIP生成に失敗しました。個別ダウンロードにフォールバックします:", err && err.message);
+        downloadSequentialFallback(siteId, matched);
+      });
+    } catch (err) {
+      console.warn("JSZipの利用に失敗しました。個別ダウンロードにフォールバックします:", err && err.message);
+      downloadSequentialFallback(siteId, matched);
+    }
+  }
+  imageDataDownloadBtn.addEventListener("click", downloadImagesForRange);
+
+  /* =====================================================================
+   * 15d. 水位変化グラフ一覧: 短期水位予測(+6h/+12h)
+   * -----------------------------------------------------------------------
+   * 重要な注意: これはAIモデルによる予測ではありません。サーバー/学習基盤を持たない単一の静的HTMLファイルの
+   * 中で本物の学習済みAIモデル(推論ランタイム込み)を現実的に組み込むことはできないため、正直に「単純な
+   * 統計的トレンド予測」として実装しています。各拠点自身の直近水位データに対する最小二乗法の線形回帰(トレンド)
+   * を主信号とし、気象庁(JMA)が公開しているAMeDAS観測点(三島市中心付近に最も近い地点)の直近降水量から
+   * 算出した簡易な補正係数を掛け合わせているだけです。安全上の判断・避難判断には使用しないでください。
+   *
+   * 国土交通省(MLIT)の「川の防災情報」および「水防災オープンデータ提供サービス」については、本セッションの
+   * 調査で、クライアント側から単純にfetchできるCORS対応の公開JSON APIが見つからなかった(利用登録・データ
+   * 提供に関する協定等が必要な形式であった)ため、本実装には統合していません。
+   * ===================================================================== */
+  var FORECAST_TREND_WINDOW_MS = 2 * 60 * 60 * 1000; // 直近2時間の水位データでトレンド(傾き)を算出
+  var FORECAST_MIN_POINTS = 3; // これ未満は「データ不足」として予測を出さない
+  var AMEDAS_TABLE_URL = "https://www.jma.go.jp/bosai/amedas/const/amedastable.json";
+  var AMEDAS_LATEST_TIME_URL = "https://www.jma.go.jp/bosai/amedas/data/latest_time.txt";
+  var MISHIMA_CENTER_LAT = 35.12, MISHIMA_CENTER_LON = 138.91;
+  var AMEDAS_FETCH_TIMEOUT_MS = 6000;
+  var AMEDAS_REFRESH_INTERVAL_MS = 30 * 60 * 1000;
+
+  var amedasState = { stationId: null, stationsLoaded: false, recentRainMm: null };
+
+  function fetchWithTimeout(url, timeoutMs) {
+    var controller = (typeof AbortController !== "undefined") ? new AbortController() : null;
+    var timer = controller ? setTimeout(function () { controller.abort(); }, timeoutMs) : null;
+    return fetch(url, { cache: "no-store", signal: controller ? controller.signal : undefined }).then(function (res) {
+      if (timer) clearTimeout(timer);
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res;
+    }, function (err) { if (timer) clearTimeout(timer); throw err; });
+  }
+
+  // amedastable.jsonの正確なフィールド形式は未検証のため、複数の座標表現(配列[度,分]形式 / 単純10進数)を
+  // 防御的に許容する。想定外の形式であってもエラーにはせず、単に該当拠点なし(null)として扱う。
+  function findNearestAmedasStation(tableJson) {
+    var bestId = null, bestDist = Infinity;
+    function coordFrom(val) {
+      if (Array.isArray(val) && val.length >= 1) return val[0] + (val[1] || 0) / 60;
+      if (typeof val === "number") return val;
+      return null;
+    }
+    Object.keys(tableJson || {}).forEach(function (id) {
+      var st = tableJson[id];
+      if (!st) return;
+      var lat = st.lat !== undefined ? coordFrom(st.lat) : null;
+      var lon = st.lon !== undefined ? coordFrom(st.lon) : null;
+      if (lat === null || lon === null) return;
+      var d = (lat - MISHIMA_CENTER_LAT) * (lat - MISHIMA_CENTER_LAT) + (lon - MISHIMA_CENTER_LON) * (lon - MISHIMA_CENTER_LON);
+      if (d < bestDist) { bestDist = d; bestId = id; }
+    });
+    return bestId;
+  }
+
+  // pointJsonの正確なフィールド名も未検証のため、複数の降水量フィールド候補を順に試す。
+  function extractRecentRainfall(pointJson) {
+    try {
+      var times = Object.keys(pointJson || {}).sort();
+      if (!times.length) return null;
+      var latest = pointJson[times[times.length - 1]];
+      var candidates = ["precipitation1h", "precipitation10m", "precipitation3h", "precipitation24h"];
+      for (var i = 0; i < candidates.length; i++) {
+        var v = latest && latest[candidates[i]];
+        if (Array.isArray(v) && typeof v[0] === "number") return v[0];
+      }
+    } catch (e) { /* 形式不明時は不明(null)扱い */ }
+    return null;
+  }
+
+  function loadAmedasStationsOnce() {
+    if (amedasState.stationsLoaded) return Promise.resolve();
+    return fetchWithTimeout(AMEDAS_TABLE_URL, AMEDAS_FETCH_TIMEOUT_MS)
+      .then(function (res) { return res.json(); })
+      .then(function (json) { amedasState.stationId = findNearestAmedasStation(json); })
+      .catch(function (err) {
+        console.warn("AMeDAS観測点一覧の取得に失敗しました(降水量補正なしでトレンドのみ継続します):", err && err.message);
+      })
+      .then(function () { amedasState.stationsLoaded = true; });
+  }
+
+  function updateRainfallSignal() {
+    return loadAmedasStationsOnce().then(function () {
+      if (!amedasState.stationId) return;
+      return fetchWithTimeout(AMEDAS_LATEST_TIME_URL, AMEDAS_FETCH_TIMEOUT_MS)
+        .then(function (res) { return res.text(); })
+        .then(function (txt) {
+          var m = txt.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+          if (!m) throw new Error("latest_timeの形式が不明です");
+          var ymd = m[1] + m[2] + m[3];
+          var hour = parseInt(m[4], 10);
+          var h3 = Math.floor(hour / 3) * 3;
+          var h3str = (h3 < 10 ? "0" : "") + h3;
+          var pointUrl = "https://www.jma.go.jp/bosai/amedas/data/point/" + amedasState.stationId + "/" + ymd + "_" + h3str + ".json";
+          return fetchWithTimeout(pointUrl, AMEDAS_FETCH_TIMEOUT_MS);
+        })
+        .then(function (res) { return res.json(); })
+        .then(function (pointJson) { amedasState.recentRainMm = extractRecentRainfall(pointJson); });
+    }).catch(function (err) {
+      console.warn("AMeDAS降水量データの取得に失敗しました(トレンドのみで予測を継続します):", err && err.message);
+      amedasState.recentRainMm = null;
+    });
+  }
+
+  // 簡易ヒューリスティック(物理的な降雨-水位応答モデルではない): 直近降水量が多いほどトレンドを増幅し、
+  // 降雨なし/不明時はやや減衰させて横ばいに近づける。数値は経験的な目安であり精緻な根拠はない。
+  function rainfallMultiplier() {
+    var mm = amedasState.recentRainMm;
+    if (typeof mm !== "number" || mm <= 0) return 0.85;
+    if (mm < 1) return 1.0;
+    if (mm < 5) return 1.3;
+    if (mm < 15) return 1.7;
+    return 2.2;
+  }
+
+  function computeTrendSlopeM(site) {
+    var s = siteStates[site.id];
+    var cutoff = Date.now() - FORECAST_TREND_WINDOW_MS;
+    var pts = s.points.filter(function (p) { return typeof p.waterLevelM === "number" && p.fetchedAt.getTime() >= cutoff; });
+    if (pts.length < FORECAST_MIN_POINTS) return null;
+    var t0 = pts[0].fetchedAt.getTime();
+    var n = pts.length, sumX = 0, sumY = 0, sumXY = 0, sumXX = 0;
+    pts.forEach(function (p) {
+      var x = (p.fetchedAt.getTime() - t0) / 3600000, y = p.waterLevelM;
+      sumX += x; sumY += y; sumXY += x * y; sumXX += x * x;
+    });
+    var denom = n * sumXX - sumX * sumX;
+    if (Math.abs(denom) < 1e-9) return 0;
+    return (n * sumXY - sumX * sumY) / denom; // m/時
+  }
+
+  function computeForecast(site) {
+    var s = siteStates[site.id];
+    var waterPoints = s.points.filter(function (p) { return typeof p.waterLevelM === "number"; });
+    if (waterPoints.length < FORECAST_MIN_POINTS) return null;
+    var slope = computeTrendSlopeM(site);
+    if (slope === null) return null;
+    var lastLevel = waterPoints[waterPoints.length - 1].waterLevelM;
+    var mult = rainfallMultiplier();
+    return { h6: lastLevel + slope * 6 * mult, h12: lastLevel + slope * 12 * mult };
+  }
+
+  function updateForecastReadouts(site) {
+    var s = siteStates[site.id];
+    if (!s.forecast6El) return;
+    var forecast = computeForecast(site);
+    if (forecast) {
+      s.forecast6El.textContent = "6時間後（参考）: " + forecast.h6.toFixed(2) + "m";
+      s.forecast12El.textContent = "12時間後（参考）: " + forecast.h12.toFixed(2) + "m";
+    } else {
+      s.forecast6El.textContent = "6時間後（参考）: データ不足";
+      s.forecast12El.textContent = "12時間後（参考）: データ不足";
+    }
+  }
+  function refreshAllForecasts() { WATER_SITES.forEach(updateForecastReadouts); }
 
   if (window.matchMedia) {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
-      SITES.forEach(function (site) { siteStates[site.id].chart.redraw(); });
+      ALL_SITES.forEach(function (site) {
+        var s = siteStates[site.id];
+        if (s.powerChart) s.powerChart.redraw();
+        if (s.graphChart) s.graphChart.redraw();
+        if (s.riverCardRefs) s.riverCardRefs.chart.redraw();
+      });
+      detailChart.redraw();
     });
   }
 
-  // 初回読み込み + 以後は約1分ごとにサーバーの最新データを再取得
+  /* =====================================================================
+   * 16. 初期化 (数値・画像の取得はサーバー(GitHub Actions)側で完了済みのため、ここではdata/配下の
+   * 生成済みファイルを読みに行くだけでよい。ブラウザを開いていない間もサーバー側の記録は続く)
+   * ===================================================================== */
+  showView("power");
+  setActiveRiver(activeRiver);
+  activeDetailSiteId = WATER_SITES[0].id;
   refreshFromServer();
   setInterval(refreshFromServer, CLIENT_REFRESH_MS);
+  updateRainfallSignal().then(refreshAllForecasts);
+  setInterval(function () { updateRainfallSignal().then(refreshAllForecasts); }, AMEDAS_REFRESH_INTERVAL_MS);
+
+  // テストハーネス/デバッグ専用のフック(本番動作には影響しない)。
+  window.__dashboardDebug = {
+    imageArchive: imageArchive, siteStates: siteStates, siteData: siteData,
+    refreshFromServer: refreshFromServer, computeForecast: computeForecast, amedasState: amedasState,
+    updateRainfallSignal: updateRainfallSignal, refreshAllForecasts: refreshAllForecasts
+  };
 })();
 </script>
 </body>
