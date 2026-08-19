@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>水位・電源監視ダッシュボード（Web版）</title>
+<title>水位・電源監視ダッシュボード</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
   :root {
@@ -95,20 +95,6 @@
   .dot.err { background: #d03b3b; }
   .dot.pending { background: #eda100; }
 
-  .autorefresh-status {
-    font-size: 12px; color: var(--text-muted); display: flex; align-items: center; gap: 5px; white-space: nowrap;
-    padding: 3px 9px; border-radius: 999px; background: var(--page-plane); border: 1px solid var(--border);
-  }
-  .autorefresh-status .pulse {
-    display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #0ca30c; flex: none;
-    animation: autorefresh-pulse 1.6s ease-in-out infinite;
-  }
-  @keyframes autorefresh-pulse {
-    0%, 100% { opacity: 0.35; transform: scale(0.85); }
-    50% { opacity: 1; transform: scale(1); }
-  }
-  .autorefresh-status.just-updated { color: #0ca30c; border-color: #0ca30c; }
-
   .error-banner {
     display: none;
     background: var(--danger-bg);
@@ -125,11 +111,28 @@
     padding: 4px 8px 16px;
     border-bottom: 1px solid var(--border);
     margin-bottom: 16px;
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;
   }
   .top-header h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
   .top-header .subtitle { color: var(--text-secondary); font-size: 12px; margin: 0; line-height: 1.5; }
+  .visit-counter { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 3px; margin-top: 2px; }
+  .visit-counter img { display: block; height: 20px; }
+  .visit-counter .visit-counter-fallback { display: none; font-size: 11px; color: var(--text-muted); }
+  .visit-counter .visit-counter-note { font-size: 10px; color: var(--text-muted); }
 
-  .app-layout { display: flex; align-items: flex-start; gap: 16px; }
+  .header-left { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+  .sidebar-toggle-btn {
+    flex: none; width: 36px; height: 36px; margin-top: 1px;
+    display: inline-flex; align-items: center; justify-content: center;
+    border-radius: 8px; border: 1px solid var(--border);
+    background: var(--surface-1); color: var(--text-primary); cursor: pointer; font-size: 17px; line-height: 1;
+  }
+  .sidebar-toggle-btn:hover { background: var(--page-plane); }
+
+  .app-layout { display: flex; align-items: flex-start; gap: 16px; position: relative; }
+  .sidebar-backdrop { display: none; }
+  /* サイドバーを折りたたんだ状態(デスクトップ幅ではメニュー領域を非表示にしてコンテンツを広く使う) */
+  .app-layout.sidebar-collapsed .sidebar { display: none; }
 
   .sidebar {
     flex: 0 0 280px;
@@ -153,12 +156,12 @@
   .river-menu-group { display: flex; flex-direction: column; }
   .river-menu-btn {
     display: flex; justify-content: space-between; align-items: center; gap: 8px;
-    width: 100%; text-align: left; font: inherit; font-size: 13px;
+    width: 100%; text-align: left; font: inherit; font-size: 13px; font-weight: 700;
     padding: 9px 10px; border-radius: 8px; border: 1px solid transparent;
     background: transparent; color: var(--text-primary); cursor: pointer;
   }
   .river-menu-btn:hover { background: var(--page-plane); }
-  .river-menu-btn.active { background: var(--series-pv); color: #fff; font-weight: 600; }
+  .river-menu-btn.active { background: var(--series-pv); color: #fff; font-weight: 700; }
   .river-menu-count { font-size: 11px; color: var(--text-muted); flex: none; }
   .river-menu-btn.active .river-menu-count { color: rgba(255,255,255,0.85); }
   .all-sites-menu-btn { font-weight: 700; margin-bottom: 4px; }
@@ -190,6 +193,26 @@
   }
   .download-menu-btn:hover { background: var(--page-plane); color: var(--text-primary); }
   .download-menu-btn.selected { background: var(--page-plane); color: var(--series-bat); font-weight: 700; }
+
+  /* ===================== モバイル表示: サイドバーをオーバーレイ式の折りたたみメニューにする ===================== */
+  @media (max-width: 900px) {
+    body { padding: 14px; }
+    .sidebar {
+      position: fixed; top: 0; left: 0; height: 100vh; max-height: 100vh;
+      width: 86vw; max-width: 320px; z-index: 60; border-radius: 0;
+      transform: translateX(0); transition: transform 0.25s ease;
+      box-shadow: 4px 0 20px rgba(0,0,0,0.28);
+    }
+    .app-layout.sidebar-collapsed .sidebar {
+      display: flex; /* デスクトップ用のdisplay:noneを上書きし、スライドで隠す */
+      transform: translateX(-105%);
+    }
+    .sidebar-backdrop {
+      display: block; position: fixed; inset: 0; background: rgba(6,20,26,0.45); z-index: 55;
+      opacity: 1; transition: opacity 0.2s ease;
+    }
+    .app-layout.sidebar-collapsed .sidebar-backdrop { opacity: 0; pointer-events: none; }
+  }
 
   .app-content { flex: 1 1 auto; min-width: 0; }
   .view-section { display: none; }
@@ -326,8 +349,9 @@
 
   .site-media-col { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; }
   .site-media-caption { font-size: 10px; color: var(--text-muted); }
-  .site-media { width: 106px; height: 62px; border-radius: 6px; overflow: hidden; background: #10222b; }
+  .site-media { width: 106px; height: 62px; border-radius: 6px; overflow: hidden; background: #10222b; display: flex; align-items: center; justify-content: center; }
   .site-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .site-media .img-nodata { font-size: 9px; padding: 2px; }
   .mini-chart-box { width: 148px; height: 62px; border-radius: 6px; overflow: hidden; background: var(--surface-1); border: 1px solid var(--gridline); position: relative; }
   .mini-chart-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--text-muted); text-align: center; padding: 4px; }
 
@@ -365,6 +389,7 @@
   .image-frame { width: 100%; aspect-ratio: 16 / 9; background: #10222b; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center; }
   .image-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
   .panel-caption { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+  .img-nodata { display: none; color: var(--text-muted); font-size: 13px; text-align: center; padding: 8px; line-height: 1.4; }
 
   .water-now { display: flex; align-items: baseline; gap: 10px; margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid var(--gridline); }
   .water-now-label { font-size: 12px; color: var(--text-secondary); }
@@ -399,21 +424,21 @@
 <body>
 <div class="wrap">
   <header class="top-header" id="topHeader">
-    <div class="header-row" style="margin-bottom:0;">
-      <div class="header-title">
-        <h1>水位・電源監視ダッシュボード（Web版）</h1>
-        <p class="subtitle" id="subtitleText">サーバー(GitHub Actions)が5分ごと(ベストエフォート)に全拠点の電源(PV/BAT)と水位を自動取得・記録しています</p>
-      </div>
-      <div class="header-toolbars">
-        <div class="toolbar">
-          <div class="status" id="globalStatusText"><span class="dot pending" id="globalStatusDot"></span>読み込み中…</div>
-          <div class="autorefresh-status" id="autoRefreshInfo">自動更新: 待機中…</div>
-          <button id="globalRefreshBtn">最新データを再読み込み</button>
-        </div>
+    <div class="header-left">
+      <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="メニューの表示切替" title="メニューの表示切替">☰</button>
+      <div>
+        <h1>水位・電源監視ダッシュボード</h1>
+        <p class="subtitle" id="subtitleText">拠点の電源(PV/BAT)と水位を5分ごとに自動取得（起動時は即時取得）</p>
       </div>
     </div>
+    <div class="visit-counter" id="visitCounter">
+      <img id="visitCounterImg" alt="アクセスカウンター">
+      <span class="visit-counter-fallback" id="visitCounterFallback">アクセスカウンター取得不可</span>
+      <span class="visit-counter-note">このページのアクセス数</span>
+    </div>
   </header>
-  <div class="app-layout">
+  <div class="app-layout" id="appLayout">
+    <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
     <nav class="sidebar" id="sidebar">
       <button type="button" class="river-menu-btn all-sites-menu-btn sidebar-toplevel" id="allSitesMenuBtn">🗺️ 全拠点（マップ）</button>
       <button type="button" class="river-menu-btn all-sites-menu-btn sidebar-toplevel" id="powerMenuBtn">⚡ 電源監視</button>
@@ -441,7 +466,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">⚡ 電源監視</h1>
-            <p class="subtitle" id="powerSubtitle">拠点をサーバー(GitHub Actions)が5分間隔(ベストエフォート)で自動取得・mV → V に換算（この画面は約1分ごとにサーバーの最新値を再取得します）</p>
+            <p class="subtitle" id="powerSubtitle">拠点を5分ごとに自動取得・mV → V に換算（起動時は即時取得）</p>
           </div>
           <div class="header-toolbars">
             <div class="toolbar">
@@ -466,10 +491,8 @@
         </div>
 
         <footer>
-          このダッシュボードはサーバー(GitHub Actions)側で5分間隔(ベストエフォート)に全27拠点のデータを自動取得し、そのままGitHub Pagesで公開しています。ブラウザを開いていなくてもサーバー側で記録が続くため、どのパソコン・スマートフォンからこのページを開いても同じ最新データ・同じ履歴を確認できます。<br>
-          画面は開いたままにしておくだけで、約1分ごとに自動でサーバーの最新データを再取得して表示を更新します(ヘッダーの「自動更新」表示で動作中かご確認いただけます)。他のタブを見ていて戻ってきたときも自動的に最新化されます。「全拠点を今すぐ更新」ボタンで手動更新もできます(いずれもサーバー側の取得自体を今すぐ実行するものではありません)。<br>
-          グラフは直近24時間分のみを表示します。全期間の記録は「表で表示」、または「データダウンロード → 電圧データ/水位データ」からご確認いただけます。<br>
-          バッテリー電圧が12.0V以下になった拠点は黄色の枠(注意)、11.5V以下になった拠点は赤色の枠(緊急・機器が動作停止する恐れのある電圧域)で強調表示されます。
+          このページを開いている間、起動直後に全拠点のデータを即時取得し、以後は5分間隔で自動的に取得・更新します。CSVダウンロードや履歴ファイルとの連携は「データダウンロード → 電圧データ」で行えます。<br>
+          バッテリー電圧が12.0V以下になった拠点は黄色の枠(注意)、11.5V以下になった拠点は赤色の枠(緊急)で強調表示されます。
         </footer>
       </div>
 
@@ -512,7 +535,7 @@
           <div class="panel">
             <h2 class="panel-title">■ 正常時映像</h2>
             <div class="image-frame"><img id="normalImg" alt="正常時映像"></div>
-            <div class="panel-caption">水DXサイト（河川水位・画像情報一覧）掲載の参考画像です</div>
+            <div class="panel-caption" id="normalImgCaption">水DXサイト（河川水位・画像情報一覧）掲載の参考画像です</div>
           </div>
           <div class="panel map-panel">
             <h2 class="panel-title">■ 拠点位置（他拠点も表示・選択中を強調）</h2>
@@ -561,7 +584,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">📈 水位変化グラフ一覧</h1>
-            <p class="subtitle" id="graphlistSubtitle">全拠点の水位変化グラフのみを一覧表示します（サーバーが5分間隔で自動取得。破線は基準(最低)水位です）。</p>
+            <p class="subtitle" id="graphlistSubtitle">全拠点の水位変化グラフのみを一覧表示します（5分ごとに自動取得。破線は基準(最低)水位です）。</p>
           </div>
           <div class="toolbar">
             <span id="graphlistStatusText">読み込み中…</span>
@@ -579,26 +602,24 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">💾 電圧データ</h1>
-            <p class="subtitle">サーバー(GitHub Actions)が5分間隔(ベストエフォート)で記録したPV/BAT電圧の履歴です。全期間の記録はCSVで直接ダウンロードできます。</p>
+            <p class="subtitle">電源監視データ(PV/BAT/水位)のCSV書き出し・履歴ファイルとの連携をここで行います。</p>
           </div>
           <div class="header-toolbars">
             <div class="toolbar">
-              <div class="status" id="voltageDataStatusText">直近の取得状況を表示しています。</div>
-              <button id="voltageTableBtn">表で表示（全履歴）</button>
-              <a class="btn" id="voltageCsvLink" href="data/history.csv" download="mishima_dashboard_history.csv">CSV全履歴をダウンロード</a>
+              <div class="status" id="voltageDataStatusText">CSVダウンロードまたは履歴ファイル連携を行えます。</div>
+              <button id="csvBtn">CSVダウンロード</button>
+            </div>
+            <div class="toolbar">
+              <div class="status" id="fileLinkStatus">履歴ファイル: 未連携（開き直すとデータは失われます）</div>
+              <label class="checkbox-label"><input type="checkbox" id="autoDownloadToggle" checked>5分ごとに自動でCSVをダウンロード(未連携時)</label>
+              <button id="linkFileBtn">履歴ファイルと連携…</button>
+              <button id="importCsvBtn">CSVから履歴を読み込む</button>
+              <input type="file" id="csvImportInput" accept=".csv,text/csv" style="display:none">
             </div>
           </div>
         </div>
-        <div class="table-section show" id="voltageTableSection">
-          <div class="table-scroll">
-            <table>
-              <thead><tr><th>拠点</th><th>取得時刻</th><th>機器の計測時刻</th><th>PV (V)</th><th>BAT (V)</th><th>取得方法</th></tr></thead>
-              <tbody id="voltageTableBody"></tbody>
-            </table>
-          </div>
-        </div>
         <footer>
-          このCSVはサーバー側(GitHub Actions)が全拠点分をまとめて自動的に記録した履歴ファイルそのものです。ブラウザ側でCSVを組み立て直す処理は行っていません。「表で表示」は直近の取得データに加え、押した時点で全期間の履歴(data/history.csv)を読み込んで一覧表示します。旧バージョンにあったFile System Access APIによるローカルの履歴ファイル連携機能は、この構成では不要になったため削除しています。
+          「履歴ファイルと連携」でパソコン内のCSVファイルを選択すると、以後の取得結果が全拠点分まとめて自動的にそのファイルへ保存され、次回このページを開いて同じファイルを選び直せば続きから記録できます（Chrome / Edge対応、File System Access API使用）。連携していない場合は、5分ごとに自動でCSVファイルがダウンロードされます。CSVの形式は電源監視ビューで取得しているデータと同じです。
         </footer>
       </div>
 
@@ -607,12 +628,11 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">💧 水位データ</h1>
-            <p class="subtitle" id="waterDataSubtitle">サーバーが5分間隔(ベストエフォート)で蓄積した水位測定値の履歴です。全期間の記録はCSVで直接ダウンロードできます。</p>
+            <p class="subtitle" id="waterDataSubtitle">全拠点の水位測定値を5分ごとに蓄積した履歴です。CSVでダウンロードできます。</p>
           </div>
           <div class="toolbar">
             <div class="status" id="waterDataStatusText">件数: 0件</div>
-            <button id="waterTableBtn">表で表示（全履歴）</button>
-            <a class="btn" id="waterCsvLink" href="data/history.csv" download="mishima_dashboard_history.csv">CSV全履歴をダウンロード</a>
+            <button id="waterCsvBtn">CSVダウンロード</button>
           </div>
         </div>
         <div class="table-scroll">
@@ -624,7 +644,7 @@
           </table>
         </div>
         <footer>
-          このデータは水位監視26拠点(電源専用のうるおい広場（大場川 / 東町）は対象外)を対象に、サーバー(GitHub Actions)が5分間隔(ベストエフォート)で取得したものです。CSVはサーバー側の履歴ファイル(data/history.csv、PV/BATと共通)をそのままダウンロードします。「表で表示（全履歴）」を押すと全期間の履歴を読み込んで一覧を更新します。
+          このデータは水位監視29拠点(電源専用のうるおい広場（大場川 / 東町）は対象外)を対象に、5分間隔の共有ポーリングで取得したものです。うち3拠点(下神川橋・中村橋・下御殿橋)は国土交通省「川の防災情報」から取得しており、水位は計算式による補正を行わない生値です。
         </footer>
       </div>
 
@@ -665,7 +685,7 @@
   "use strict";
 
   /* =====================================================================
-   * 1. 拠点カタログ (電源監視20拠点 + 水位監視26拠点 をマージ、計27拠点)
+   * 1. 拠点カタログ (電源監視20拠点 + 水位監視26拠点 をマージ、計27拠点 + 川の防災情報5拠点 = 計32拠点)
    * ===================================================================== */
   var WATER_SITES_RAW = [
     { id: "cam02", name: "中郷第１樋管（大場川 / 御園）", lat: 35.076968, lon: 138.92336, correction: 5510, op: "-" },
@@ -737,24 +757,115 @@
     }
   });
   var POWER_SITES = POWER_ORDER.map(function (id) { return SITE_CATALOG[id]; });          // 20拠点(電源監視の元順)
-  var WATER_SITES = WATER_SITES_RAW.map(function (s) { return SITE_CATALOG[s.id]; });     // 26拠点(水位監視の元順、水位センサーあり)
-  // 水位センサーは無いが座標のある電源専用拠点(現在はcam01)をマップ・河川ツリー専用に追加した拠点リスト。
-  var MAP_SITES = WATER_SITES.concat(POWER_SITES.filter(function (s) { return !s.hasWater && typeof s.lat === "number"; }));
-  var ALL_IDS = POWER_ORDER.concat(WATER_SITES_RAW.map(function (s) { return s.id; }).filter(function (id) { return POWER_ORDER.indexOf(id) < 0; }));
-  var ALL_SITES = ALL_IDS.map(function (id) { return SITE_CATALOG[id]; }); // 27拠点(重複なし) - 共有ポーリング対象
+
+  /* ---------------------------------------------------------------------
+   * 1b. 国土交通省「川の防災情報」ソースの追加拠点(三島市関連、計5拠点)
+   * -----------------------------------------------------------------------
+   * 従来のmatsuhisa.info拠点とは取得パターンが異なるため、専用のsourceTypeで区別する。
+   *   - kawabou-water  : 水位観測拠点。水位状況→水位の数値を計算式(補正)を入れずそのまま採用。
+   *                       https://www.river.go.jp/kawabou/file/files/tmlist/stg/{yyyymmdd}/{hhmm(5分刻み)}/{obsCd13}.json
+   *                       の obsValue.stg (m) / obsValue.obsTime をそのまま使用(CORS開放を確認済み)。
+   *   - kawabou-camera : 河川カメラ拠点。ライブ映像(現在)と正常時映像の2タブを持つ。
+   *                       https://cam.river.go.jp/cam/{now|normal}/{camCode}.jpg を5分間隔で再取得。
+   *                       同名.jsonに撮影時刻(get_time)が入っている(CORS開放を確認済み)。
+   * obsCd13 = ofcCd(5桁0埋め) + itmkndCd(3桁0埋め) + obsCd(5桁0埋め) (例: 5633/4/16 → "0563300400016")
+   * 出典: 川の防災情報 - 国土交通省 (https://www.river.go.jp/kawabou/)
+   *
+   * kw01～kw03は水位観測拠点だが、国交省サイドにはカメラ画像が無いため、
+   * 静岡県「川の防災情報」河川監視カメラ(cam.shizuoka4.jp、camtypeで指定)から映像を取得する。
+   *   - 正常時(平時)画像: https://www.cam.shizuoka4.jp/common/img/heiji/{camtypeの先頭1桁}/{camtypeの残り3桁}.jpg (静的・CORS開放を確認済み)
+   *   - ライブ画像      : https://www.cam.shizuoka4.jp/cam/{camtype}.json (撮影時刻obsdateを取得。CORSブロックのためr.jina.aiプロキシ経由で取得。プロキシ自体もCORS開放を確認済み)
+   *                       → https://www.cam.shizuoka4.jp/cam/{camtype}/{yyyy}/{mm}/{dd}/{yyyymmddHHMM}00_01.jpg (CORS開放を確認済み)
+   * --------------------------------------------------------------------- */
+  var KAWABOU_WATER_SITES_RAW = [
+    { id: "kw01", name: "下神川橋（大場川 / 三島市加茂川町）", lat: 35.1230556, lon: 138.9225, obsCd13: "0563300400016",
+      shizuokaCamtype: "2036", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/036.jpg" },
+    { id: "kw02", name: "中村橋（大場川 / 三島市中）", lat: 35.1061111, lon: 138.9355556, obsCd13: "0563300400156",
+      shizuokaCamtype: "2089", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/089.jpg" },
+    { id: "kw03", name: "下御殿橋（御殿川 / 三島市青木）", lat: 35.1086111, lon: 138.9219444, obsCd13: "0563300400157",
+      shizuokaCamtype: "2090", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/090.jpg" }
+  ];
+  var KAWABOU_CAMERA_SITES_RAW = [
+    { id: "kc01", name: "境川排水機場屋上（狩野川 / 三島市）", lat: 35.0854083, lon: 138.9080278,
+      liveImageUrl: "https://cam.river.go.jp/cam/now/cctv_220001_51C04874.jpg",
+      normalImageUrl: "https://cam.river.go.jp/cam/normal/cctv_220001_51C04874.jpg",
+      camJsonUrl: "https://cam.river.go.jp/cam/now/cctv_220001_51C04874.json" },
+    { id: "kc02", name: "大場川 0.0k+152 右岸（大場川 / 三島市御園）", lat: 35.077285094, lon: 138.923893975,
+      liveImageUrl: "https://cam.river.go.jp/cam/now/121826024.jpg",
+      normalImageUrl: "https://cam.river.go.jp/cam/normal/121826024.jpg",
+      camJsonUrl: "https://cam.river.go.jp/cam/now/121826024.json" },
+    { id: "kc03", name: "大場川左岸 2k200（大場川 / 函南町間宮）", lat: 35.0897885, lon: 138.9354008,
+      liveImageUrl: "https://cam.river.go.jp/cam/now/121826016.jpg",
+      normalImageUrl: "https://cam.river.go.jp/cam/normal/121826016.jpg",
+      camJsonUrl: "https://cam.river.go.jp/cam/now/121826016.json" },
+    { id: "kc04", name: "大場川（狩野川 / 沼津市大平）", lat: 35.0734472, lon: 138.921525,
+      liveImageUrl: "https://cam.river.go.jp/cam/now/cctv_220001_51C03436.jpg",
+      normalImageUrl: "https://cam.river.go.jp/cam/normal/cctv_220001_51C03436.jpg",
+      camJsonUrl: "https://cam.river.go.jp/cam/now/cctv_220001_51C03436.json" },
+    { id: "kc05", name: "狩野川左岸 11k000（狩野川 / 沼津市大平）", lat: 35.0772856, lon: 138.9129728,
+      liveImageUrl: "https://cam.river.go.jp/cam/now/121826006.jpg",
+      normalImageUrl: "https://cam.river.go.jp/cam/normal/121826006.jpg",
+      camJsonUrl: "https://cam.river.go.jp/cam/now/121826006.json" },
+    { id: "kc06", name: "函南観音川排水機場 屋上（大場川 / 函南町）", lat: 35.0856667, lon: 138.9364194,
+      liveImageUrl: "https://cam.river.go.jp/cam/now/cctv_220001_51C04876.jpg",
+      normalImageUrl: "https://cam.river.go.jp/cam/normal/cctv_220001_51C04876.jpg",
+      camJsonUrl: "https://cam.river.go.jp/cam/now/cctv_220001_51C04876.json" },
+    { id: "kc07", name: "狩野川 8.6k+17（狩野川 / 清水町徳倉）", lat: 35.086168173, lon: 138.904438341,
+      liveImageUrl: "https://cam.river.go.jp/cam/now/121826023.jpg",
+      normalImageUrl: "https://cam.river.go.jp/cam/normal/121826023.jpg",
+      camJsonUrl: "https://cam.river.go.jp/cam/now/121826023.json" },
+    { id: "kc08", name: "狩野川左岸 7k050（狩野川 / 清水町徳倉）", lat: 35.0974681, lon: 138.8997331,
+      liveImageUrl: "https://cam.river.go.jp/cam/now/121826004.jpg",
+      normalImageUrl: "https://cam.river.go.jp/cam/normal/121826004.jpg",
+      camJsonUrl: "https://cam.river.go.jp/cam/now/121826004.json" }
+  ];
+  var KAWABOU_WATER_SOURCE_NOTE = "出典: 国土交通省「川の防災情報」（水位は計算式による補正を行わない生値です）";
+  var KAWABOU_SHIZUOKA_CAM_SOURCE_NOTE = "出典: 静岡県「川の防災情報」河川監視カメラ（水位データの出典は国土交通省「川の防災情報」）";
+  var KAWABOU_CAMERA_SOURCE_NOTE = "出典: 国土交通省「川の防災情報」掲載の正常時参考画像です";
+  KAWABOU_WATER_SITES_RAW.forEach(function (s) {
+    SITE_CATALOG[s.id] = {
+      id: s.id, name: s.name, lat: s.lat, lon: s.lon,
+      obsCd13: s.obsCd13, sourceType: "kawabou-water",
+      sourceNote: s.shizuokaCamtype ? KAWABOU_SHIZUOKA_CAM_SOURCE_NOTE : KAWABOU_WATER_SOURCE_NOTE,
+      shizuokaCamtype: s.shizuokaCamtype || null,
+      normalImageUrl: s.normalImageUrl || null, hasWater: true, hasPower: false
+    };
+  });
+  KAWABOU_CAMERA_SITES_RAW.forEach(function (s) {
+    SITE_CATALOG[s.id] = {
+      id: s.id, name: s.name, lat: s.lat, lon: s.lon,
+      liveImageUrl: s.liveImageUrl, normalImageUrl: s.normalImageUrl, camJsonUrl: s.camJsonUrl,
+      sourceType: "kawabou-camera", sourceNote: KAWABOU_CAMERA_SOURCE_NOTE,
+      hasWater: false, hasPower: false
+    };
+  });
+  var KAWABOU_WATER_IDS = KAWABOU_WATER_SITES_RAW.map(function (s) { return s.id; });
+  var KAWABOU_CAMERA_IDS = KAWABOU_CAMERA_SITES_RAW.map(function (s) { return s.id; });
+  var KAWABOU_CAMERA_SITES = KAWABOU_CAMERA_IDS.map(function (id) { return SITE_CATALOG[id]; });
+
+  var WATER_SITES = WATER_SITES_RAW.map(function (s) { return SITE_CATALOG[s.id]; })
+    .concat(KAWABOU_WATER_IDS.map(function (id) { return SITE_CATALOG[id]; })); // 26+3=29拠点(水位センサーあり)
+  // 水位センサーは無いが座標のある拠点(電源専用のcam01、および川の防災情報のカメラ専用拠点)をマップ・河川ツリー専用に追加。
+  var MAP_SITES = WATER_SITES.concat(POWER_SITES.filter(function (s) { return !s.hasWater && typeof s.lat === "number"; }))
+    .concat(KAWABOU_CAMERA_SITES);
+  var ALL_IDS = POWER_ORDER.concat(WATER_SITES_RAW.map(function (s) { return s.id; }).filter(function (id) { return POWER_ORDER.indexOf(id) < 0; }))
+    .concat(KAWABOU_WATER_IDS).concat(KAWABOU_CAMERA_IDS);
+  var ALL_SITES = ALL_IDS.map(function (id) { return SITE_CATALOG[id]; }); // 27+11=38拠点(重複なし) - 共有ポーリング対象
 
   var RATED_BAT_VOLTAGE = 12.5;
   var WARN_BAT_VOLTAGE = 12.0;
   var CRITICAL_BAT_VOLTAGE = 11.5;
 
-  var CLIENT_REFRESH_MS = 60 * 1000; // 画面の自動再読み込み間隔(サーバー側の実際の取得間隔=5分ベストエフォートとは別)
+  var FETCH_INTERVAL_MS = 5 * 60 * 1000; // 5分間隔(元の間隔に戻す)
+  var AUTO_DOWNLOAD_INTERVAL_MS = 5 * 60 * 1000;
   var MAX_CHART_POINTS = 288;
   var CHART_WINDOW_MS = 24 * 60 * 60 * 1000;
-  var MAX_STORED_POINTS = 4032; // ブラウザのメモリ上に保持する上限(14日分・表示用の安全上限。サーバー側の全期間記録には影響しません)
-
-  var DATA_LATEST_URL = "data/latest.json";
-  var DATA_RECENT_URL = "data/recent.csv";
-  var DATA_HISTORY_URL = "data/history.csv";
+  var MAX_STORED_POINTS = 2016;
+  var POLL_CONCURRENCY = 3;
+  // 大場ポンプ場流入水路・神川都市下水路・徳倉都市下水路の3拠点のみ、画像・水位データともに2分間隔で取得する
+  // (この3拠点は他拠点と同じtest.cgiから画像・水位を同時に取得するため、取得間隔を上げるだけで両方が2分更新になる)。
+  var FAST_POLL_SITE_IDS = ["cam39", "cam50", "cam51"];
+  var FAST_POLL_INTERVAL_MS = 2 * 60 * 1000;
 
   function isDark() { return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
   function palette() {
@@ -770,40 +881,97 @@
   }
 
   /* =====================================================================
-   * 2. サーバーデータ読み込み (取得・解析はサーバー(GitHub Actions)側のscripts/poll.mjsが
-   * 既に行っており、このダッシュボードは data/latest.json, data/recent.csv, data/history.csv を
-   * 読むだけでよい。CORSプロキシ経由のHTMLスクレイピングはここでは一切行わない。
-   * 例外は「画像データ」ビューのZIPアーカイブ用バイト取得(fetchImageBlobWithFallback)のみで、
-   * これは画像バイナリそのものを取りに行く必要があり、ブラウザから見ると引き続きクロスオリジンのため。
+   * 2. 取得・解析ロジック (共通、1サイトにつき1回の取得でPV/BAT/水位/画像すべて抽出)
    * ===================================================================== */
-
-  // GitHub PagesはCDN(Fastly)経由で配信されており、fetchの cache:"no-store" はブラウザ自身の
-  // キャッシュ利用を止めるだけでCDN側のキャッシュには効かない。そのため、新しいコミットが反映された後も
-  // CDNの保持期間(数分程度)が過ぎるまで古い内容が返り続け、拠点の取得時刻やグラフが更新されないように
-  // 見えることがある。リクエストURLに毎回異なるクエリ文字列を付与し、CDNキャッシュを確実に回避する。
-  function withCacheBuster(url) {
-    return url + (url.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
+  function stripTags(html) {
+    return html.replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">");
   }
 
-  // 画像データビューのZIPアーカイブ専用: latest.jsonが返す解決済みの画像URLからバイト列(Blob)を
-  // 取得する。直接fetchを試し、失敗時のみ(ブラウザからはクロスオリジンのため起き得る)CORSプロキシに
-  // フォールバックする。数値・画像URLの抽出そのものはサーバー側で完了済みなので、HTMLスクレイピングは不要。
-  function fetchImageBlobWithFallback(url) {
-    var fallbackBuilders = [
-      function () { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(url) + "&_ts=" + Date.now(); },
-      function () { return "https://corsproxy.io/?url=" + encodeURIComponent(url) + "&_ts=" + Date.now(); }
-    ];
-    function attempt(u) {
-      return fetch(u, { cache: "no-store" }).then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.blob();
-      });
+  // CRITICAL: 3つのフォールバック分岐(imgタグ / markdown画像 / 裸のjpg URL)を必ず維持する。
+  // r.jina.aiなど一部のCORSプロキシはHTMLをmarkdown/テキストに変換するため、分岐(2)(3)が無いと
+  // 一部拠点でライブ画像が更新されなくなる不具合が過去に発生している。
+  function extractImageUrl(rawText, baseUrl) {
+    var candidates = [];
+    var imgTagRegex = /<img\b[^>]*>/gi;
+    var srcAttrRegex = /\ssrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/i;
+    var tagMatch;
+    while ((tagMatch = imgTagRegex.exec(rawText)) !== null) {
+      var srcMatch = srcAttrRegex.exec(tagMatch[0]);
+      if (srcMatch) {
+        var src = srcMatch[1] || srcMatch[2] || srcMatch[3];
+        if (src) candidates.push(src);
+      }
     }
-    var p = attempt(url);
-    fallbackBuilders.forEach(function (build) {
-      p = p.catch(function () { return attempt(build()); });
+    if (!candidates.length) {
+      var mdImgRegex = /!\[[^\]]*\]\(([^)\s]+)[^)]*\)/g;
+      var mdMatch;
+      while ((mdMatch = mdImgRegex.exec(rawText)) !== null) {
+        if (mdMatch[1]) candidates.push(mdMatch[1]);
+      }
+    }
+    if (!candidates.length) {
+      var bareUrlRegex = /(?:https?:\/\/[^\s"'<>()]+?\.jpe?g(?:\?[^\s"'<>()]*)?|[A-Za-z0-9_\-./]+\.jpe?g(?:\?[^\s"'<>()]*)?)(?=[\s"'<>)]|$)/gi;
+      var bareMatch;
+      while ((bareMatch = bareUrlRegex.exec(rawText)) !== null) {
+        candidates.push(bareMatch[0]);
+      }
+    }
+    if (!candidates.length) return null;
+    var jpgCandidates = candidates.filter(function (src) { return /\.jpe?g(\?|#|$)/i.test(src); });
+    var chosen = jpgCandidates.length ? jpgCandidates[jpgCandidates.length - 1] : candidates[candidates.length - 1];
+    try { return new URL(chosen, baseUrl).href; } catch (e) { return null; }
+  }
+
+  // v17のparseReadingを元にしつつ、PV/BATが無くても例外を投げないよう緩和(水位専用拠点は
+  // ページにPV/BATが無いことがあるため)。water補正情報(correction/op)がある拠点のみ水位を算出する。
+  function parseReading(rawText, baseUrl, site) {
+    var imageUrl = extractImageUrl(rawText, baseUrl);
+    var text = stripTags(rawText);
+    var pvMatch = text.match(/PV\s*[=＝]\s*(-?\d+(?:\.\d+)?)\s*m?V/i);
+    var batMatch = text.match(/BAT\s*[=＝]\s*(-?\d+(?:\.\d+)?)\s*m?V/i);
+    var timeMatch = text.match(/Measure\s*Time\s*[=＝]\s*([0-9]{4}-[0-9]{2}-[0-9]{2}[ T][0-9]{2}:[0-9]{2}:[0-9]{2})/i);
+    var sensorMatch = text.match(/(?:Sencer|Distance)\s*[=＝]\s*(-?\d+(?:\.\d+)?)\s*cm/i);
+
+    var waterLevelM = null;
+    if (sensorMatch && site && typeof site.correction === "number" && site.op) {
+      var rawMm = parseFloat(sensorMatch[1]) * 10;
+      var resultMm = site.op === "+" ? (site.correction + rawMm) : (site.correction - rawMm);
+      waterLevelM = resultMm / 1000;
+    }
+    return {
+      pv: pvMatch ? parseFloat(pvMatch[1]) / 1000 : null,
+      bat: batMatch ? parseFloat(batMatch[1]) / 1000 : null,
+      measureTime: timeMatch ? timeMatch[1] : null,
+      imageUrl: imageUrl,
+      waterLevelM: waterLevelM
+    };
+  }
+
+  function buildFallbacks(targetUrl) {
+    return [
+      { name: "allorigin経由", build: function () { return "https://api.allorigins.win/raw?url=" + encodeURIComponent(targetUrl) + "&_ts=" + Date.now(); } },
+      { name: "corsproxy.io経由", build: function () { return "https://corsproxy.io/?url=" + encodeURIComponent(targetUrl) + "&_ts=" + Date.now(); } },
+      { name: "r.jina.ai経由", build: function () { return "https://r.jina.ai/" + targetUrl + "?_ts=" + Date.now(); } }
+    ];
+  }
+  function tryFetch(url, label, opts) {
+    return fetch(url, opts || { cache: "no-store" }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.text().then(function (t) {
+        if (!t || !t.trim()) throw new Error("空の応答");
+        return { text: t, via: label };
+      });
+    }).catch(function (err) {
+      throw new Error(label + ": " + (err && err.message ? err.message : String(err)));
     });
-    return p;
+  }
+  function fetchRaw(targetUrl) {
+    var errors = [];
+    var attempt = tryFetch(targetUrl, "直接取得", { cache: "no-store", mode: "cors" });
+    buildFallbacks(targetUrl).forEach(function (fb) {
+      attempt = attempt.catch(function (err) { errors.push(err.message); return tryFetch(fb.build(), fb.name); });
+    });
+    return attempt.catch(function (lastErr) { errors.push(lastErr.message); throw new Error(errors.join(" / ")); });
   }
 
   function fmtClock(d) {
@@ -813,6 +981,105 @@
   function fmtTime(d) {
     var p = function (n) { return String(n).padStart(2, "0"); };
     return p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
+
+  /* ---------------------------------------------------------------------
+   * 2b. 「川の防災情報」拠点用の取得ロジック(matsuhisa.info系とは別経路)
+   * --------------------------------------------------------------------- */
+  // tmlist系JSONは5分刻みのパスのみ存在するため、現在時刻を直近5分に切り捨てて使う。
+  // (未来分・未生成分のパスを渡してもobsValueには常に最新の実測値が入るためズレても実害はないが、
+  //  安定して200を得るために切り捨てておく。)
+  // ブラウザのローカルタイムゾーンに関わらず、常にJST(UTC+9)の壁時計時刻でパスを構築する
+  // (このダッシュボードは海外のブラウザから開かれる可能性もあるため、d.getHours()等のローカル時刻に依存しない)。
+  function toJstParts(d) {
+    var utcMs = d.getTime() + d.getTimezoneOffset() * 60000;
+    var jst = new Date(utcMs + 9 * 3600000);
+    return { y: jst.getUTCFullYear(), mo: jst.getUTCMonth(), day: jst.getUTCDate(), h: jst.getUTCHours(), mi: jst.getUTCMinutes() };
+  }
+  function kawabouWaterJsonUrl(obsCd13, d) {
+    var p = toJstParts(d);
+    var flooredMin = p.mi - (p.mi % 5);
+    var p2 = function (n) { return String(n).padStart(2, "0"); };
+    var datePart = p.y + p2(p.mo + 1) + p2(p.day);
+    var timePart = p2(p.h) + p2(flooredMin);
+    return "https://www.river.go.jp/kawabou/file/files/tmlist/stg/" + datePart + "/" + timePart + "/" + obsCd13 + ".json";
+  }
+  // "2026-08-19T13:25:01+09:00" 形式 → "2026/08/19 13:25:01" に整形(他拠点のmeasureTime表記に合わせる)。
+  function fmtKawabouIsoTime(iso) {
+    if (!iso) return null;
+    var m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})/);
+    if (!m) return iso;
+    return m[1] + "/" + m[2] + "/" + m[3] + " " + m[4] + ":" + m[5] + ":" + m[6];
+  }
+  function fetchKawabouWaterReading(site) {
+    var url = kawabouWaterJsonUrl(site.obsCd13, new Date());
+    return fetch(url, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) throw new Error("国交省API: HTTP " + res.status);
+      return res.json();
+    }).then(function (json) {
+      var v = json && json.obsValue;
+      if (!v || typeof v.stg !== "number") throw new Error("国交省API: 水位データなし");
+      return { waterLevelM: v.stg, measureTime: v.obsTime || null, pv: null, bat: null, imageUrl: null };
+    });
+  }
+  function fetchKawabouCameraReading(site) {
+    return fetch(site.camJsonUrl, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) throw new Error("国交省カメラ: HTTP " + res.status);
+      return res.json();
+    }).then(function (json) {
+      return { imageUrl: site.liveImageUrl, measureTime: fmtKawabouIsoTime(json && json.get_time), pv: null, bat: null, waterLevelM: null };
+    });
+  }
+  // 静岡県「川の防災情報」河川監視カメラ(cam.shizuoka4.jp)からライブ画像を取得する。
+  // 撮影時刻(obsdate)を得るためのJSONはCORSブロックされているため、r.jina.aiプロキシ経由で取得する
+  // (プロキシ自体はCORS開放されていることを確認済み。画像本体(.jpg)は直接<img src>で読み込み可能)。
+  function shizuokaCamJsonUrl(camtype) {
+    return "https://www.cam.shizuoka4.jp/cam/" + camtype + ".json";
+  }
+  function shizuokaLiveImageUrlFromObsdate(camtype, obsdate) {
+    // obsdate例: "2026/08/19 16:04"
+    var m = String(obsdate).match(/^(\d{4})\/(\d{2})\/(\d{2}) (\d{2}):(\d{2})/);
+    if (!m) return null;
+    var y = m[1], mo = m[2], d = m[3], h = m[4], mi = m[5];
+    return {
+      url: "https://www.cam.shizuoka4.jp/cam/" + camtype + "/" + y + "/" + mo + "/" + d + "/" + y + mo + d + h + mi + "00_01.jpg",
+      measureTime: y + "/" + mo + "/" + d + " " + h + ":" + mi + ":00"
+    };
+  }
+  function fetchShizuokaLiveImage(camtype) {
+    var targetUrl = shizuokaCamJsonUrl(camtype) + "?_=" + Date.now();
+    var proxyUrl = "https://r.jina.ai/" + targetUrl;
+    return fetch(proxyUrl, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) throw new Error("静岡県カメラ: HTTP " + res.status);
+      return res.text();
+    }).then(function (text) {
+      var m = text.match(/"obsdate"\s*:\s*"([^"]+)"/);
+      if (!m) throw new Error("静岡県カメラ: obsdate取得失敗");
+      var obsdate = m[1].replace(/\\\//g, "/");
+      var built = shizuokaLiveImageUrlFromObsdate(camtype, obsdate);
+      if (!built) throw new Error("静岡県カメラ: 日時解析失敗");
+      return built;
+    });
+  }
+  // kawabou-water拠点のうちshizuokaCamtypeを持つもの(kw01～kw03)は、水位取得(国交省)に加えて
+  // 静岡県サイドからライブ画像を取得する。画像取得の成否は水位取得の成否とは独立して扱い、
+  // 画像だけ失敗した場合でも水位データは正常に反映する(reading.imageFetchFailedで区別)。
+  function fetchKawabouWaterReadingWithCamera(site) {
+    var waterPromise = fetchKawabouWaterReading(site);
+    if (!site.shizuokaCamtype) return waterPromise;
+    var camPromise = fetchShizuokaLiveImage(site.shizuokaCamtype)
+      .then(function (cam) { return { ok: true, cam: cam }; })
+      .catch(function () { return { ok: false }; });
+    return Promise.all([waterPromise, camPromise]).then(function (results) {
+      var water = results[0], camResult = results[1];
+      if (camResult.ok) {
+        water.imageUrl = camResult.cam.url;
+        water.imageFetchFailed = false;
+      } else {
+        water.imageFetchFailed = true;
+      }
+      return water;
+    });
   }
 
   /* =====================================================================
@@ -1135,7 +1402,7 @@
   var siteData = {};   // id -> {pv,bat,measureTime,imageUrl,waterLevelM,lastState,lastFetchedAt,via}
   var siteStates = {}; // id -> {points:[], baselineLevelM, cardRefs...}
   ALL_SITES.forEach(function (site) {
-    siteData[site.id] = { pv: null, bat: null, measureTime: null, imageUrl: null, waterLevelM: null, lastState: "pending", lastFetchedAt: null, via: null };
+    siteData[site.id] = { pv: null, bat: null, measureTime: null, imageUrl: null, waterLevelM: null, lastState: "pending", lastFetchedAt: null, via: null, imageFetchFailed: false };
     siteStates[site.id] = { site: site, points: [], baselineLevelM: null };
   });
 
@@ -1221,6 +1488,32 @@
   }
 
   /* =====================================================================
+   * 6b. サイドバーの折りたたみ(モバイル表示ではオーバーレイ式のドロワーになる)
+   * ===================================================================== */
+  var appLayoutEl = document.getElementById("appLayout");
+  var sidebarToggleBtn = document.getElementById("sidebarToggleBtn");
+  var sidebarBackdrop = document.getElementById("sidebarBackdrop");
+  var MOBILE_SIDEBAR_QUERY = "(max-width: 900px)";
+  function isMobileSidebarWidth() {
+    return window.matchMedia(MOBILE_SIDEBAR_QUERY).matches;
+  }
+  function setSidebarCollapsed(collapsed) {
+    appLayoutEl.classList.toggle("sidebar-collapsed", collapsed);
+    sidebarToggleBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  }
+  // 初期状態: モバイル幅では折りたたみ、それ以外(タブレット/PC)では展開しておく。
+  setSidebarCollapsed(isMobileSidebarWidth());
+  sidebarToggleBtn.addEventListener("click", function () {
+    setSidebarCollapsed(!appLayoutEl.classList.contains("sidebar-collapsed"));
+  });
+  sidebarBackdrop.addEventListener("click", function () { setSidebarCollapsed(true); });
+  // モバイル幅でメニュー項目(河川名・拠点・データダウンロード等)をクリックしたら、
+  // 画面遷移後にオーバーレイのメニューを自動的に閉じる。
+  sidebar.addEventListener("click", function (e) {
+    if (isMobileSidebarWidth() && e.target.closest("button")) setSidebarCollapsed(true);
+  });
+
+  /* =====================================================================
    * 7. ビュー切り替え
    * ===================================================================== */
   var viewIds = ["power", "allmap", "river", "site", "camlist", "graphlist", "voltagedata", "waterdata", "imagedata"];
@@ -1236,7 +1529,7 @@
     if (name === "allmap") { allSitesMenuBtn.classList.add("active"); ensureAllSitesMap(); clearSidebarSelectedSite(); }
     if (name === "camlist") camlistMenuBtn.classList.add("active");
     if (name === "graphlist") graphlistMenuBtn.classList.add("active");
-    if (name === "voltagedata") { voltageDataMenuBtn.classList.add("selected"); rebuildVoltageTable(); }
+    if (name === "voltagedata") voltageDataMenuBtn.classList.add("selected");
     if (name === "waterdata") { waterDataMenuBtn.classList.add("selected"); rebuildWaterTable(); }
     if (name === "imagedata") { imageDataMenuBtn.classList.add("selected"); updateImageDataStatus(); }
     if (name === "river") {
@@ -1278,7 +1571,7 @@
     if (html !== undefined) e.innerHTML = html;
     return e;
   }
-  document.getElementById("powerSubtitle").textContent = POWER_SITES.length + "拠点をサーバー(GitHub Actions)が5分間隔(ベストエフォート)で自動取得・mV → V に換算（この画面は約1分ごとにサーバーの最新値を再取得します）";
+  document.getElementById("powerSubtitle").textContent = POWER_SITES.length + "拠点を5分ごとに自動取得・mV → V に換算（起動時は即時取得）";
 
   POWER_SITES.forEach(function (site) {
     var card = el2("div", { class: "card" });
@@ -1329,13 +1622,13 @@
   var errorBanner = document.getElementById("errorBanner");
   var tableBody = document.getElementById("tableBody");
   var tableSection = document.getElementById("tableSection");
-  var globalStatusDot = document.getElementById("globalStatusDot");
-  var globalStatusText = document.getElementById("globalStatusText");
+  var fileLinkStatusEl = document.getElementById("fileLinkStatus");
+  var autoDownloadToggle = document.getElementById("autoDownloadToggle");
 
   function showError(message) { errorBanner.textContent = message; errorBanner.classList.add("show"); }
   function hideError() { errorBanner.classList.remove("show"); }
+  function setFileLinkStatus(text) { fileLinkStatusEl.textContent = text; }
 
-  // 電源監視ビュー自身のステータス行(POWER_SITES=20拠点のみが対象、従来どおり)。
   function updateGlobalStatus() {
     var states = POWER_SITES.map(function (s) { return siteData[s.id].lastState; });
     var errCount = states.filter(function (s) { return s === "err"; }).length;
@@ -1347,21 +1640,6 @@
     if (pendingCount) text += " / 取得中" + pendingCount + "件";
     statusDot.className = "dot " + dotClass;
     statusText.textContent = text;
-  }
-
-  // ヘッダーの全体ステータス行(ALL_SITES=27拠点対象)。サーバーの最終取得時刻も表示する。
-  function updateHeaderStatus(generatedAt) {
-    if (!globalStatusDot) return;
-    var states = ALL_SITES.map(function (s) { return siteData[s.id].lastState; });
-    var errCount = states.filter(function (s) { return s === "err"; }).length;
-    var pendingCount = states.filter(function (s) { return s === "pending"; }).length;
-    var okCount = states.filter(function (s) { return s === "ok"; }).length;
-    var dotClass = errCount ? "err" : (pendingCount ? "pending" : (okCount ? "ok" : "pending"));
-    var text = ALL_SITES.length + "拠点中 正常" + okCount + "件";
-    if (errCount) text += " / 取得失敗" + errCount + "件";
-    if (generatedAt) text += "（サーバー最終取得: " + fmtClock(generatedAt) + "）";
-    globalStatusDot.className = "dot " + dotClass;
-    globalStatusText.textContent = text;
   }
 
   function updateBatAlertState(site, batVoltage) {
@@ -1394,6 +1672,62 @@
     var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && typeof p.pv === "number" && typeof p.bat === "number"; });
     if (recent.length > MAX_CHART_POINTS) recent = recent.slice(-MAX_CHART_POINTS);
     s.powerChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), pv: p.pv, bat: p.bat }; }));
+  }
+
+  /* =====================================================================
+   * 4b. 画像取得失敗時の「取得データなし」表示ヘルパー
+   * -----------------------------------------------------------------------
+   * imgEl: <img>要素, frameEl: その親コンテナ(.image-frame / .site-media など)。
+   * frameElの中に「取得データなし」テキストを持つ.img-nodataを1つ用意しておき、
+   * 画像を表示する時は隠し、画像src読み込みエラー時・明示的に「画像なし」を
+   * 示したい時は画像を隠してテキストを表示する。
+   * ===================================================================== */
+  function ensureNodataEl(frameEl) {
+    var nd = frameEl.querySelector(".img-nodata");
+    if (!nd) {
+      nd = document.createElement("div");
+      nd.className = "img-nodata";
+      nd.textContent = "取得データなし";
+      frameEl.appendChild(nd);
+    }
+    return nd;
+  }
+  // failed=true: 明示的に「取得データなし」を表示(url未取得かつ取得試行が失敗済み)。
+  // failed=false かつ url無し: まだ取得中(初回取得前)なのでプレースホルダーは出さず空のまま。
+  function showImageOrNoData(imgEl, frameEl, url, failed) {
+    var nd = ensureNodataEl(frameEl);
+    if (url) {
+      nd.style.display = "none";
+      imgEl.style.display = "";
+      imgEl.src = url;
+    } else if (failed) {
+      imgEl.style.display = "none";
+      imgEl.removeAttribute("src");
+      nd.style.display = "block";
+    } else {
+      imgEl.style.display = "";
+      imgEl.removeAttribute("src");
+      nd.style.display = "none";
+    }
+  }
+  // <img>読み込み自体が失敗した場合(URLはあったがHTTPエラー等)にも「取得データなし」を表示する。
+  function attachImageErrorFallback(imgEl, frameEl) {
+    imgEl.addEventListener("error", function () {
+      if (!imgEl.getAttribute("src")) return; // src除去による疑似エラーは無視
+      imgEl.style.display = "none";
+      ensureNodataEl(frameEl).style.display = "block";
+    });
+    imgEl.addEventListener("load", function () {
+      imgEl.style.display = "";
+      var nd = frameEl.querySelector(".img-nodata");
+      if (nd) nd.style.display = "none";
+    });
+  }
+  // ライブ画像が現時点で「取得データなし」表示になるべきかどうか(拠点全体の取得失敗、または
+  // 画像個別取得の失敗のいずれか)。
+  function liveImageFailed(site) {
+    var d = siteData[site.id];
+    return !d.imageUrl && !!d.imageFetchFailed;
   }
 
   function updateSiteImage(site, imageUrl) {
@@ -1434,6 +1768,13 @@
         "<td>" + (typeof p.waterLevelM === "number" ? p.waterLevelM.toFixed(2) : "–") + "</td><td>" + p.via + "</td></tr>";
     }).join("");
     tableBody.innerHTML = html;
+  }
+
+  var flushTimer = null;
+  function scheduleFlush() {
+    if (!fileHandle) return;
+    if (flushTimer) return;
+    flushTimer = setTimeout(function () { flushTimer = null; flushToFile(); }, 500);
   }
 
   /* =====================================================================
@@ -1524,9 +1865,8 @@
     var s = siteStates[site.id];
     if (!s.riverCardRefs) return;
     var refs = s.riverCardRefs;
-    if (siteData[site.id].imageUrl) {
-      refs.liveImgEl.src = siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
-    }
+    var liveUrl = siteData[site.id].imageUrl ? (siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now()) : null;
+    showImageOrNoData(refs.liveImgEl, refs.liveBoxEl, liveUrl, liveImageFailed(site));
     if (!site.hasWater) {
       refs.placeholderEl.style.display = "";
       refs.placeholderEl.textContent = "水位センサー非搭載";
@@ -1572,14 +1912,16 @@
       var liveCaption = document.createElement("div"); liveCaption.className = "site-media-caption"; liveCaption.textContent = "ライブ映像";
       var liveBox = document.createElement("div"); liveBox.className = "site-media";
       var liveImg = document.createElement("img"); liveImg.alt = "ライブカメラ映像"; liveBox.appendChild(liveImg);
+      attachImageErrorFallback(liveImg, liveBox);
       liveCol.appendChild(liveCaption); liveCol.appendChild(liveBox);
 
       var normalCol = document.createElement("div"); normalCol.className = "site-media-col";
       var normalCaption = document.createElement("div"); normalCaption.className = "site-media-caption"; normalCaption.textContent = "正常時映像";
       var normalBox = document.createElement("div"); normalBox.className = "site-media";
       var normalImg = document.createElement("img"); normalImg.alt = "正常時映像";
-      if (site.normalImageUrl) normalImg.src = site.normalImageUrl;
       normalBox.appendChild(normalImg); normalCol.appendChild(normalCaption); normalCol.appendChild(normalBox);
+      attachImageErrorFallback(normalImg, normalBox);
+      showImageOrNoData(normalImg, normalBox, site.normalImageUrl || null, !site.normalImageUrl);
 
       var chartCol = document.createElement("div"); chartCol.className = "site-media-col";
       var chartCaption = document.createElement("div"); chartCaption.className = "site-media-caption"; chartCaption.textContent = "水位変化";
@@ -1598,7 +1940,7 @@
       item.addEventListener("click", function () { selectSiteInRiverPanel(site.id, { scroll: false }); });
       siteOrderList.appendChild(item);
 
-      siteStates[site.id].riverCardRefs = { liveImgEl: liveImg, chart: chart, placeholderEl: placeholder };
+      siteStates[site.id].riverCardRefs = { liveImgEl: liveImg, liveBoxEl: liveBox, chart: chart, placeholderEl: placeholder };
       refreshRiverCard(site);
     });
     renderRiverMap(sites);
@@ -1622,7 +1964,8 @@
   document.getElementById("allSitesMapSub").textContent = MAP_SITES.length + "拠点すべての位置を表示します。マーカーを押すと、その拠点の詳細へ移動します。";
   function allSitesPopupHtml(site) {
     if (!site.hasWater) {
-      return "<b>" + site.name + "</b><br>（水位センサー非搭載・電源監視のみ）<br><a href=\"#\" data-goto-site=\"" + site.id + "\">この拠点の詳細へ移動 →</a>";
+      var note = site.hasPower ? "（水位センサー非搭載・電源監視のみ）" : "（カメラ映像のみ・水位データ非搭載）";
+      return "<b>" + site.name + "</b><br>" + note + "<br><a href=\"#\" data-goto-site=\"" + site.id + "\">この拠点の詳細へ移動 →</a>";
     }
     var lvl = siteStates[site.id].points.filter(function (p) { return typeof p.waterLevelM === "number"; });
     var levelText = lvl.length ? lvl[lvl.length - 1].waterLevelM.toFixed(2) + " m" : "取得中…";
@@ -1663,8 +2006,14 @@
    * 11. 拠点詳細ビュー
    * ===================================================================== */
   var liveImg = document.getElementById("liveImg");
+  var liveFrameEl = liveImg.parentNode;
   var liveCaption = document.getElementById("liveCaption");
   var normalImg = document.getElementById("normalImg");
+  var normalFrameEl = normalImg.parentNode;
+  var normalImgCaption = document.getElementById("normalImgCaption");
+  var NORMAL_IMG_CAPTION_DEFAULT = "水DXサイト（河川水位・画像情報一覧）掲載の参考画像です";
+  attachImageErrorFallback(liveImg, liveFrameEl);
+  attachImageErrorFallback(normalImg, normalFrameEl);
   var waterNowValue = document.getElementById("waterNowValue");
   var waterNowDelta = document.getElementById("waterNowDelta");
   var dataListBody = document.getElementById("dataListBody");
@@ -1750,10 +2099,11 @@
     clearSidebarSelectedSite();
     if (s.menuBtnEl) s.menuBtnEl.classList.add("selected");
     normalImg.alt = "正常時映像";
-    normalImg.src = site.normalImageUrl || "";
+    showImageOrNoData(normalImg, normalFrameEl, site.normalImageUrl || null, !site.normalImageUrl);
+    if (normalImgCaption) normalImgCaption.textContent = site.sourceNote || NORMAL_IMG_CAPTION_DEFAULT;
     liveImg.alt = "ライブカメラ映像";
-    if (siteData[site.id].imageUrl) liveImg.src = siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
-    else liveImg.removeAttribute("src");
+    var liveUrl = siteData[site.id].imageUrl ? (siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now()) : null;
+    showImageOrNoData(liveImg, liveFrameEl, liveUrl, liveImageFailed(site));
     liveCaption.textContent = siteData[site.id].lastFetchedAt ? "最終取得 " + fmtClock(siteData[site.id].lastFetchedAt) + "（" + (siteData[site.id].via || "") + "）" : "取得中…";
     hideError();
     updateDetailNow();
@@ -1771,8 +2121,6 @@
       renderSiteDetail();
     }
   }
-  normalImg.addEventListener("error", function () { normalImg.alt = "正常時映像を取得できませんでした"; });
-  liveImg.addEventListener("error", function () { liveImg.alt = "ライブカメラ映像を取得できませんでした"; });
 
   /* =====================================================================
    * 12. ライブカメラ一覧ビュー
@@ -1782,7 +2130,7 @@
   // ライブカメラ一覧ビューからのみ除外する拠点(河川ツリー・全拠点マップ・水位グラフ一覧など他ビューには影響しない)。
   var CAMLIST_EXCLUDE_IDS = ["cam41", "cam44", "cam45", "cam48"];
   // 水位センサーは無いがライブカメラ一覧には含める拠点(cam01=うるおい広場)。
-  var CAMLIST_INCLUDE_EXTRA_IDS = ["cam01"];
+  var CAMLIST_INCLUDE_EXTRA_IDS = ["cam01", "kc01", "kc02", "kc03", "kc04", "kc05", "kc06", "kc07", "kc08"];
   // 表示順は「河川別拠点一覧」と同じ(河川の並び→上流→下流)にする。
   var CAMLIST_SITES = RIVER_ORDER_SITES.filter(function (site) {
     return (site.hasWater || CAMLIST_INCLUDE_EXTRA_IDS.indexOf(site.id) >= 0) && CAMLIST_EXCLUDE_IDS.indexOf(site.id) < 0;
@@ -1799,21 +2147,21 @@
     header.appendChild(h2); header.appendChild(status);
     var frame = document.createElement("div"); frame.className = "image-frame";
     var img = document.createElement("img"); img.alt = "ライブカメラ映像"; frame.appendChild(img);
+    attachImageErrorFallback(img, frame);
     var caption = document.createElement("button"); caption.type = "button"; caption.className = "card-caption"; caption.textContent = "詳細を見る →";
     caption.addEventListener("click", function () { showView("site"); openSiteDetail(site.id); });
     card.appendChild(header); card.appendChild(frame); card.appendChild(caption);
     camGrid.appendChild(card);
-    siteStates[site.id].camDotEl = dot; siteStates[site.id].camLabelEl = statusLabel; siteStates[site.id].camImgEl = img;
+    siteStates[site.id].camDotEl = dot; siteStates[site.id].camLabelEl = statusLabel; siteStates[site.id].camImgEl = img; siteStates[site.id].camFrameEl = frame;
   });
   function refreshCamlistCard(site) {
     var s = siteStates[site.id];
     if (!s.camImgEl) return;
-    if (siteData[site.id].imageUrl) {
-      s.camImgEl.src = siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
-      s.camLabelEl.textContent = "最終取得 " + fmtClock(new Date());
-    }
+    var url = siteData[site.id].imageUrl ? (siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now()) : null;
+    showImageOrNoData(s.camImgEl, s.camFrameEl, url, liveImageFailed(site));
+    if (url) s.camLabelEl.textContent = "最終取得 " + fmtClock(new Date());
   }
-  document.getElementById("camlistRefreshBtn").addEventListener("click", refreshFromServer);
+  document.getElementById("camlistRefreshBtn").addEventListener("click", function () { pollEverythingNow(); });
 
   /* =====================================================================
    * 13. 水位変化グラフ一覧ビュー
@@ -1869,28 +2217,10 @@
     }
     updateForecastReadouts(site);
   }
-  document.getElementById("graphlistRefreshBtn").addEventListener("click", refreshFromServer);
+  document.getElementById("graphlistRefreshBtn").addEventListener("click", function () { pollEverythingNow(); });
 
-  // latest.json中のある拠点の情報を、ステータス表示・画像表示など「今の状態」に関わるすべてのビューへ反映する。
-  // 数値の履歴(チャート・現在値タイル)は別途 recent.csv/history.csv 側(mergeAndDedupe)から反映する。
-  function applySiteStatus(site, info) {
+  function setSiteDots(site, state) {
     var s = siteStates[site.id];
-    var d = siteData[site.id];
-    if (!info) { d.lastState = "pending"; return; }
-    d.via = info.via || d.via;
-    d.measureTime = info.measureTime || d.measureTime;
-    d.lastFetchedAt = info.lastFetchAt ? new Date(info.lastFetchAt) : d.lastFetchedAt;
-    d.lastFetchOk = !!info.lastFetchOk;
-    d.lastError = info.lastError || null;
-    d.lastSuccessAt = info.lastSuccessAt ? new Date(info.lastSuccessAt) : d.lastSuccessAt;
-    if (info.imageUrl) d.imageUrl = info.imageUrl;
-
-    var state = info.lastFetchOk ? "ok" : "err";
-    var text = info.lastFetchOk
-      ? ("最終取得 " + fmtClock(d.lastFetchedAt) + "（" + (info.via || "サーバー") + "）")
-      : ("取得失敗 " + (d.lastFetchedAt ? fmtClock(d.lastFetchedAt) : "") + ": " + (info.lastError || "不明なエラー") +
-         (d.lastSuccessAt ? "（前回成功: " + fmtClock(d.lastSuccessAt) + "）" : ""));
-
     if (s.menuDotEl) s.menuDotEl.className = "dot " + state;
     if (s.camDotEl) s.camDotEl.className = "dot " + state;
     if (s.graphDotEl) s.graphDotEl.className = "dot " + state;
@@ -1898,215 +2228,263 @@
       if (s.camLabelEl) s.camLabelEl.textContent = "取得失敗";
       if (s.graphLabelEl) s.graphLabelEl.textContent = "取得失敗";
     }
-    setSiteStatus(site, state, text);
-
-    if (d.imageUrl) {
-      updateSiteImage(site, d.imageUrl);
-      refreshCamlistCard(site);
-      refreshRiverCard(site);
-      refreshDetailIfActive(site);
-    }
+    setSiteStatus(site, state, state === "ok" ? ("最終更新 " + fmtClock(new Date())) : (state === "err" ? ("取得失敗 " + fmtClock(new Date())) : "取得中…"));
   }
 
   /* =====================================================================
-   * 14. サーバーからの読み込み (latest.json = 現在状態/画像/エラー、recent.csv/history.csv = 数値履歴)
+   * 14. 共有ポーリング (27拠点、同時実行数3、1回リトライ) - addPointが全ビューへ反映する
    * ===================================================================== */
-  var lastArchivedGeneratedAt = null; // 画像アーカイブの重複キャプチャ防止(サーバーのポーリング周期=generatedAtの値ごとに1回のみ)
-  function maybeArchiveImages(latest) {
-    if (!latest.generatedAt || latest.generatedAt === lastArchivedGeneratedAt) return;
-    lastArchivedGeneratedAt = latest.generatedAt;
-    var ts = new Date(latest.generatedAt);
-    ALL_SITES.forEach(function (site) {
-      var info = latest.sites[site.id];
-      if (info && info.lastFetchOk && info.imageUrl) archiveImageBlob(site, info.imageUrl, ts);
-    });
+  function addPoint(site, reading, via) {
+    var s = siteStates[site.id];
+    var point = {
+      fetchedAt: new Date(), measureTime: reading.measureTime,
+      pv: typeof reading.pv === "number" ? reading.pv : null,
+      bat: typeof reading.bat === "number" ? reading.bat : null,
+      waterLevelM: typeof reading.waterLevelM === "number" ? reading.waterLevelM : null,
+      via: via
+    };
+    s.points.push(point);
+    if (s.points.length > MAX_STORED_POINTS) s.points.splice(0, s.points.length - MAX_STORED_POINTS);
+    if (site.hasWater && s.baselineLevelM === null && typeof point.waterLevelM === "number") s.baselineLevelM = point.waterLevelM;
+
+    var d = siteData[site.id];
+    if (typeof reading.pv === "number") d.pv = reading.pv;
+    if (typeof reading.bat === "number") d.bat = reading.bat;
+    if (reading.measureTime) d.measureTime = reading.measureTime;
+    if (reading.imageUrl) { d.imageUrl = reading.imageUrl; d.imageFetchFailed = false; }
+    else { d.imageUrl = null; d.imageFetchFailed = true; }
+    if (typeof reading.waterLevelM === "number") d.waterLevelM = reading.waterLevelM;
+    d.lastState = "ok"; d.lastFetchedAt = point.fetchedAt; d.via = via;
+    if (reading.imageUrl) archiveImageBlob(site, reading.imageUrl, point.fetchedAt);
+
+    refreshPowerCard(site);
+    updateSiteImage(site, reading.imageUrl);
+    refreshCamlistCard(site);
+    refreshGraphlistCard(site);
+    refreshRiverCard(site);
+    refreshDetailIfActive(site);
+    if (tableSection.classList.contains("show")) rebuildTable();
+    if (site.hasWater && currentView === "waterdata") rebuildWaterTable();
+    scheduleFlush();
   }
 
-  function loadLatestJson() {
-    return fetch(withCacheBuster(DATA_LATEST_URL), { cache: "no-store" })
-      .then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.json();
-      })
-      .then(function (latest) {
-        if (!latest || !latest.sites) throw new Error("latest.jsonの形式が不正です");
-        ALL_SITES.forEach(function (site) { applySiteStatus(site, latest.sites[site.id]); });
-        var generatedAt = latest.generatedAt ? new Date(latest.generatedAt) : null;
-        updateHeaderStatus(generatedAt);
-        var genText = generatedAt ? fmtClock(generatedAt) : fmtClock(new Date());
-        camlistStatusText.textContent = "最終取得 " + genText + "（サーバー）";
-        graphlistStatusText.textContent = "最終取得 " + genText + "（サーバー）";
-        maybeArchiveImages(latest);
+  function pollSite(site, isRetry) {
+    setSiteDots(site, "pending");
+    // 「川の防災情報」拠点(kawabou-water / kawabou-camera)はmatsuhisa.info系のtest.cgiを持たないため、
+    // 専用の取得関数(JSON直接取得、CORS開放済み・プロキシ不要)に振り分ける。
+    var readingPromise, viaLabel;
+    if (site.sourceType === "kawabou-water") {
+      readingPromise = fetchKawabouWaterReadingWithCamera(site);
+      viaLabel = site.shizuokaCamtype ? "国交省 川の防災情報 / 静岡県 川の防災情報（画像）" : "国交省 川の防災情報";
+    } else if (site.sourceType === "kawabou-camera") {
+      readingPromise = fetchKawabouCameraReading(site); viaLabel = "国交省 川の防災情報";
+    } else {
+      readingPromise = fetchRaw(site.url).then(function (result) {
+        viaLabel = result.via;
+        return parseReading(result.text, site.url, site);
+      });
+    }
+    return readingPromise
+      .then(function (reading) {
         hideError();
-      });
-  }
-
-  function loadRecentCsv() {
-    return fetch(withCacheBuster(DATA_RECENT_URL), { cache: "no-store" })
-      .then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.text();
-      })
-      .then(function (text) {
-        mergeAndDedupe(parseCsvRows(text));
-      });
-  }
-
-  function loadFullHistoryForTable() {
-    return fetch(withCacheBuster(DATA_HISTORY_URL), { cache: "no-store" })
-      .then(function (res) {
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        return res.text();
-      })
-      .then(function (text) {
-        mergeAndDedupe(parseCsvRows(text));
-        rebuildTable();
-        rebuildVoltageTable();
-        rebuildWaterTable();
+        addPoint(site, reading, viaLabel);
+        setSiteDots(site, "ok");
       })
       .catch(function (err) {
-        showError("全履歴の取得に失敗しました: " + (err && err.message ? err.message : String(err)));
+        if (!isRetry) {
+          return new Promise(function (resolve) { setTimeout(resolve, 2500 + Math.random() * 2500); })
+            .then(function () { return pollSite(site, true); });
+        }
+        siteData[site.id].lastState = "err";
+        siteData[site.id].imageUrl = null;
+        siteData[site.id].imageFetchFailed = true;
+        setSiteDots(site, "err");
+        // 取得失敗が確定した時点で画像表示箇所を再描画し、「取得データなし」を反映する
+        // (addPointは成功時のみ呼ばれるため、失敗時はここで明示的に更新する必要がある)。
+        refreshCamlistCard(site);
+        refreshRiverCard(site);
+        refreshDetailIfActive(site);
       });
   }
-
-  // ---- 自動更新の可視化(ページを開きっぱなしにしていても動いていると分かるように) ----
-  var autoRefreshInfoEl = document.getElementById("autoRefreshInfo");
-  var nextRefreshAt = Date.now() + CLIENT_REFRESH_MS;
-  var flashTimer = null;
-  function updateAutoRefreshLabel() {
-    if (!autoRefreshInfoEl) return;
-    if (autoRefreshInfoEl.classList.contains("just-updated")) return;
-    var secLeft = Math.max(0, Math.round((nextRefreshAt - Date.now()) / 1000));
-    autoRefreshInfoEl.innerHTML = '<span class="pulse"></span>自動更新: 次回まで約' + secLeft + '秒';
+  // sitesを対象にポーリングする共通処理。updateStatus!==falseの場合のみ一覧画面の取得状況テキストを更新する
+  // (2分間隔の高頻度グループは、5分間隔グループの表示中の「取得中…」テキストを不必要に上書きしないよう既定でfalse)。
+  function pollSites(sites, opts) {
+    opts = opts || {};
+    var showStatus = opts.updateStatus !== false;
+    if (showStatus) {
+      camlistStatusText.textContent = "取得中…（" + fmtClock(new Date()) + "）";
+      graphlistStatusText.textContent = "取得中…（" + fmtClock(new Date()) + "）";
+    }
+    var queue = sites.slice();
+    var remaining = queue.length;
+    function runNext() {
+      var site = queue.shift();
+      if (!site) return;
+      var delay = Math.random() * 400;
+      setTimeout(function () {
+        pollSite(site).then(function () {
+          remaining--;
+          if (remaining <= 0 && showStatus) {
+            camlistStatusText.textContent = "最終取得完了 " + fmtClock(new Date());
+            graphlistStatusText.textContent = "最終取得完了 " + fmtClock(new Date());
+          }
+          runNext();
+        });
+      }, delay);
+    }
+    for (var i = 0; i < POLL_CONCURRENCY; i++) runNext();
   }
-  function flashJustUpdated() {
-    if (!autoRefreshInfoEl) return;
-    autoRefreshInfoEl.classList.add("just-updated");
-    autoRefreshInfoEl.innerHTML = '<span class="pulse"></span>' + fmtClock(new Date()) + ' に自動更新しました';
-    if (flashTimer) clearTimeout(flashTimer);
-    flashTimer = setTimeout(function () {
-      autoRefreshInfoEl.classList.remove("just-updated");
-      updateAutoRefreshLabel();
-    }, 2500);
+  // 通常グループ(5分間隔) - 2分間隔の高頻度グループは別枠(pollFastSites)で回すため、二重取得を避けて除外する。
+  function pollAll() {
+    pollSites(ALL_SITES.filter(function (s) { return FAST_POLL_SITE_IDS.indexOf(s.id) < 0; }));
   }
-  setInterval(updateAutoRefreshLabel, 1000);
-  updateAutoRefreshLabel();
-
-  function refreshFromServer() {
-    nextRefreshAt = Date.now() + CLIENT_REFRESH_MS;
-    return Promise.all([loadLatestJson(), loadRecentCsv()]).then(function () {
-      flashJustUpdated();
-    }).catch(function (err) {
-      showError("サーバーのデータ取得に失敗しました: " + (err && err.message ? err.message : String(err)) +
-        "（初回公開直後は data/ 配下のファイルがまだ存在しないことがあります。GitHub Actionsの初回実行完了後に再読み込みしてください）");
-      updateAutoRefreshLabel();
-    });
+  // 高頻度グループ(2分間隔): 大場ポンプ場流入水路・神川都市下水路・徳倉都市下水路
+  function pollFastSites() {
+    pollSites(ALL_SITES.filter(function (s) { return FAST_POLL_SITE_IDS.indexOf(s.id) >= 0; }), { updateStatus: false });
   }
-
-  // タブを離れて戻ってきたときは、次の定期実行を待たずにすぐ最新化する
-  document.addEventListener("visibilitychange", function () {
-    if (!document.hidden) refreshFromServer();
-  });
-
-  document.getElementById("refreshBtn").addEventListener("click", refreshFromServer);
-  var globalRefreshBtnEl = document.getElementById("globalRefreshBtn");
-  if (globalRefreshBtnEl) globalRefreshBtnEl.addEventListener("click", refreshFromServer);
+  // 「今すぐ更新」ボタンは両グループまとめて更新する(ユーザー操作時は全拠点を対象にする)。
+  function pollEverythingNow() { pollAll(); pollFastSites(); }
+  document.getElementById("refreshBtn").addEventListener("click", pollEverythingNow);
 
   /* =====================================================================
-   * 15. CSV表示・ダウンロード (電源監視ビュー、POWER_SITESのみ対象。CSV自体はサーバーの
-   * history.csvへの直リンクであり、ブラウザ側での再構築は行わない)
+   * 15. CSV / 履歴ファイル連携 (電源監視ビュー専用、POWER_SITESのみ対象)
    * ===================================================================== */
-  // data/recent.csv, data/history.csv 共通の解析関数。サーバー側の履歴移行(6列→7列ヘッダー)により
-  // 同一ファイル内に6列(旧・水位列なし)行と7列(新・水位列あり)行が混在し得るため、各行ごとの実際の
-  // 列数(cols.length)で判定する(先頭のヘッダー行1行だけを見て決めるとファイル全体を誤判定するため)。
+  var CSV_HEADER = "拠点,取得時刻,機器の計測時刻,PV(V),BAT(V),水位(m),取得方法";
+  function allPointsFlat() {
+    var out = [];
+    POWER_SITES.forEach(function (site) { siteStates[site.id].points.forEach(function (p) { out.push({ site: site, p: p }); }); });
+    return out;
+  }
+  function buildCsvContent() {
+    var rows = allPointsFlat().map(function (r) {
+      var p = r.p;
+      return [r.site.id, p.fetchedAt.toISOString(), p.measureTime || "",
+        typeof p.pv === "number" ? p.pv.toFixed(3) : "", typeof p.bat === "number" ? p.bat.toFixed(3) : "",
+        typeof p.waterLevelM === "number" ? p.waterLevelM.toFixed(2) : "", p.via].join(",");
+    });
+    return CSV_HEADER + "\n" + rows.join("\n") + (rows.length ? "\n" : "");
+  }
   function parseCsvRows(text) {
     var lines = text.split(/\r?\n/).filter(function (l) { return l.trim().length; });
+    if (!lines.length) return [];
+    var startIdx = lines[0].indexOf("拠点") === 0 ? 1 : 0;
+    var hasWaterCol = lines[0].indexOf("水位") >= 0;
     var out = [];
-    for (var i = 0; i < lines.length; i++) {
+    for (var i = startIdx; i < lines.length; i++) {
       var cols = lines[i].split(",");
-      if (cols[0] === "拠点") continue; // ヘッダー行(先頭以外に紛れ込んでいても安全にスキップ)
-      if (cols.length !== 6 && cols.length !== 7) continue;
+      if (cols.length < 5) continue;
       var siteId = cols[0];
       var fetchedAt = new Date(cols[1]);
-      if (isNaN(fetchedAt.getTime())) continue;
       var pv = cols[3] !== "" ? parseFloat(cols[3]) : NaN;
       var bat = cols[4] !== "" ? parseFloat(cols[4]) : NaN;
+      if (isNaN(fetchedAt.getTime())) continue;
       var waterLevelM = null, via;
-      if (cols.length === 7) {
+      if (hasWaterCol && cols.length >= 7) {
         waterLevelM = cols[5] !== "" ? parseFloat(cols[5]) : null;
         if (waterLevelM !== null && isNaN(waterLevelM)) waterLevelM = null;
-        via = cols[6] || "";
-      } else {
-        via = cols[5] || ""; // 旧6列形式(水位列なし)
-      }
+        via = cols[6] || "履歴ファイル";
+      } else { via = cols[5] || "履歴ファイル"; }
       out.push({ siteId: siteId, fetchedAt: fetchedAt, measureTime: cols[2] || null, pv: isNaN(pv) ? null : pv, bat: isNaN(bat) ? null : bat, waterLevelM: waterLevelM, via: via });
     }
     return out;
   }
   function mergeAndDedupe(newPoints) {
     var bySite = {};
-    ALL_SITES.forEach(function (site) { bySite[site.id] = {}; });
-    ALL_SITES.forEach(function (site) { siteStates[site.id].points.forEach(function (p) { bySite[site.id][p.fetchedAt.getTime()] = p; }); });
+    POWER_SITES.forEach(function (site) { bySite[site.id] = {}; });
+    POWER_SITES.forEach(function (site) { siteStates[site.id].points.forEach(function (p) { bySite[site.id][p.fetchedAt.getTime()] = p; }); });
     newPoints.forEach(function (np) {
       if (!bySite[np.siteId]) return;
       bySite[np.siteId][np.fetchedAt.getTime()] = { fetchedAt: np.fetchedAt, measureTime: np.measureTime, pv: np.pv, bat: np.bat, waterLevelM: typeof np.waterLevelM === "number" ? np.waterLevelM : null, via: np.via };
     });
-    ALL_SITES.forEach(function (site) {
-      var s = siteStates[site.id];
+    POWER_SITES.forEach(function (site) {
       var merged = Object.keys(bySite[site.id]).map(function (k) { return bySite[site.id][k]; });
       merged.sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
       if (merged.length > MAX_STORED_POINTS) merged = merged.slice(merged.length - MAX_STORED_POINTS);
-      s.points = merged;
-      if (site.hasWater && s.baselineLevelM === null) {
-        for (var i = 0; i < merged.length; i++) {
-          if (typeof merged[i].waterLevelM === "number") { s.baselineLevelM = merged[i].waterLevelM; break; }
-        }
-      }
+      siteStates[site.id].points = merged;
       refreshPowerCard(site);
-      refreshGraphlistCard(site);
-      refreshRiverCard(site);
-      refreshDetailIfActive(site);
     });
     if (tableSection.classList.contains("show")) rebuildTable();
-    if (currentView === "voltagedata") rebuildVoltageTable();
-    if (currentView === "waterdata") rebuildWaterTable();
   }
-
+  function downloadCsv() {
+    var blob = new Blob([buildCsvContent()], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a"); a.href = url;
+    a.download = "mishima_power_" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
+  var fileHandle = null;
+  var fsApiSupported = typeof window.showSaveFilePicker === "function";
+  async function flushToFile() {
+    if (!fileHandle) return;
+    try {
+      var writable = await fileHandle.createWritable();
+      await writable.write(buildCsvContent());
+      await writable.close();
+    } catch (e) {
+      console.warn("履歴ファイルへの書き込みに失敗しました:", e);
+      setFileLinkStatus("履歴ファイル: 書き込みエラーのため連携を解除しました（「履歴ファイルと連携」からやり直してください）");
+      fileHandle = null;
+    }
+  }
+  async function connectHistoryFile() {
+    if (!fsApiSupported) {
+      showError("お使いのブラウザは履歴ファイルとの自動連携(File System Access API)に対応していません。Chrome / Edge でお試しいただくか、「CSVから履歴を読み込む」をご利用ください。");
+      return;
+    }
+    var handle;
+    try {
+      handle = await window.showSaveFilePicker({ suggestedName: "mishima_power_history.csv", types: [{ description: "CSV", accept: { "text/csv": [".csv"] } }] });
+    } catch (e) { return; }
+    try {
+      var file = await handle.getFile();
+      var text = await file.text();
+      fileHandle = handle;
+      if (text && text.trim()) {
+        var imported = parseCsvRows(text);
+        if (imported.length) mergeAndDedupe(imported);
+      }
+      await flushToFile();
+      setFileLinkStatus("履歴ファイル: 「" + handle.name + "」と連携中(全拠点分を自動的に記録・復元します)");
+    } catch (e) {
+      console.warn("履歴ファイルの連携に失敗しました:", e);
+      showError("履歴ファイルとの連携に失敗しました: " + e.message);
+    }
+  }
+  function importCsvFile(file) {
+    var reader = new FileReader();
+    reader.onload = function () {
+      var imported = parseCsvRows(String(reader.result));
+      if (imported.length) {
+        mergeAndDedupe(imported);
+        setFileLinkStatus("履歴ファイル: 「" + file.name + "」から" + imported.length + "件読み込みました(自動保存はされません。都度CSVダウンロードで保存してください)");
+      } else { showError("CSVファイルから有効なデータを読み込めませんでした。フォーマットをご確認ください。"); }
+    };
+    reader.onerror = function () { showError("CSVファイルの読み込みに失敗しました。"); };
+    reader.readAsText(file);
+  }
+  document.getElementById("csvBtn").addEventListener("click", downloadCsv);
+  document.getElementById("linkFileBtn").addEventListener("click", connectHistoryFile);
+  document.getElementById("importCsvBtn").addEventListener("click", function () { document.getElementById("csvImportInput").click(); });
+  document.getElementById("csvImportInput").addEventListener("change", function (evt) {
+    var file = evt.target.files && evt.target.files[0];
+    if (file) importCsvFile(file);
+    evt.target.value = "";
+  });
   document.getElementById("tableBtn").addEventListener("click", function () {
     var showing = tableSection.classList.toggle("show");
     this.textContent = showing ? "表を隠す" : "表で表示";
-    if (showing) loadFullHistoryForTable();
+    if (showing) rebuildTable();
   });
-
-  var voltageTableBody = document.getElementById("voltageTableBody");
-  var voltageDataStatusText = document.getElementById("voltageDataStatusText");
-  function rebuildVoltageTable() {
-    if (!voltageTableBody) return;
-    var rows = [];
-    POWER_SITES.forEach(function (site) { siteStates[site.id].points.forEach(function (p) { rows.push({ site: site, p: p }); }); });
-    rows.sort(function (a, b) { return b.p.fetchedAt - a.p.fetchedAt; });
-    voltageTableBody.innerHTML = rows.map(function (r) {
-      var p = r.p;
-      return "<tr><td>" + r.site.name + "</td><td>" + fmtTime(p.fetchedAt) + "</td><td>" + (p.measureTime || "–") + "</td>" +
-        "<td>" + (typeof p.pv === "number" ? p.pv.toFixed(1) : "–") + "</td><td>" + (typeof p.bat === "number" ? p.bat.toFixed(1) : "–") + "</td>" +
-        "<td>" + p.via + "</td></tr>";
-    }).join("");
-    if (voltageDataStatusText) voltageDataStatusText.textContent = "件数: " + rows.length + "件";
-  }
-  document.getElementById("voltageTableBtn").addEventListener("click", loadFullHistoryForTable);
-
-  // ダウンロードリンクもCDNキャッシュを避けるため、クリック直前にURLを毎回更新する(サーバーのhistory.csv
-  // への直リンクであり、ブラウザ側でCSVを組み立て直す処理は行わない)。
-  ["voltageCsvLink", "waterCsvLink"].forEach(function (id) {
-    var linkEl = document.getElementById(id);
-    if (linkEl) linkEl.addEventListener("click", function () { linkEl.href = withCacheBuster(DATA_HISTORY_URL); });
-  });
+  setInterval(function () {
+    if (autoDownloadToggle.checked && !fileHandle && allPointsFlat().length) downloadCsv();
+  }, AUTO_DOWNLOAD_INTERVAL_MS);
 
   /* =====================================================================
-   * 15b. データダウンロード: 水位データ (WATER_SITESのみ対象)
+   * 15b. データダウンロード: 水位データ (WATER_SITESのみ対象、5分間隔で蓄積)
    * ===================================================================== */
   var waterTableBody = document.getElementById("waterTableBody");
   var waterDataStatusText = document.getElementById("waterDataStatusText");
+  var WATER_CSV_HEADER = "拠点,取得時刻,機器の計測時刻,水位(m)";
   function waterPointsFlat() {
     var out = [];
     WATER_SITES.forEach(function (site) {
@@ -2115,6 +2493,20 @@
       });
     });
     return out;
+  }
+  function buildWaterCsvContent() {
+    var rows = waterPointsFlat().map(function (r) {
+      var p = r.p;
+      return [r.site.name, p.fetchedAt.toISOString(), p.measureTime || "", p.waterLevelM.toFixed(2)].join(",");
+    });
+    return WATER_CSV_HEADER + "\n" + rows.join("\n") + (rows.length ? "\n" : "");
+  }
+  function downloadWaterCsv() {
+    var blob = new Blob([buildWaterCsvContent()], { type: "text/csv;charset=utf-8" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a"); a.href = url;
+    a.download = "mishima_water_" + new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-") + ".csv";
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
   }
   function rebuildWaterTable() {
     if (!waterTableBody) return;
@@ -2127,19 +2519,16 @@
     }).join("");
     if (waterDataStatusText) waterDataStatusText.textContent = "件数: " + rows.length + "件";
   }
-  document.getElementById("waterTableBtn").addEventListener("click", loadFullHistoryForTable);
+  document.getElementById("waterCsvBtn").addEventListener("click", downloadWaterCsv);
 
   /* =====================================================================
    * 15c. データダウンロード: 画像データ (実際に取得できた画像バイトのアーカイブ)
    * -----------------------------------------------------------------------
    * 各拠点のカメラURLは常にその時点の最新画像しか返さない(過去画像を後から取れる仕組みではない)ため、
-   * サーバー(latest.json)が新しい取得サイクル(generatedAt)を報告するたびに、そのサイクルで成功した
-   * 拠点分だけ画像バイトをその場でfetchしてブラウザメモリ上に貯めておく方式(maybeArchiveImages経由、
-   * generatedAtごとに1回のみ実行しdedupeする。クライアントの60秒ごとの再読み込みのたびに、まだ更新
-   * されていない同じ画像を何度も取得してしまうのを防ぐため)。
+   * 共有ポーリングが成功するたびに画像バイトをその場でfetchしてブラウザメモリ上に貯めておく方式。
    * メモリ圧迫を避けるため、拠点ごとに件数(IMAGE_ARCHIVE_MAX_PER_SITE)と経過時間(IMAGE_ARCHIVE_MAX_AGE_MS)
-   * の両方で上限を設け、超えた古いものから間引く。画像取得の失敗は本体のステータス表示の信頼性に
-   * 影響させないよう、必ずベストエフォート(catchで揉み消し)で行う。
+   * の両方で上限を設け、超えた古いものから間引く。画像取得の失敗は本体ポーリング(電源/水位/画像URL抽出)の
+   * 信頼性に影響させないよう、必ずベストエフォート(catchで揉み消し)で行う。
    * ===================================================================== */
   var IMAGE_ARCHIVE_MAX_PER_SITE = 300;
   var IMAGE_ARCHIVE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
@@ -2155,11 +2544,12 @@
     imageArchive[siteId] = kept;
   }
 
-  // 非同期・ノンブロッキングのベストエフォート処理。失敗しても本体の表示には一切影響しない。
-  // latest.jsonが返す解決済み画像URLからバイト列を取得するだけなので、HTMLスクレイピングは不要だが、
-  // ブラウザからは引き続きクロスオリジンのため、直接fetch失敗時はCORSプロキシにフォールバックする。
+  // 非同期・ノンブロッキングのベストエフォート処理。失敗しても共有ポーリング本体には一切影響しない。
   function archiveImageBlob(site, imageUrl, ts) {
-    fetchImageBlobWithFallback(imageUrl).then(function (blob) {
+    fetch(imageUrl, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.blob();
+    }).then(function (blob) {
       imageArchive[site.id].push({ ts: ts, blob: blob });
       pruneImageArchive(site.id);
       if (currentView === "imagedata" && imageDataSiteSelect && imageDataSiteSelect.value === site.id) updateImageDataStatus();
@@ -2416,22 +2806,51 @@
   }
 
   /* =====================================================================
-   * 16. 初期化 (数値・画像の取得はサーバー(GitHub Actions)側で完了済みのため、ここではdata/配下の
-   * 生成済みファイルを読みに行くだけでよい。ブラウザを開いていない間もサーバー側の記録は続く)
+   * 16. 初期化
    * ===================================================================== */
   showView("power");
   setActiveRiver(activeRiver);
   activeDetailSiteId = WATER_SITES[0].id;
-  refreshFromServer();
-  setInterval(refreshFromServer, CLIENT_REFRESH_MS);
+  pollAll();
+  pollFastSites();
+  setInterval(pollAll, FETCH_INTERVAL_MS);
+  setInterval(pollFastSites, FAST_POLL_INTERVAL_MS);
   updateRainfallSignal().then(refreshAllForecasts);
   setInterval(function () { updateRainfallSignal().then(refreshAllForecasts); }, AMEDAS_REFRESH_INTERVAL_MS);
+
+  /* ---------------------------------------------------------------------
+   * 17. アクセスカウンター(ホームページ公開時用)
+   * -----------------------------------------------------------------------
+   * バックエンドを持たない静的ページのため、登録不要の無料外部カウンター
+   * サービス(hitscounter.dev)を利用する。実際に表示されているページの
+   * URLをキーとして集計されるため、公開URLで開いた場合にそのURL単位で
+   * アクセス数がカウントされる(ローカルファイルとして開いた場合はfile://
+   * パスがキーになり、意味のある集計にはならない点に注意)。
+   * 取得に失敗した場合(オフライン・サービス停止時など)はテキストで
+   * 「アクセスカウンター取得不可」と表示する。
+   * --------------------------------------------------------------------- */
+  (function initVisitCounter() {
+    var img = document.getElementById("visitCounterImg");
+    var fallback = document.getElementById("visitCounterFallback");
+    if (!img || !fallback) return;
+    var pageUrl = location.href.split("#")[0];
+    img.addEventListener("error", function () {
+      img.style.display = "none";
+      fallback.style.display = "inline";
+    });
+    img.src = "https://hitscounter.dev/api/hit?url=" + encodeURIComponent(pageUrl) +
+      "&label=%E8%A8%AA%E5%95%8F%E6%95%B0&icon=eye-fill&color=%232a78d6&style=flat";
+  })();
 
   // テストハーネス/デバッグ専用のフック(本番動作には影響しない)。
   window.__dashboardDebug = {
     imageArchive: imageArchive, siteStates: siteStates, siteData: siteData,
-    refreshFromServer: refreshFromServer, computeForecast: computeForecast, amedasState: amedasState,
-    updateRainfallSignal: updateRainfallSignal, refreshAllForecasts: refreshAllForecasts
+    pollAll: pollAll, computeForecast: computeForecast, amedasState: amedasState,
+    updateRainfallSignal: updateRainfallSignal, refreshAllForecasts: refreshAllForecasts,
+    SITE_CATALOG: SITE_CATALOG, ALL_SITES: ALL_SITES,
+    showView: showView, openSiteDetail: openSiteDetail,
+    pollFastSites: pollFastSites, FAST_POLL_SITE_IDS: FAST_POLL_SITE_IDS, FAST_POLL_INTERVAL_MS: FAST_POLL_INTERVAL_MS,
+    setSidebarCollapsed: setSidebarCollapsed, isMobileSidebarWidth: isMobileSidebarWidth
   };
 })();
 </script>
