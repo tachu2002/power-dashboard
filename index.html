@@ -280,6 +280,11 @@
 
   .chart-box { position: relative; height: 150px; min-width: 0; }
 
+  .power-chart-row { display: flex; gap: 10px; min-width: 0; }
+  .power-chart-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .power-chart-col .chart-legend { justify-content: center; }
+  .power-chart-col .chart-box { height: 150px; }
+
   .mini-stats { display: flex; align-items: center; gap: 16px; margin-top: 4px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--gridline); }
   .mini-stats .site-thumb {
     margin-left: auto; max-width: 100px; max-height: 100px; width: auto; height: auto;
@@ -304,7 +309,7 @@
   .panel { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 12px; min-width: 0; }
   .panel-title { font-size: 20px; font-weight: 600; margin: 0 0 8px; color: var(--text-primary); }
   .panel-sub { font-size: 12px; color: var(--text-secondary); margin: -4px 0 10px; }
-  .map-box { width: 100%; height: 320px; border-radius: 8px; overflow: hidden; }
+  .map-box { position: relative; width: 100%; height: 320px; border-radius: 8px; overflow: hidden; }
   .map-box.all-sites-map { height: 70vh; min-height: 480px; }
 
   .all-sites-map-panel { display: flex; flex-direction: column; height: calc(100vh - 130px); min-height: 560px; }
@@ -611,7 +616,6 @@
             </div>
             <div class="toolbar">
               <div class="status" id="fileLinkStatus">履歴ファイル: 未連携（開き直すとデータは失われます）</div>
-              <label class="checkbox-label"><input type="checkbox" id="autoDownloadToggle" checked>5分ごとに自動でCSVをダウンロード(未連携時)</label>
               <button id="linkFileBtn">履歴ファイルと連携…</button>
               <button id="importCsvBtn">CSVから履歴を読み込む</button>
               <input type="file" id="csvImportInput" accept=".csv,text/csv" style="display:none">
@@ -657,7 +661,7 @@
           </div>
         </div>
         <div class="notice-banner" id="imageDataDisclaimer">
-          ご注意: 各拠点のカメラURLは常にその時点の最新画像を返す仕組みのため、過去の任意時点の画像を後から取得することはできません。このアーカイブは、このダッシュボードのタブを開いてポーリングが実際に行われていた間に取得できた画像だけを、ブラウザのメモリ上に一時的に保存したものです（拠点ごと最大300枚、または直近48時間分のいずれか少ない方まで）。タブを閉じる/再読み込みすると失われ、正式な過去画像アーカイブの代わりにはなりません。
+          GitHub Actionsが5分おきに全拠点のカメラ画像をサーバー(このリポジトリのdata/images/配下)へ自動保存しており、直近5日分をいつでもここからダウンロードできます（5日より古いものはサーバー側で自動的に削除されます）。ダッシュボードのタブを閉じていた間の画像もサーバー側に保存されているため失われません。
         </div>
         <div class="toolbar">
           <label for="imageDataSiteSelect" style="font-size:13px;color:var(--text-secondary);">拠点:</label>
@@ -857,7 +861,6 @@
   var CRITICAL_BAT_VOLTAGE = 11.5;
 
   var FETCH_INTERVAL_MS = 5 * 60 * 1000; // 5分間隔(元の間隔に戻す)
-  var AUTO_DOWNLOAD_INTERVAL_MS = 5 * 60 * 1000;
   var MAX_CHART_POINTS = 288;
   var CHART_WINDOW_MS = 24 * 60 * 60 * 1000;
   var MAX_STORED_POINTS = 2016;
@@ -869,6 +872,7 @@
   // GitHub Actions側(scripts/poll.mjs)がサーバー側で定期取得し、data/recent.csvへ書き出した
   // 過去データ。ページを開いた直後にこれを読み込み、ブラウザを閉じていた間の履歴もグラフへ反映する。
   var SERVER_HISTORY_URL = "data/recent.csv";
+  var IMAGE_MANIFEST_URL = "data/images/manifest.json";
 
   function isDark() { return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
   function palette() {
@@ -1088,7 +1092,9 @@
   /* =====================================================================
    * 3. チャート実装 (SVG自前実装。3種類: PV/BAT二系列、水位単系列(基準線+tooltip)、ミニスパークライン)
    * ===================================================================== */
-  function createCombinedChart(containerId, ratedValue, ratedLabel) {
+  // PV・BATを左右2つの単系列グラフに分けて表示するためのチャート(旧createCombinedChartを置き換え)。
+  // seriesKeyは "pv" または "bat" (palette()の色キーと対応)。ratedValueは定格電圧の破線参照値。
+  function createPowerSeriesChart(containerId, seriesKey, ratedValue, ratedLabel) {
     var svgNS = "http://www.w3.org/2000/svg";
     var container = document.getElementById(containerId);
     var svg = document.createElementNS(svgNS, "svg");
@@ -1099,8 +1105,8 @@
       "background:var(--surface-1);border:1px solid var(--gridline);border-radius:8px;padding:6px 10px;" +
       "font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.12);z-index:2;";
     container.appendChild(tooltip);
-    var W = 600, H = 220;
-    var marginLeft = 60, marginRight = 70, marginTop = 12, marginBottom = 26;
+    var W = 300, H = 220;
+    var marginLeft = 52, marginRight = 16, marginTop = 12, marginBottom = 26;
     var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
     var lastPoints = [];
     function niceScale(dataMin, dataMax) {
@@ -1118,10 +1124,10 @@
       return { min: niceLo, max: niceHi, ticks: ticks };
     }
     function el(tag, attrs) { var e = document.createElementNS(svgNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
-    function drawSeriesEndLabel(svg, pal, x, y, text, dyNudge) {
+    function drawSeriesEndLabel(svg, pal, x, y, text) {
       var approxWidth = text.length * 7 + 10;
       var boxX = Math.min(x + 8, W - approxWidth - 4);
-      var boxY = y - 10 + (dyNudge || 0);
+      var boxY = y - 10;
       svg.appendChild(el("rect", { x: boxX - 4, y: boxY, width: approxWidth, height: 20, rx: 4, fill: pal.surface, opacity: 0.9 }));
       var t = el("text", { x: boxX, y: boxY + 10, "dominant-baseline": "middle", fill: pal.textPrimary, "font-size": 13, "font-weight": 600, "font-family": "system-ui, -apple-system, sans-serif" });
       t.textContent = text; svg.appendChild(t);
@@ -1134,11 +1140,11 @@
       tooltip.style.opacity = 0;
       if (!points.length) return;
       var pal = palette();
+      var color = pal[seriesKey];
       var n = points.length;
-      var pvVals = points.map(function (p) { return p.pv; });
-      var batVals = points.map(function (p) { return p.bat; });
-      var allVals = pvVals.concat(batVals);
-      if (typeof ratedValue === "number") allVals = allVals.concat([ratedValue]);
+      var vals = points.map(function (p) { return p.value; });
+      var allVals = vals.slice();
+      if (typeof ratedValue === "number") allVals.push(ratedValue);
       var scale = niceScale(Math.min.apply(null, allVals), Math.max.apply(null, allVals));
       function xAt(i) { return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW; }
       function yAt(v) { return marginTop + plotH - ((v - scale.min) / (scale.max - scale.min)) * plotH; }
@@ -1152,46 +1158,32 @@
           label.textContent = t.toFixed(1); svg.appendChild(label);
         }
       });
-      var labelCount = Math.min(6, n);
+      var labelCount = Math.min(5, n);
       for (var k = 0; k < labelCount; k++) {
         var idx = labelCount === 1 ? 0 : Math.round((k / (labelCount - 1)) * (n - 1));
         var lbl = el("text", { x: xAt(idx), y: H - 6, "text-anchor": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
         lbl.textContent = points[idx].label; svg.appendChild(lbl);
       }
-      var ratedLabelInfo = null;
       if (typeof ratedValue === "number" && ratedValue >= scale.min && ratedValue <= scale.max) {
         var ry = yAt(ratedValue);
         svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: ry, y2: ry, stroke: pal.rated, "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
-        ratedLabelInfo = { y: ry, text: ratedLabel || (ratedValue + "V") };
-      }
-      function pathFor(values, color) {
-        var d = values.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
-        svg.appendChild(el("path", { d: d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
-      }
-      pathFor(pvVals, pal.pv); pathFor(batVals, pal.bat);
-      if (ratedLabelInfo) {
-        var rlabelWidth = ratedLabelInfo.text.length * 6.4 + 9;
+        var rtext = ratedLabel || (ratedValue + "V");
+        var rlabelWidth = rtext.length * 6.4 + 9;
         var rlabelX = Math.max(2, marginLeft - rlabelWidth - 6);
-        svg.appendChild(el("rect", { x: rlabelX, y: ratedLabelInfo.y - 16, width: rlabelWidth, height: 16, fill: pal.surface, opacity: 0.85 }));
-        var rlabel = el("text", { x: rlabelX + 3, y: ratedLabelInfo.y - 8, "text-anchor": "start", "dominant-baseline": "middle", fill: pal.rated, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
-        rlabel.textContent = ratedLabelInfo.text; svg.appendChild(rlabel);
+        svg.appendChild(el("rect", { x: rlabelX, y: ry - 16, width: rlabelWidth, height: 16, fill: pal.surface, opacity: 0.85 }));
+        var rlabel = el("text", { x: rlabelX + 3, y: ry - 8, "text-anchor": "start", "dominant-baseline": "middle", fill: pal.rated, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
+        rlabel.textContent = rtext; svg.appendChild(rlabel);
       }
+      var d = vals.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
+      svg.appendChild(el("path", { d: d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
       var lastIdx = n - 1;
-      var exPv = xAt(lastIdx), eyPv = yAt(pvVals[lastIdx]);
-      var exBat = xAt(lastIdx), eyBat = yAt(batVals[lastIdx]);
-      svg.appendChild(el("circle", { cx: exPv, cy: eyPv, r: 4, fill: pal.pv, stroke: pal.surface, "stroke-width": 2 }));
-      svg.appendChild(el("circle", { cx: exBat, cy: eyBat, r: 4, fill: pal.bat, stroke: pal.surface, "stroke-width": 2 }));
-      var nudgePv = 0, nudgeBat = 0;
-      if (Math.abs(eyPv - eyBat) < 20) {
-        if (eyPv <= eyBat) { nudgePv = -11; nudgeBat = 11; } else { nudgePv = 11; nudgeBat = -11; }
-      }
-      drawSeriesEndLabel(svg, pal, exPv, eyPv, pvVals[lastIdx].toFixed(1) + " V", nudgePv);
-      drawSeriesEndLabel(svg, pal, exBat, eyBat, batVals[lastIdx].toFixed(1) + " V", nudgeBat);
+      var ex = xAt(lastIdx), ey = yAt(vals[lastIdx]);
+      svg.appendChild(el("circle", { cx: ex, cy: ey, r: 4, fill: color, stroke: pal.surface, "stroke-width": 2 }));
+      drawSeriesEndLabel(svg, pal, ex, ey, vals[lastIdx].toFixed(1) + " V");
       var hoverGroup = el("g", { opacity: 0 });
       var crosshair = el("line", { x1: 0, x2: 0, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1 });
-      var hoverDotPv = el("circle", { r: 4, fill: pal.pv, stroke: pal.surface, "stroke-width": 2 });
-      var hoverDotBat = el("circle", { r: 4, fill: pal.bat, stroke: pal.surface, "stroke-width": 2 });
-      hoverGroup.appendChild(crosshair); hoverGroup.appendChild(hoverDotPv); hoverGroup.appendChild(hoverDotBat);
+      var hoverDot = el("circle", { r: 4, fill: color, stroke: pal.surface, "stroke-width": 2 });
+      hoverGroup.appendChild(crosshair); hoverGroup.appendChild(hoverDot);
       svg.appendChild(hoverGroup);
       var hitRect = el("rect", { x: marginLeft, y: marginTop, width: plotW, height: plotH, fill: "transparent" });
       hitRect.style.cursor = "crosshair"; svg.appendChild(hitRect);
@@ -1201,29 +1193,23 @@
         var relX = (clientX - rect.left) / rect.width * W;
         var idx2 = Math.round(((relX - marginLeft) / plotW) * (n - 1));
         idx2 = Math.max(0, Math.min(n - 1, idx2));
-        var px = xAt(idx2), pyPv = yAt(pvVals[idx2]), pyBat = yAt(batVals[idx2]);
+        var px = xAt(idx2), py = yAt(vals[idx2]);
         crosshair.setAttribute("x1", px); crosshair.setAttribute("x2", px);
-        hoverDotPv.setAttribute("cx", px); hoverDotPv.setAttribute("cy", pyPv);
-        hoverDotBat.setAttribute("cx", px); hoverDotBat.setAttribute("cy", pyBat);
+        hoverDot.setAttribute("cx", px); hoverDot.setAttribute("cy", py);
         hoverGroup.setAttribute("opacity", 1);
         while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
         var line0 = document.createElement("div");
         line0.style.cssText = "color:var(--text-secondary);"; line0.textContent = points[idx2].label;
         tooltip.appendChild(line0);
-        [["PV", pal.pv, pvVals[idx2]], ["BAT", pal.bat, batVals[idx2]]].forEach(function (row) {
-          var line = document.createElement("div");
-          line.style.cssText = "color:var(--text-primary);font-weight:600;display:flex;align-items:center;gap:6px;margin-top:2px;";
-          var swatch = document.createElement("span");
-          swatch.style.cssText = "display:inline-block;width:10px;height:2px;background:" + row[1] + ";";
-          var valSpan = document.createElement("span");
-          valSpan.textContent = row[0] + " " + row[2].toFixed(1) + " V";
-          line.appendChild(swatch); line.appendChild(valSpan); tooltip.appendChild(line);
-        });
+        var line = document.createElement("div");
+        line.style.cssText = "color:var(--text-primary);font-weight:600;";
+        line.textContent = vals[idx2].toFixed(1) + " V";
+        tooltip.appendChild(line);
         var containerRect = container.getBoundingClientRect();
         var tipX = (px / W) * containerRect.width;
-        var tipY = (Math.min(pyPv, pyBat) / H) * containerRect.height;
-        tooltip.style.left = Math.max(4, Math.min(tipX + 12, containerRect.width - 140)) + "px";
-        tooltip.style.top = Math.max(tipY - 54, 4) + "px";
+        var tipY = (py / H) * containerRect.height;
+        tooltip.style.left = Math.max(4, Math.min(tipX + 12, containerRect.width - 100)) + "px";
+        tooltip.style.top = Math.max(tipY - 44, 4) + "px";
         tooltip.style.opacity = 1;
       }
       function pointerLeave() { hoverGroup.setAttribute("opacity", 0); tooltip.style.opacity = 0; }
@@ -1408,6 +1394,17 @@
     siteData[site.id] = { pv: null, bat: null, measureTime: null, imageUrl: null, waterLevelM: null, lastState: "pending", lastFetchedAt: null, via: null, imageFetchFailed: false };
     siteStates[site.id] = { site: site, points: [], baselineLevelM: null };
   });
+  // 「最低水位」の点線は、保持している過去データ(サーバー履歴読込み分+セッション中の取得分)全体から
+  // 実際の最低値を都度計算し直す(初回取得値で固定してしまわないようにする)。
+  function recomputeBaseline(site) {
+    if (!site.hasWater) return;
+    var s = siteStates[site.id];
+    var min = null;
+    s.points.forEach(function (p) {
+      if (typeof p.waterLevelM === "number" && (min === null || p.waterLevelM < min)) min = p.waterLevelM;
+    });
+    s.baselineLevelM = min;
+  }
 
   /* =====================================================================
    * 5. 河川グルーピング (MAP_SITES対象: 水位センサー拠点+座標のある電源専用拠点)
@@ -1551,7 +1548,8 @@
       // 表示切り替え時に再描画して実際のコンテナ幅に合わせる。
       ALL_SITES.forEach(function (site) {
         var s = siteStates[site.id];
-        if (name === "power" && s.powerChart) s.powerChart.redraw();
+        if (name === "power" && s.pvChart) s.pvChart.redraw();
+        if (name === "power" && s.batChart) s.batChart.redraw();
         if (name === "graphlist" && s.graphChart) s.graphChart.redraw();
       });
     }
@@ -1597,17 +1595,26 @@
     var batAlertLine = el2("div", { class: "bat-alert-line" });
     card.appendChild(batAlertLine);
 
-    var legend = el2("div", { class: "chart-legend" },
-      '<span class="legend-item"><span class="legend-line" style="background:var(--series-pv)"></span>PV（発電電圧）</span>' +
-      '<span class="legend-item"><span class="legend-line" style="background:var(--series-bat)"></span>BAT（バッテリー電圧）</span>');
-    card.appendChild(legend);
+    var chartRow = el2("div", { class: "power-chart-row" });
+    var pvCol = el2("div", { class: "power-chart-col" });
+    var pvLegend = el2("div", { class: "chart-legend" },
+      '<span class="legend-item"><span class="legend-line" style="background:var(--series-pv)"></span>PV（発電電圧）</span>');
+    var pvChartBox = el2("div", { class: "chart-box", id: "pchart-pv-" + site.id });
+    pvCol.appendChild(pvLegend); pvCol.appendChild(pvChartBox);
 
-    var chartBox = el2("div", { class: "chart-box", id: "pchart-" + site.id });
-    card.appendChild(chartBox);
+    var batCol = el2("div", { class: "power-chart-col" });
+    var batLegend = el2("div", { class: "chart-legend" },
+      '<span class="legend-item"><span class="legend-line" style="background:var(--series-bat)"></span>BAT（バッテリー電圧）</span>');
+    var batChartBox = el2("div", { class: "chart-box", id: "pchart-bat-" + site.id });
+    batCol.appendChild(batLegend); batCol.appendChild(batChartBox);
+
+    chartRow.appendChild(pvCol); chartRow.appendChild(batCol);
+    card.appendChild(chartRow);
     sitesGrid.appendChild(card);
 
     var s = siteStates[site.id];
-    s.powerChart = createCombinedChart("pchart-" + site.id, RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(1) + "V");
+    s.pvChart = createPowerSeriesChart("pchart-pv-" + site.id, "pv");
+    s.batChart = createPowerSeriesChart("pchart-bat-" + site.id, "bat", RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(1) + "V");
     s.powerCardEl = card;
     s.powerStatusDotEl = statusEl.querySelector(".dot");
     s.powerStatusTextEl = statusEl.querySelector(".status-text");
@@ -1626,7 +1633,6 @@
   var tableBody = document.getElementById("tableBody");
   var tableSection = document.getElementById("tableSection");
   var fileLinkStatusEl = document.getElementById("fileLinkStatus");
-  var autoDownloadToggle = document.getElementById("autoDownloadToggle");
 
   function showError(message) { errorBanner.textContent = message; errorBanner.classList.add("show"); }
   function hideError() { errorBanner.classList.remove("show"); }
@@ -1674,7 +1680,8 @@
     var cutoff = Date.now() - CHART_WINDOW_MS;
     var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && typeof p.pv === "number" && typeof p.bat === "number"; });
     if (recent.length > MAX_CHART_POINTS) recent = recent.slice(-MAX_CHART_POINTS);
-    s.powerChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), pv: p.pv, bat: p.bat }; }));
+    s.pvChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.pv }; }));
+    s.batChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.bat }; }));
   }
 
   /* =====================================================================
@@ -2248,7 +2255,7 @@
     };
     s.points.push(point);
     if (s.points.length > MAX_STORED_POINTS) s.points.splice(0, s.points.length - MAX_STORED_POINTS);
-    if (site.hasWater && s.baselineLevelM === null && typeof point.waterLevelM === "number") s.baselineLevelM = point.waterLevelM;
+    if (site.hasWater && typeof point.waterLevelM === "number") recomputeBaseline(site);
 
     var d = siteData[site.id];
     if (typeof reading.pv === "number") d.pv = reading.pv;
@@ -2258,7 +2265,6 @@
     else { d.imageUrl = null; d.imageFetchFailed = true; }
     if (typeof reading.waterLevelM === "number") d.waterLevelM = reading.waterLevelM;
     d.lastState = "ok"; d.lastFetchedAt = point.fetchedAt; d.via = via;
-    if (reading.imageUrl) archiveImageBlob(site, reading.imageUrl, point.fetchedAt);
 
     refreshPowerCard(site);
     updateSiteImage(site, reading.imageUrl);
@@ -2435,10 +2441,7 @@
       if (merged.length > MAX_STORED_POINTS) merged = merged.slice(merged.length - MAX_STORED_POINTS);
       s.points = merged;
       var site = s.site;
-      if (site.hasWater && s.baselineLevelM === null) {
-        var firstWater = merged.filter(function (p) { return typeof p.waterLevelM === "number"; })[0];
-        if (firstWater) s.baselineLevelM = firstWater.waterLevelM;
-      }
+      recomputeBaseline(site);
       touchedSites.push(site);
     });
     touchedSites.forEach(function (site) {
@@ -2532,10 +2535,6 @@
     this.textContent = showing ? "表を隠す" : "表で表示";
     if (showing) rebuildTable();
   });
-  setInterval(function () {
-    if (autoDownloadToggle.checked && !fileHandle && allPointsFlat().length) downloadCsv();
-  }, AUTO_DOWNLOAD_INTERVAL_MS);
-
   /* =====================================================================
    * 15b. データダウンロード: 水位データ (WATER_SITESのみ対象、5分間隔で蓄積)
    * ===================================================================== */
@@ -2579,41 +2578,16 @@
   document.getElementById("waterCsvBtn").addEventListener("click", downloadWaterCsv);
 
   /* =====================================================================
-   * 15c. データダウンロード: 画像データ (実際に取得できた画像バイトのアーカイブ)
+   * 15c. データダウンロード: 画像データ (サーバー保存分の画像アーカイブ、全拠点・直近IMAGE_RETENTION_DAYS日分)
    * -----------------------------------------------------------------------
-   * 各拠点のカメラURLは常にその時点の最新画像しか返さない(過去画像を後から取れる仕組みではない)ため、
-   * 共有ポーリングが成功するたびに画像バイトをその場でfetchしてブラウザメモリ上に貯めておく方式。
-   * メモリ圧迫を避けるため、拠点ごとに件数(IMAGE_ARCHIVE_MAX_PER_SITE)と経過時間(IMAGE_ARCHIVE_MAX_AGE_MS)
-   * の両方で上限を設け、超えた古いものから間引く。画像取得の失敗は本体ポーリング(電源/水位/画像URL抽出)の
-   * 信頼性に影響させないよう、必ずベストエフォート(catchで揉み消し)で行う。
+   * GitHub Actions(scripts/poll.mjs)が5分おきに全拠点のカメラ画像をサーバー(data/images/配下)へ
+   * 自動保存し、直近IMAGE_RETENTION_DAYS日分のみを保持する(それより古いものはサーバー側で自動削除)。
+   * このUIは data/images/manifest.json (拠点ごとの保存済み画像一覧)を読み込み、拠点・期間を指定して
+   * その場でZIPにまとめてダウンロードする。ダッシュボードのタブを閉じていても、GitHub Actions側が
+   * 動いている限り画像は蓄積され続ける(旧バージョンのブラウザメモリ限定アーカイブとは異なる)。
    * ===================================================================== */
-  var IMAGE_ARCHIVE_MAX_PER_SITE = 300;
-  var IMAGE_ARCHIVE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
-  var IMAGE_SITES = ALL_SITES; // 全拠点のtest.cgiページに画像(imgタグ)が含まれるため、画像アーカイブは全拠点を対象とする
-  var imageArchive = {}; // id -> [{ts:Date, blob:Blob}, ...] 古い順
-  ALL_SITES.forEach(function (site) { imageArchive[site.id] = []; });
-
-  function pruneImageArchive(siteId) {
-    var arr = imageArchive[siteId];
-    var cutoff = Date.now() - IMAGE_ARCHIVE_MAX_AGE_MS;
-    var kept = arr.filter(function (e) { return e.ts.getTime() >= cutoff; });
-    if (kept.length > IMAGE_ARCHIVE_MAX_PER_SITE) kept = kept.slice(kept.length - IMAGE_ARCHIVE_MAX_PER_SITE);
-    imageArchive[siteId] = kept;
-  }
-
-  // 非同期・ノンブロッキングのベストエフォート処理。失敗しても共有ポーリング本体には一切影響しない。
-  function archiveImageBlob(site, imageUrl, ts) {
-    fetch(imageUrl, { cache: "no-store" }).then(function (res) {
-      if (!res.ok) throw new Error("HTTP " + res.status);
-      return res.blob();
-    }).then(function (blob) {
-      imageArchive[site.id].push({ ts: ts, blob: blob });
-      pruneImageArchive(site.id);
-      if (currentView === "imagedata" && imageDataSiteSelect && imageDataSiteSelect.value === site.id) updateImageDataStatus();
-    }).catch(function (err) {
-      console.warn("画像アーカイブへの保存に失敗しました(" + site.id + "):", err && err.message);
-    });
-  }
+  var IMAGE_RETENTION_DAYS_FALLBACK = 5;
+  var imageManifest = null; // { generatedAt, retentionDays, sites: {id: {name, files: [{ts, file}]}} } または読み込み前はnull
 
   var imageDataSiteSelect = document.getElementById("imageDataSiteSelect");
   var imageDataStartInput = document.getElementById("imageDataStart");
@@ -2622,21 +2596,45 @@
   var imageDataMessage = document.getElementById("imageDataMessage");
   var imageDataDownloadBtn = document.getElementById("imageDataDownloadBtn");
 
-  IMAGE_SITES.forEach(function (site) {
+  ALL_SITES.forEach(function (site) {
     var opt = document.createElement("option");
     opt.value = site.id; opt.textContent = site.name;
     imageDataSiteSelect.appendChild(opt);
   });
 
+  var imageManifestFailed = false; // trueの間は、後続のupdateImageDataStatus()呼び出し(showView等)でも「0枚」ではなく読み込み失敗の案内を維持する
+
   function updateImageDataStatus() {
+    if (imageManifestFailed) {
+      imageDataStatusText.textContent = "サーバーの画像アーカイブ情報を読み込めませんでした(GitHub Actionsが未設定・未実行、または初回実行前の可能性があります)。";
+      return;
+    }
     var siteId = imageDataSiteSelect.value;
-    var arr = imageArchive[siteId] || [];
-    if (!arr.length) { imageDataStatusText.textContent = "現在キャッシュされている画像: 0枚"; return; }
-    var oldest = arr[0].ts, newest = arr[arr.length - 1].ts;
-    imageDataStatusText.textContent = "現在キャッシュされている画像: " + arr.length + "枚（" + fmtTime(oldest) + " 〜 " + fmtTime(newest) + "）";
+    if (!imageManifest) { imageDataStatusText.textContent = "サーバーの画像アーカイブ情報を読み込み中…"; return; }
+    var entry = imageManifest.sites ? imageManifest.sites[siteId] : null;
+    var files = entry && entry.files ? entry.files : [];
+    if (!files.length) { imageDataStatusText.textContent = "サーバーに保存されている画像: 0枚"; return; }
+    var oldest = new Date(files[0].ts), newest = new Date(files[files.length - 1].ts);
+    imageDataStatusText.textContent = "サーバーに保存されている画像: " + files.length + "枚（" + fmtTime(oldest) + " 〜 " + fmtTime(newest) + "）";
   }
   imageDataSiteSelect.addEventListener("change", updateImageDataStatus);
-  updateImageDataStatus();
+
+  function loadImageManifest() {
+    return fetch(IMAGE_MANIFEST_URL, { cache: "no-store" }).then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    }).then(function (json) {
+      imageManifest = json;
+      imageManifestFailed = false;
+      updateImageDataStatus();
+    }).catch(function (err) {
+      console.warn("画像アーカイブ一覧(manifest.json)の読み込みに失敗しました:", err && err.message);
+      imageManifest = { sites: {} };
+      imageManifestFailed = true;
+      updateImageDataStatus();
+    });
+  }
+  loadImageManifest();
 
   function pad2(n) { return String(n).padStart(2, "0"); }
   function tsFileName(d) { return d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate()) + pad2(d.getHours()) + pad2(d.getMinutes()) + pad2(d.getSeconds()); }
@@ -2653,7 +2651,7 @@
     imageDataMessage.textContent = "JSZipを読み込めなかったため、" + entries.length + "枚を個別ファイルとして順番にダウンロードします…";
     var i = 0;
     function next() {
-      if (i >= entries.length) { imageDataMessage.textContent = entries.length + "枚のダウンロードを開始しました(個別ファイル、JSZip未使用)。"; return; }
+      if (i >= entries.length) { imageDataMessage.textContent = entries.length + "枚のダウンロードを開始しました(個別ファイル、JSZip未使用)。"; imageDataDownloadBtn.disabled = false; return; }
       var e = entries[i++];
       triggerBlobDownload(e.blob, siteId + "_" + tsFileName(e.ts) + ".jpg");
       setTimeout(next, 300);
@@ -2664,34 +2662,53 @@
   function downloadImagesForRange() {
     imageDataMessage.textContent = "";
     var siteId = imageDataSiteSelect.value;
-    var arr = imageArchive[siteId] || [];
+    var entry = imageManifest && imageManifest.sites ? imageManifest.sites[siteId] : null;
+    var files = entry && entry.files ? entry.files : [];
     var startVal = imageDataStartInput.value, endVal = imageDataEndInput.value;
     var startMs = startVal ? new Date(startVal).getTime() : -Infinity;
     var endMs = endVal ? new Date(endVal).getTime() : Infinity;
     if (isNaN(startMs)) startMs = -Infinity;
     if (isNaN(endMs)) endMs = Infinity;
-    var matched = arr.filter(function (e) { var t = e.ts.getTime(); return t >= startMs && t <= endMs; });
+    var matched = files.filter(function (f) { var t = new Date(f.ts).getTime(); return t >= startMs && t <= endMs; });
     if (!matched.length) {
-      imageDataMessage.textContent = "指定した期間に一致する画像がありません（0枚）。期間を広げるか、ダッシュボードを開いたまましばらく待ってから再度お試しください。";
+      var retentionDays = (imageManifest && imageManifest.retentionDays) || IMAGE_RETENTION_DAYS_FALLBACK;
+      imageDataMessage.textContent = "指定した期間に一致する画像がサーバーにありません（0枚）。保存期間は直近" + retentionDays + "日間です。";
       return;
     }
-    // JSZipはcdnjsから読み込む(Leafletと同様の防御的パターン)。読み込めていない場合は個別ダウンロードに
-    // フォールバックする(サンドボックス環境やCDN到達不可時でもページが壊れないようにするため)。
-    if (typeof JSZip === "undefined") { downloadSequentialFallback(siteId, matched); return; }
-    try {
-      var zip = new JSZip();
-      matched.forEach(function (e) { zip.file(siteId + "_" + tsFileName(e.ts) + ".jpg", e.blob); });
-      zip.generateAsync({ type: "blob" }).then(function (content) {
-        triggerBlobDownload(content, siteId + "_images_" + tsFileName(new Date()) + ".zip");
-        imageDataMessage.textContent = matched.length + "枚をZIPファイルとしてダウンロードしました。";
-      }).catch(function (err) {
-        console.warn("ZIP生成に失敗しました。個別ダウンロードにフォールバックします:", err && err.message);
-        downloadSequentialFallback(siteId, matched);
-      });
-    } catch (err) {
-      console.warn("JSZipの利用に失敗しました。個別ダウンロードにフォールバックします:", err && err.message);
-      downloadSequentialFallback(siteId, matched);
-    }
+    imageDataMessage.textContent = matched.length + "枚をサーバーから取得しています…";
+    imageDataDownloadBtn.disabled = true;
+    Promise.all(matched.map(function (f) {
+      return fetch(f.file, { cache: "no-store" }).then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.blob();
+      }).then(function (blob) { return { ts: new Date(f.ts), blob: blob }; }).catch(function () { return null; });
+    })).then(function (results) {
+      var ok = results.filter(Boolean);
+      if (!ok.length) {
+        imageDataMessage.textContent = "画像の取得に失敗しました。時間をおいて再度お試しください。";
+        imageDataDownloadBtn.disabled = false;
+        return;
+      }
+      // JSZipはcdnjsから読み込む(Leafletと同様の防御的パターン)。読み込めていない場合は個別ダウンロードに
+      // フォールバックする(サンドボックス環境やCDN到達不可時でもページが壊れないようにするため)。
+      if (typeof JSZip === "undefined") { downloadSequentialFallback(siteId, ok); return; }
+      try {
+        var zip = new JSZip();
+        ok.forEach(function (e) { zip.file(siteId + "_" + tsFileName(e.ts) + ".jpg", e.blob); });
+        zip.generateAsync({ type: "blob" }).then(function (content) {
+          triggerBlobDownload(content, siteId + "_images_" + tsFileName(new Date()) + ".zip");
+          var failed = matched.length - ok.length;
+          imageDataMessage.textContent = ok.length + "枚をZIPファイルとしてダウンロードしました" + (failed ? "（" + failed + "枚は取得に失敗しました）" : "") + "。";
+          imageDataDownloadBtn.disabled = false;
+        }).catch(function (err) {
+          console.warn("ZIP生成に失敗しました。個別ダウンロードにフォールバックします:", err && err.message);
+          downloadSequentialFallback(siteId, ok);
+        });
+      } catch (err) {
+        console.warn("JSZipの利用に失敗しました。個別ダウンロードにフォールバックします:", err && err.message);
+        downloadSequentialFallback(siteId, ok);
+      }
+    });
   }
   imageDataDownloadBtn.addEventListener("click", downloadImagesForRange);
 
@@ -2854,7 +2871,8 @@
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
       ALL_SITES.forEach(function (site) {
         var s = siteStates[site.id];
-        if (s.powerChart) s.powerChart.redraw();
+        if (s.pvChart) s.pvChart.redraw();
+        if (s.batChart) s.batChart.redraw();
         if (s.graphChart) s.graphChart.redraw();
         if (s.riverCardRefs) s.riverCardRefs.chart.redraw();
       });
@@ -2902,7 +2920,7 @@
 
   // テストハーネス/デバッグ専用のフック(本番動作には影響しない)。
   window.__dashboardDebug = {
-    imageArchive: imageArchive, siteStates: siteStates, siteData: siteData,
+    siteStates: siteStates, siteData: siteData,
     pollAll: pollAll, computeForecast: computeForecast, amedasState: amedasState,
     updateRainfallSignal: updateRainfallSignal, refreshAllForecasts: refreshAllForecasts,
     SITE_CATALOG: SITE_CATALOG, ALL_SITES: ALL_SITES,
@@ -2910,7 +2928,9 @@
     pollFastSites: pollFastSites, FAST_POLL_SITE_IDS: FAST_POLL_SITE_IDS, FAST_POLL_INTERVAL_MS: FAST_POLL_INTERVAL_MS,
     setSidebarCollapsed: setSidebarCollapsed, isMobileSidebarWidth: isMobileSidebarWidth,
     loadServerHistory: loadServerHistory, mergeServerHistory: mergeServerHistory, parseCsvRows: parseCsvRows,
-    SERVER_HISTORY_URL: SERVER_HISTORY_URL
+    SERVER_HISTORY_URL: SERVER_HISTORY_URL, recomputeBaseline: recomputeBaseline,
+    loadImageManifest: loadImageManifest, IMAGE_MANIFEST_URL: IMAGE_MANIFEST_URL,
+    getImageManifest: function () { return imageManifest; }
   };
 })();
 </script>
