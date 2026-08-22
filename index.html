@@ -106,6 +106,66 @@
   }
   .error-banner.show { display: block; }
 
+  /* 取得できない拠点の枠を繰り返し強調する赤枠アニメーション(Request F-B)。カード系のコンテナに付与する。 */
+  @keyframes fetchAlertBlink {
+    0%, 100% { box-shadow: 0 0 0 2px rgba(211,59,59,0.95); border-color: #d03b3b; }
+    50% { box-shadow: 0 0 0 5px rgba(211,59,59,0.15); border-color: #ff8f8f; }
+  }
+  .fetch-alert-frame {
+    border: 2px solid #d03b3b !important;
+    animation: fetchAlertBlink 1.6s ease-in-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .fetch-alert-frame { animation: none; box-shadow: 0 0 0 2px rgba(211,59,59,0.95); }
+  }
+
+  /* タイトル右の「電光掲示板」風ティッカー(Request F-C)。取得できない拠点名を繰り返し右→左へスライド表示する。 */
+  .error-ticker {
+    display: none;
+    flex: 1 1 260px;
+    min-width: 160px;
+    max-width: 520px;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+    background: #12100f;
+    border: 1px solid #3a1414;
+    border-radius: 8px;
+    padding: 6px 10px;
+    overflow: hidden;
+  }
+  .error-ticker-label {
+    flex: none;
+    font-size: 11px;
+    font-weight: 700;
+    color: #ff5252;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+  .error-ticker-viewport { flex: 1; min-width: 0; overflow: hidden; }
+  .error-ticker-track {
+    display: inline-flex;
+    white-space: nowrap;
+    animation: tickerScroll 16s linear infinite;
+    will-change: transform;
+  }
+  .ticker-seg {
+    display: inline-block;
+    padding-right: 48px;
+    font-family: "Courier New", ui-monospace, monospace;
+    font-size: 13px;
+    letter-spacing: 0.02em;
+    color: #ff5f5f;
+    text-shadow: 0 0 6px rgba(255,60,60,0.55);
+  }
+  @keyframes tickerScroll {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .error-ticker-track { animation-duration: 45s; }
+  }
+
   /* ===================== 全体レイアウト: 上部ヘッダー + 左サイドバー + メインコンテンツ ===================== */
   .top-header {
     padding: 4px 8px 16px;
@@ -436,6 +496,12 @@
         <p class="subtitle" id="subtitleText">拠点の電源(PV/BAT)と水位を5分ごとに自動取得（起動時は即時取得）</p>
       </div>
     </div>
+    <div class="error-ticker" id="errorTicker" aria-live="polite">
+      <span class="error-ticker-label">⚠ 取得失敗中</span>
+      <div class="error-ticker-viewport">
+        <div class="error-ticker-track" id="errorTickerTrack"></div>
+      </div>
+    </div>
     <div class="visit-counter" id="visitCounter">
       <img id="visitCounterImg" alt="アクセスカウンター">
       <span class="visit-counter-fallback" id="visitCounterFallback">アクセスカウンター取得不可</span>
@@ -648,7 +714,7 @@
           </table>
         </div>
         <footer>
-          このデータは水位監視29拠点(電源専用のうるおい広場（大場川 / 東町）は対象外)を対象に、5分間隔の共有ポーリングで取得したものです。うち3拠点(下神川橋・中村橋・下御殿橋)は国土交通省「川の防災情報」から取得しており、水位は計算式による補正を行わない生値です。
+          このデータは水位監視37拠点(電源専用のうるおい広場（大場川 / 東町）は対象外)を対象に、5分間隔の共有ポーリングで取得したものです。うち11拠点(下神川橋・中村橋・下御殿橋・青木橋・境川・島田橋・夏梅木橋・大場・大場川左岸2.3k+44・間宮・徳倉)は国土交通省「川の防災情報」から取得しており、水位は計算式による補正を行わない生値(危機管理型水位計は堤防天端からの高さ)です。
         </footer>
       </div>
 
@@ -689,7 +755,7 @@
   "use strict";
 
   /* =====================================================================
-   * 1. 拠点カタログ (電源監視20拠点 + 水位監視26拠点 をマージ、計27拠点 + 川の防災情報5拠点 = 計32拠点)
+   * 1. 拠点カタログ (電源監視20拠点 + 水位監視26拠点 をマージ、計27拠点 + 川の防災情報19拠点 = 計46拠点)
    * ===================================================================== */
   var WATER_SITES_RAW = [
     { id: "cam02", name: "中郷第１樋管（大場川 / 御園）", lat: 35.076968, lon: 138.92336, correction: 5510, op: "-" },
@@ -763,7 +829,7 @@
   var POWER_SITES = POWER_ORDER.map(function (id) { return SITE_CATALOG[id]; });          // 20拠点(電源監視の元順)
 
   /* ---------------------------------------------------------------------
-   * 1b. 国土交通省「川の防災情報」ソースの追加拠点(三島市関連、計5拠点)
+   * 1b. 国土交通省「川の防災情報」ソースの追加拠点(三島市関連、計19拠点)
    * -----------------------------------------------------------------------
    * 従来のmatsuhisa.info拠点とは取得パターンが異なるため、専用のsourceTypeで区別する。
    *   - kawabou-water  : 水位観測拠点。水位状況→水位の数値を計算式(補正)を入れずそのまま採用。
@@ -787,7 +853,19 @@
     { id: "kw02", name: "中村橋（大場川 / 三島市中）", lat: 35.1061111, lon: 138.9355556, obsCd13: "0563300400156",
       shizuokaCamtype: "2089", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/089.jpg" },
     { id: "kw03", name: "下御殿橋（御殿川 / 三島市青木）", lat: 35.1086111, lon: 138.9219444, obsCd13: "0563300400157",
-      shizuokaCamtype: "2090", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/090.jpg" }
+      shizuokaCamtype: "2090", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/090.jpg" },
+    // --- ここから8拠点追加(2026-08-22、国土交通省「川の防災情報」より。カメラ画像は無くいずれも水位のみ) ---
+    // kind省略(既定"stg")=通常の水位観測所。obsCd13を使用し、obsValue.stg(m)をそのまま採用。
+    // kind:"swstg"=危機管理型水位計。obsCdを使用し、URLパスが"stg"ではなく"swstg"、
+    //   値はobsValue.stgHght(堤防天端からの高さ。マイナス値=天端より低い)を採用する(fetchKawabouWaterReading参照)。
+    { id: "kw04", name: "青木橋（大場川 / 長泉町中土狩）", lat: 35.1422222, lon: 138.9088889, obsCd13: "0563300400020" },
+    { id: "kw05", name: "境川（境川 / 栄町）", lat: 35.1189972, lon: 138.906475, kind: "swstg", obsCd: "2200000022" },
+    { id: "kw06", name: "島田橋（三島山田川 / 川原ケ谷）", lat: 35.1271861, lon: 138.9311222, kind: "swstg", obsCd: "2200000031" },
+    { id: "kw07", name: "夏梅木橋（夏梅木川 / 谷田）", lat: 35.1090306, lon: 138.9386639, kind: "swstg", obsCd: "2200000025" },
+    { id: "kw08", name: "大場（大場川 / 函南町間宮）", lat: 35.0897222, lon: 138.9355556, obsCd13: "2182600400010" },
+    { id: "kw09", name: "大場川左岸2.3k+44（大場川 / 函南町間宮）", lat: 35.0912417, lon: 138.934925, kind: "swstg", obsCd: "8500000282" },
+    { id: "kw10", name: "間宮（函南観音川 / 函南町間宮）", lat: 35.0875, lon: 138.9383333, obsCd13: "0563300400169" },
+    { id: "kw11", name: "徳倉（狩野川 / 清水町下徳倉）", lat: 35.0922222, lon: 138.9005556, obsCd13: "2182600400007" }
   ];
   var KAWABOU_CAMERA_SITES_RAW = [
     { id: "kc01", name: "境川排水機場屋上（狩野川 / 三島市）", lat: 35.0854083, lon: 138.9080278,
@@ -826,11 +904,13 @@
   var KAWABOU_WATER_SOURCE_NOTE = "出典: 国土交通省「川の防災情報」（水位は計算式による補正を行わない生値です）";
   var KAWABOU_SHIZUOKA_CAM_SOURCE_NOTE = "出典: 静岡県「川の防災情報」河川監視カメラ（水位データの出典は国土交通省「川の防災情報」）";
   var KAWABOU_CAMERA_SOURCE_NOTE = "出典: 国土交通省「川の防災情報」掲載の正常時参考画像です";
+  var KAWABOU_SWSTG_SOURCE_NOTE = "出典: 国土交通省「川の防災情報」（危機管理型水位計。表示値は堤防天端からの高さ(m)、マイナスは天端より低い状態です）";
   KAWABOU_WATER_SITES_RAW.forEach(function (s) {
     SITE_CATALOG[s.id] = {
       id: s.id, name: s.name, lat: s.lat, lon: s.lon,
-      obsCd13: s.obsCd13, sourceType: "kawabou-water",
-      sourceNote: s.shizuokaCamtype ? KAWABOU_SHIZUOKA_CAM_SOURCE_NOTE : KAWABOU_WATER_SOURCE_NOTE,
+      obsCd13: s.obsCd13 || null, obsCd: s.obsCd || null, kind: s.kind || "stg",
+      sourceType: "kawabou-water",
+      sourceNote: s.shizuokaCamtype ? KAWABOU_SHIZUOKA_CAM_SOURCE_NOTE : (s.kind === "swstg" ? KAWABOU_SWSTG_SOURCE_NOTE : KAWABOU_WATER_SOURCE_NOTE),
       shizuokaCamtype: s.shizuokaCamtype || null,
       normalImageUrl: s.normalImageUrl || null, hasWater: true, hasPower: false
     };
@@ -848,13 +928,13 @@
   var KAWABOU_CAMERA_SITES = KAWABOU_CAMERA_IDS.map(function (id) { return SITE_CATALOG[id]; });
 
   var WATER_SITES = WATER_SITES_RAW.map(function (s) { return SITE_CATALOG[s.id]; })
-    .concat(KAWABOU_WATER_IDS.map(function (id) { return SITE_CATALOG[id]; })); // 26+3=29拠点(水位センサーあり)
+    .concat(KAWABOU_WATER_IDS.map(function (id) { return SITE_CATALOG[id]; })); // 26+11=37拠点(水位センサーあり)
   // 水位センサーは無いが座標のある拠点(電源専用のcam01、および川の防災情報のカメラ専用拠点)をマップ・河川ツリー専用に追加。
   var MAP_SITES = WATER_SITES.concat(POWER_SITES.filter(function (s) { return !s.hasWater && typeof s.lat === "number"; }))
     .concat(KAWABOU_CAMERA_SITES);
   var ALL_IDS = POWER_ORDER.concat(WATER_SITES_RAW.map(function (s) { return s.id; }).filter(function (id) { return POWER_ORDER.indexOf(id) < 0; }))
     .concat(KAWABOU_WATER_IDS).concat(KAWABOU_CAMERA_IDS);
-  var ALL_SITES = ALL_IDS.map(function (id) { return SITE_CATALOG[id]; }); // 27+11=38拠点(重複なし) - 共有ポーリング対象
+  var ALL_SITES = ALL_IDS.map(function (id) { return SITE_CATALOG[id]; }); // 27+19=46拠点(重複なし) - 共有ポーリング対象
 
   var RATED_BAT_VOLTAGE = 12.5;
   var WARN_BAT_VOLTAGE = 12.0;
@@ -1011,6 +1091,16 @@
     var timePart = p2(p.h) + p2(flooredMin);
     return "https://www.river.go.jp/kawabou/file/files/tmlist/stg/" + datePart + "/" + timePart + "/" + obsCd13 + ".json";
   }
+  // 危機管理型水位計(kind:"swstg")用。URLパスが"stg"ではなく"swstg"、コードも13桁のobsCd13ではなく
+  // 生のobsCd(10桁)を使う点のみ通常拠点と異なる(2026-08-22 8拠点追加分、境川/島田橋/夏梅木橋/大場川左岸2.3k+44)。
+  function kawabouSwstgJsonUrl(obsCd, d) {
+    var p = toJstParts(d);
+    var flooredMin = p.mi - (p.mi % 5);
+    var p2 = function (n) { return String(n).padStart(2, "0"); };
+    var datePart = p.y + p2(p.mo + 1) + p2(p.day);
+    var timePart = p2(p.h) + p2(flooredMin);
+    return "https://www.river.go.jp/kawabou/file/files/tmlist/swstg/" + datePart + "/" + timePart + "/" + obsCd + ".json";
+  }
   // "2026-08-19T13:25:01+09:00" 形式 → "2026/08/19 13:25:01" に整形(他拠点のmeasureTime表記に合わせる)。
   function fmtKawabouIsoTime(iso) {
     if (!iso) return null;
@@ -1019,12 +1109,18 @@
     return m[1] + "/" + m[2] + "/" + m[3] + " " + m[4] + ":" + m[5] + ":" + m[6];
   }
   function fetchKawabouWaterReading(site) {
-    var url = kawabouWaterJsonUrl(site.obsCd13, new Date());
+    var isSwstg = site.kind === "swstg";
+    var url = isSwstg ? kawabouSwstgJsonUrl(site.obsCd, new Date()) : kawabouWaterJsonUrl(site.obsCd13, new Date());
     return fetch(url, { cache: "no-store" }).then(function (res) {
       if (!res.ok) throw new Error("国交省API: HTTP " + res.status);
       return res.json();
     }).then(function (json) {
       var v = json && json.obsValue;
+      if (isSwstg) {
+        // 危機管理型水位計は堤防天端からの高さ(stgHght, m)を「水位」として採用する(サイト表示の主要数値と同じ)。
+        if (!v || typeof v.stgHght !== "number") throw new Error("国交省API: 水位データなし");
+        return { waterLevelM: v.stgHght, measureTime: v.obsTime || v.tmObsTime || null, pv: null, bat: null, imageUrl: null };
+      }
       if (!v || typeof v.stg !== "number") throw new Error("国交省API: 水位データなし");
       return { waterLevelM: v.stg, measureTime: v.obsTime || null, pv: null, bat: null, imageUrl: null };
     });
@@ -1630,6 +1726,8 @@
   var statusDot = document.getElementById("statusDot");
   var statusText = document.getElementById("statusText");
   var errorBanner = document.getElementById("errorBanner");
+  var errorTicker = document.getElementById("errorTicker");
+  var errorTickerTrack = document.getElementById("errorTickerTrack");
   var tableBody = document.getElementById("tableBody");
   var tableSection = document.getElementById("tableSection");
   var fileLinkStatusEl = document.getElementById("fileLinkStatus");
@@ -2138,7 +2236,8 @@
   var camGrid = document.getElementById("camGrid");
   var camlistStatusText = document.getElementById("camlistStatusText");
   // ライブカメラ一覧ビューからのみ除外する拠点(河川ツリー・全拠点マップ・水位グラフ一覧など他ビューには影響しない)。
-  var CAMLIST_EXCLUDE_IDS = ["cam41", "cam44", "cam45", "cam48"];
+  // kw04～kw11(2026-08-22追加の8拠点)はカメラ画像を持たない水位のみの拠点のため、ライブカメラ一覧からは除外する。
+  var CAMLIST_EXCLUDE_IDS = ["cam41", "cam44", "cam45", "cam48", "kw04", "kw05", "kw06", "kw07", "kw08", "kw09", "kw10", "kw11"];
   // 水位センサーは無いがライブカメラ一覧には含める拠点(cam01=うるおい広場)。
   var CAMLIST_INCLUDE_EXTRA_IDS = ["cam01", "kc01", "kc02", "kc03", "kc04", "kc05", "kc06", "kc07", "kc08"];
   // 表示順は「河川別拠点一覧」と同じ(河川の並び→上流→下流)にする。
@@ -2163,6 +2262,7 @@
     card.appendChild(header); card.appendChild(frame); card.appendChild(caption);
     camGrid.appendChild(card);
     siteStates[site.id].camDotEl = dot; siteStates[site.id].camLabelEl = statusLabel; siteStates[site.id].camImgEl = img; siteStates[site.id].camFrameEl = frame;
+    siteStates[site.id].camCardEl = card;
   });
   function refreshCamlistCard(site) {
     var s = siteStates[site.id];
@@ -2214,6 +2314,7 @@
     s.graphChart = createLevelChart("gchart-" + site.id);
     s.graphDotEl = dot; s.graphLabelEl = statusLabel; s.graphNowValueEl = nowValue;
     s.forecast6El = f6; s.forecast12El = f12;
+    s.graphCardEl = card;
   });
   function refreshGraphlistCard(site) {
     var s = siteStates[site.id];
@@ -2229,6 +2330,43 @@
   }
   document.getElementById("graphlistRefreshBtn").addEventListener("click", function () { pollEverythingNow(); });
 
+  // 取得できない拠点の枠を赤枠で繰り返し強調する(Request F-B)。カード系コンテナすべてに反映する。
+  // 河川別拠点一覧(site-order-item)は表示中の河川グループのみDOMに存在するため、都度クエリで取得する。
+  function updateFetchAlertFrame(site, isErr) {
+    var s = siteStates[site.id];
+    if (s.powerCardEl) s.powerCardEl.classList.toggle("fetch-alert-frame", isErr);
+    if (s.camCardEl) s.camCardEl.classList.toggle("fetch-alert-frame", isErr);
+    if (s.graphCardEl) s.graphCardEl.classList.toggle("fetch-alert-frame", isErr);
+    if (siteOrderList) {
+      var riverItem = siteOrderList.querySelector('.site-order-item[data-site-id="' + site.id + '"]');
+      if (riverItem) riverItem.classList.toggle("fetch-alert-frame", isErr);
+    }
+  }
+  // タイトル右の電光掲示板風ティッカー(Request F-C)を、現在取得失敗中の拠点名一覧で更新する。
+  // シームレスループのため表示テキストを2つ複製し、実測幅から一定速度になるようアニメーション時間を都度算出する。
+  function updateErrorTicker() {
+    if (!errorTicker || !errorTickerTrack) return;
+    var failingNames = ALL_SITES.filter(function (s) {
+      return siteData[s.id] && siteData[s.id].lastState === "err";
+    }).map(function (s) { return s.name; });
+    if (!failingNames.length) {
+      errorTicker.style.display = "none";
+      errorTickerTrack.innerHTML = "";
+      return;
+    }
+    errorTicker.style.display = "flex";
+    var text = failingNames.join("　／　");
+    errorTickerTrack.innerHTML = "";
+    var seg1 = document.createElement("span"); seg1.className = "ticker-seg"; seg1.textContent = text;
+    var seg2 = document.createElement("span"); seg2.className = "ticker-seg"; seg2.textContent = text;
+    errorTickerTrack.appendChild(seg1); errorTickerTrack.appendChild(seg2);
+    requestAnimationFrame(function () {
+      var singleWidth = errorTickerTrack.scrollWidth / 2;
+      var speedPxPerSec = 55;
+      var duration = Math.max(8, singleWidth / speedPxPerSec);
+      errorTickerTrack.style.animationDuration = duration + "s";
+    });
+  }
   function setSiteDots(site, state) {
     var s = siteStates[site.id];
     if (s.menuDotEl) s.menuDotEl.className = "dot " + state;
@@ -2239,10 +2377,12 @@
       if (s.graphLabelEl) s.graphLabelEl.textContent = "取得失敗";
     }
     setSiteStatus(site, state, state === "ok" ? ("最終更新 " + fmtClock(new Date())) : (state === "err" ? ("取得失敗 " + fmtClock(new Date())) : "取得中…"));
+    updateFetchAlertFrame(site, state === "err");
+    updateErrorTicker();
   }
 
   /* =====================================================================
-   * 14. 共有ポーリング (27拠点、同時実行数3、1回リトライ) - addPointが全ビューへ反映する
+   * 14. 共有ポーリング (46拠点、同時実行数3、1回リトライ) - addPointが全ビューへ反映する
    * ===================================================================== */
   function addPoint(site, reading, via) {
     var s = siteStates[site.id];
@@ -2415,7 +2555,7 @@
     if (tableSection.classList.contains("show")) rebuildTable();
   }
   // GitHub Actions(scripts/poll.mjs)がサーバー側で定期取得してdata/recent.csvへ書き出した過去データを
-  // ページを開いた直後に読み込み、水位・電源の全拠点(matsuhisa.info系27拠点+国交省水位3拠点)の
+  // ページを開いた直後に読み込み、水位・電源の全拠点(matsuhisa.info系27拠点+国交省水位11拠点)の
   // グラフへ反映する。mergeAndDedupeはPOWER_SITES(電源監視ビュー専用20拠点)限定のため、
   // こちらは全拠点を対象にした別関数として用意する。data/recent.csvが存在しない(GitHub Actions未設定・
   // 未実行)場合は何もせず、従来通りブラウザ側のライブ取得のみで動作する。
@@ -2930,7 +3070,11 @@
     loadServerHistory: loadServerHistory, mergeServerHistory: mergeServerHistory, parseCsvRows: parseCsvRows,
     SERVER_HISTORY_URL: SERVER_HISTORY_URL, recomputeBaseline: recomputeBaseline,
     loadImageManifest: loadImageManifest, IMAGE_MANIFEST_URL: IMAGE_MANIFEST_URL,
-    getImageManifest: function () { return imageManifest; }
+    getImageManifest: function () { return imageManifest; },
+    fetchKawabouWaterReading: fetchKawabouWaterReading,
+    kawabouWaterJsonUrl: kawabouWaterJsonUrl, kawabouSwstgJsonUrl: kawabouSwstgJsonUrl,
+    updateErrorTicker: updateErrorTicker, updateFetchAlertFrame: updateFetchAlertFrame,
+    setSiteDots: setSiteDots, riverGroupOf: riverGroupOf, riverGroups: riverGroups
   };
 })();
 </script>
