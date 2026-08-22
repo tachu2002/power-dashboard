@@ -259,7 +259,7 @@
     body { padding: 14px; }
     .sidebar {
       position: fixed; top: 0; left: 0; height: 100vh; max-height: 100vh;
-      width: 86vw; max-width: 320px; z-index: 60; border-radius: 0;
+      width: 86vw; max-width: 320px; z-index: 2001; border-radius: 0;
       transform: translateX(0); transition: transform 0.25s ease;
       box-shadow: 4px 0 20px rgba(0,0,0,0.28);
     }
@@ -268,7 +268,10 @@
       transform: translateX(-105%);
     }
     .sidebar-backdrop {
-      display: block; position: fixed; inset: 0; background: rgba(6,20,26,0.45); z-index: 55;
+      /* Leafletの内部パネ/コントロールは通常z-index:200〜1000程度を使うため、
+         それより十分高いz-indexにして、河川別拠点一覧の地図がメニューより
+         前面に出てしまう不具合(モバイルでの開閉時)を防ぐ。 */
+      display: block; position: fixed; inset: 0; background: rgba(6,20,26,0.45); z-index: 2000;
       opacity: 1; transition: opacity 0.2s ease;
     }
     .app-layout.sidebar-collapsed .sidebar-backdrop { opacity: 0; pointer-events: none; }
@@ -371,6 +374,11 @@
   .panel-sub { font-size: 12px; color: var(--text-secondary); margin: -4px 0 10px; }
   .map-box { position: relative; width: 100%; height: 320px; border-radius: 8px; overflow: hidden; }
   .map-box.all-sites-map { height: 70vh; min-height: 480px; }
+  .nowcast-toggle {
+    display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary);
+    margin: -4px 0 10px; cursor: pointer; user-select: none;
+  }
+  .nowcast-toggle input { cursor: pointer; }
 
   .all-sites-map-panel { display: flex; flex-direction: column; height: calc(100vh - 130px); min-height: 560px; }
   .all-sites-map-panel .map-box { flex: 1 1 auto; height: auto; }
@@ -390,6 +398,9 @@
   .site-marker-pulse { position: absolute; inset: -9px; border-radius: 50%; background: rgba(235,104,52,0.55); opacity: 0; transform: scale(0.55); z-index: 1; pointer-events: none; }
   .site-marker-wrap.selected .site-marker-badge { background: var(--series-bat); box-shadow: 0 0 0 3px #fff, 0 2px 8px rgba(0,0,0,0.45); }
   .site-marker-wrap.selected .site-marker-pulse { animation: site-marker-pulse-anim 1.5s ease-out infinite; }
+  /* 短時間で水位の上昇幅が大きい拠点のアイコンを目立たせる(赤系+パルス)。selectedと同時に付く場合はこちらを優先。 */
+  .site-marker-wrap.rising-fast .site-marker-badge { background: #e0501f; box-shadow: 0 0 0 3px #fff, 0 2px 10px rgba(224,80,31,0.7); }
+  .site-marker-wrap.rising-fast .site-marker-pulse { background: rgba(224,80,31,0.6); animation: site-marker-pulse-anim 1.1s ease-out infinite; }
   @keyframes site-marker-pulse-anim {
     0%   { opacity: 0.55; transform: scale(0.55); }
     70%  { opacity: 0; transform: scale(1.7); }
@@ -400,25 +411,25 @@
     border: 1px solid var(--border); color: #0b1c24; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
   }
 
-  .site-order-list { display: flex; flex-direction: column; gap: 10px; }
+  .site-order-list { display: flex; flex-direction: column; gap: 13px; }
   .site-order-item {
-    display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding: 10px 12px;
-    border: 1px solid var(--border); border-radius: 10px; background: var(--page-plane);
+    display: flex; align-items: center; flex-wrap: wrap; gap: 16px; padding: 13px 16px;
+    border: 1px solid var(--border); border-radius: 13px; background: var(--page-plane);
     outline: 0 solid transparent; outline-offset: 2px; transition: outline-color 0.2s, background 0.2s; cursor: pointer;
   }
   .site-order-item.jump-highlight { outline: 3px solid var(--series-bat); background: var(--surface-1); }
-  .site-order-badge { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--series-pv); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
-  .site-order-body { flex: 1 1 170px; min-width: 150px; }
-  .site-order-name { font-size: 14px; font-weight: 600; color: var(--text-primary); }
-  .site-order-coords { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .site-order-badge { flex: none; width: 39px; height: 39px; border-radius: 50%; background: var(--series-pv); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; }
+  .site-order-body { flex: 1 1 220px; min-width: 195px; }
+  .site-order-name { font-size: 18px; font-weight: 600; color: var(--text-primary); }
+  .site-order-coords { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
 
-  .site-media-col { flex: none; display: flex; flex-direction: column; align-items: center; gap: 3px; }
-  .site-media-caption { font-size: 10px; color: var(--text-muted); }
-  .site-media { width: 106px; height: 62px; border-radius: 6px; overflow: hidden; background: #10222b; display: flex; align-items: center; justify-content: center; }
+  .site-media-col { flex: none; display: flex; flex-direction: column; align-items: center; gap: 4px; }
+  .site-media-caption { font-size: 13px; color: var(--text-muted); }
+  .site-media { width: 138px; height: 81px; border-radius: 8px; overflow: hidden; background: #10222b; display: flex; align-items: center; justify-content: center; }
   .site-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
-  .site-media .img-nodata { font-size: 9px; padding: 2px; }
-  .mini-chart-box { width: 148px; height: 62px; border-radius: 6px; overflow: hidden; background: var(--surface-1); border: 1px solid var(--gridline); position: relative; }
-  .mini-chart-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--text-muted); text-align: center; padding: 4px; }
+  .site-media .img-nodata { font-size: 12px; padding: 3px; }
+  .mini-chart-box { width: 192px; height: 81px; border-radius: 8px; overflow: hidden; background: var(--surface-1); border: 1px solid var(--gridline); position: relative; }
+  .mini-chart-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--text-muted); text-align: center; padding: 5px; }
 
   .site-order-link {
     flex: none; font-size: 12px; font-weight: 600; color: var(--series-pv); text-decoration: none;
@@ -484,6 +495,10 @@
   .simple-card .site-card-header { margin-bottom: 6px; }
   .card-caption { display: block; text-decoration: none; color: var(--text-muted); font-size: 11px; margin-top: 6px; background: none; border: none; padding: 0; text-align: left; cursor: pointer; }
   .graph-box { position: relative; height: 190px; min-width: 0; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 6px; }
+  .chart-legend:empty { display: none; margin-top: 0; }
+  .chart-legend-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
+  .chart-legend-dot { width: 9px; height: 9px; border-radius: 2px; flex: none; }
 </style>
 </head>
 <body>
@@ -493,7 +508,7 @@
       <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="メニューの表示切替" title="メニューの表示切替">☰</button>
       <div>
         <h1>水位・電源監視ダッシュボード</h1>
-        <p class="subtitle" id="subtitleText">拠点の電源(PV/BAT)と水位を5分ごとに自動取得（起動時は即時取得）</p>
+        <p class="subtitle" id="subtitleText">拠点の電源(PV/BAT)と水位を1分ごとに自動取得（起動時は即時取得）</p>
       </div>
     </div>
     <div class="error-ticker" id="errorTicker" aria-live="polite">
@@ -537,7 +552,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">⚡ 電源監視</h1>
-            <p class="subtitle" id="powerSubtitle">拠点を5分ごとに自動取得・mV → V に換算（起動時は即時取得）</p>
+            <p class="subtitle" id="powerSubtitle">拠点を1分ごとに自動取得・mV → V に換算（起動時は即時取得）</p>
           </div>
           <div class="header-toolbars">
             <div class="toolbar">
@@ -562,7 +577,7 @@
         </div>
 
         <footer>
-          このページを開いている間、起動直後に全拠点のデータを即時取得し、以後は5分間隔で自動的に取得・更新します。CSVダウンロードや履歴ファイルとの連携は「データダウンロード → 電圧データ」で行えます。<br>
+          このページを開いている間、起動直後に全拠点のデータを即時取得し、以後は1分間隔で自動的に取得・更新します。CSVダウンロードや履歴ファイルとの連携は「データダウンロード → 電圧データ」で行えます。<br>
           バッテリー電圧が12.0V以下になった拠点は黄色の枠(注意)、11.5V以下になった拠点は赤色の枠(緊急)で強調表示されます。
         </footer>
       </div>
@@ -572,6 +587,7 @@
         <div class="panel all-sites-map-panel">
           <h2 class="panel-title">■ 全拠点マップ</h2>
           <p class="panel-sub" id="allSitesMapSub">全拠点の位置を表示します。マーカーを押すと、その拠点の詳細へ移動します。</p>
+          <label class="nowcast-toggle"><input type="checkbox" id="nowcastToggle" checked> 雨雲(気象庁ナウキャスト)を表示</label>
           <div class="map-box all-sites-map" id="allSitesMap"></div>
         </div>
       </div>
@@ -622,9 +638,10 @@
               <div class="water-now-delta" id="waterNowDelta">&nbsp;</div>
             </div>
             <div class="chart-box" id="waterChart" style="height:220px"></div>
+            <div class="chart-legend" id="waterChart-legend"></div>
           </div>
           <div class="panel list-panel">
-            <h2 class="panel-title">■ 取得データ一覧（5分毎）</h2>
+            <h2 class="panel-title">■ 取得データ一覧（1分毎）</h2>
             <div class="data-list-scroll">
               <table class="data-list-table">
                 <thead><tr><th>日時</th><th>水位(m)</th></tr></thead>
@@ -640,7 +657,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">📷 ライブカメラ一覧</h1>
-            <p class="subtitle" id="camlistSubtitle">全拠点のライブカメラ映像のみを一覧表示します（5分ごとに自動更新）。</p>
+            <p class="subtitle" id="camlistSubtitle">全拠点のライブカメラ映像のみを一覧表示します（1分ごとに自動更新）。</p>
           </div>
           <div class="toolbar">
             <span id="camlistStatusText">読み込み中…</span>
@@ -655,7 +672,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">📈 水位変化グラフ一覧</h1>
-            <p class="subtitle" id="graphlistSubtitle">全拠点の水位変化グラフのみを一覧表示します（5分ごとに自動取得。破線は基準(最低)水位です）。</p>
+            <p class="subtitle" id="graphlistSubtitle">全拠点の水位変化グラフのみを一覧表示します（1分ごとに自動取得。破線は基準(最低)水位です）。</p>
           </div>
           <div class="toolbar">
             <span id="graphlistStatusText">読み込み中…</span>
@@ -698,7 +715,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">💧 水位データ</h1>
-            <p class="subtitle" id="waterDataSubtitle">全拠点の水位測定値を5分ごとに蓄積した履歴です。CSVでダウンロードできます。</p>
+            <p class="subtitle" id="waterDataSubtitle">全拠点の水位測定値を蓄積した履歴です（ページ表示中は1分ごと、サーバー側では5分ごとに自動収集）。CSVでダウンロードできます。</p>
           </div>
           <div class="toolbar">
             <div class="status" id="waterDataStatusText">件数: 0件</div>
@@ -847,25 +864,50 @@
    *   - ライブ画像      : https://www.cam.shizuoka4.jp/cam/{camtype}.json (撮影時刻obsdateを取得。CORSブロックのためr.jina.aiプロキシ経由で取得。プロキシ自体もCORS開放を確認済み)
    *                       → https://www.cam.shizuoka4.jp/cam/{camtype}/{yyyy}/{mm}/{dd}/{yyyymmddHHMM}00_01.jpg (CORS開放を確認済み)
    * --------------------------------------------------------------------- */
+  // 各拠点の公式基準水位(thresholds)は、国土交通省「川の防災情報」のマスターデータAPI
+  // (https://www.river.go.jp/kawabou/file/files/master/obs/{stg|swstg}/{code}.json) から2026-08-22時点で取得。
+  // stg拠点: rsrvStg(水防団待機水位)・warnStg(氾濫注意水位)・dsgnMoblzdStg(避難判断水位)・
+  //   spclWarnStg(特別警戒水位)・dngStg(氾濫危険水位)。未設定(null)の項目は当該拠点で未公表のため省略。
+  // swstg拠点: strtStgHght(観測開始水位)・fldStgHght(氾濫開始水位)・dngStgHght(危険水位、設定拠点のみ)。
+  var TH_RSRV = { key: "rsrvStg", label: "水防団待機水位", color: "#38bdf8" };
+  var TH_WARN = { key: "warnStg", label: "氾濫注意水位", color: "#eab308" };
+  var TH_MOBLZD = { key: "dsgnMoblzdStg", label: "避難判断水位", color: "#f97316" };
+  var TH_SPCLWARN = { key: "spclWarnStg", label: "特別警戒水位", color: "#ef4444" };
+  var TH_DNG = { key: "dngStg", label: "氾濫危険水位", color: "#c026d3" };
+  var TH_STRT_HGHT = { key: "strtStgHght", label: "観測開始水位", color: "#eab308" };
+  var TH_FLD_HGHT = { key: "fldStgHght", label: "氾濫開始水位", color: "#111827" };
+  var TH_DNG_HGHT = { key: "dngStgHght", label: "危険水位", color: "#c026d3" };
+  function th(def, value) { return { key: def.key, label: def.label, color: def.color, value: value }; }
   var KAWABOU_WATER_SITES_RAW = [
     { id: "kw01", name: "下神川橋（大場川 / 三島市加茂川町）", lat: 35.1230556, lon: 138.9225, obsCd13: "0563300400016",
-      shizuokaCamtype: "2036", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/036.jpg" },
+      shizuokaCamtype: "2036", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/036.jpg",
+      thresholds: [th(TH_DNG, 4), th(TH_WARN, 2.5), th(TH_RSRV, 2)] },
     { id: "kw02", name: "中村橋（大場川 / 三島市中）", lat: 35.1061111, lon: 138.9355556, obsCd13: "0563300400156",
-      shizuokaCamtype: "2089", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/089.jpg" },
+      shizuokaCamtype: "2089", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/089.jpg",
+      thresholds: [] /* 国交省から基準水位が未公表 */ },
     { id: "kw03", name: "下御殿橋（御殿川 / 三島市青木）", lat: 35.1086111, lon: 138.9219444, obsCd13: "0563300400157",
-      shizuokaCamtype: "2090", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/090.jpg" },
+      shizuokaCamtype: "2090", normalImageUrl: "https://www.cam.shizuoka4.jp/common/img/heiji/2/090.jpg",
+      thresholds: [] /* 国交省から基準水位が未公表 */ },
     // --- ここから8拠点追加(2026-08-22、国土交通省「川の防災情報」より。カメラ画像は無くいずれも水位のみ) ---
     // kind省略(既定"stg")=通常の水位観測所。obsCd13を使用し、obsValue.stg(m)をそのまま採用。
     // kind:"swstg"=危機管理型水位計。obsCdを使用し、URLパスが"stg"ではなく"swstg"、
     //   値はobsValue.stgHght(堤防天端からの高さ。マイナス値=天端より低い)を採用する(fetchKawabouWaterReading参照)。
-    { id: "kw04", name: "青木橋（大場川 / 長泉町中土狩）", lat: 35.1422222, lon: 138.9088889, obsCd13: "0563300400020" },
-    { id: "kw05", name: "境川（境川 / 栄町）", lat: 35.1189972, lon: 138.906475, kind: "swstg", obsCd: "2200000022" },
-    { id: "kw06", name: "島田橋（三島山田川 / 川原ケ谷）", lat: 35.1271861, lon: 138.9311222, kind: "swstg", obsCd: "2200000031" },
-    { id: "kw07", name: "夏梅木橋（夏梅木川 / 谷田）", lat: 35.1090306, lon: 138.9386639, kind: "swstg", obsCd: "2200000025" },
-    { id: "kw08", name: "大場（大場川 / 函南町間宮）", lat: 35.0897222, lon: 138.9355556, obsCd13: "2182600400010" },
-    { id: "kw09", name: "大場川左岸2.3k+44（大場川 / 函南町間宮）", lat: 35.0912417, lon: 138.934925, kind: "swstg", obsCd: "8500000282" },
-    { id: "kw10", name: "間宮（函南観音川 / 函南町間宮）", lat: 35.0875, lon: 138.9383333, obsCd13: "0563300400169" },
-    { id: "kw11", name: "徳倉（狩野川 / 清水町下徳倉）", lat: 35.0922222, lon: 138.9005556, obsCd13: "2182600400007" }
+    { id: "kw04", name: "青木橋（大場川 / 長泉町中土狩）", lat: 35.1422222, lon: 138.9088889, obsCd13: "0563300400020",
+      thresholds: [th(TH_DNG, 3.4), th(TH_WARN, 3.2), th(TH_RSRV, 2.8)] },
+    { id: "kw05", name: "境川（境川 / 栄町）", lat: 35.1189972, lon: 138.906475, kind: "swstg", obsCd: "2200000022",
+      thresholds: [th(TH_FLD_HGHT, 0), th(TH_STRT_HGHT, -0.66)] },
+    { id: "kw06", name: "島田橋（三島山田川 / 川原ケ谷）", lat: 35.1271861, lon: 138.9311222, kind: "swstg", obsCd: "2200000031",
+      thresholds: [th(TH_FLD_HGHT, 0), th(TH_STRT_HGHT, -1.69)] },
+    { id: "kw07", name: "夏梅木橋（夏梅木川 / 谷田）", lat: 35.1090306, lon: 138.9386639, kind: "swstg", obsCd: "2200000025",
+      thresholds: [th(TH_FLD_HGHT, 0), th(TH_STRT_HGHT, -2.26)] },
+    { id: "kw08", name: "大場（大場川 / 函南町間宮）", lat: 35.0897222, lon: 138.9355556, obsCd13: "2182600400010",
+      thresholds: [th(TH_DNG, 7.6), th(TH_SPCLWARN, 7.2), th(TH_MOBLZD, 5.4), th(TH_WARN, 4.8), th(TH_RSRV, 3)] },
+    { id: "kw09", name: "大場川左岸2.3k+44（大場川 / 函南町間宮）", lat: 35.0912417, lon: 138.934925, kind: "swstg", obsCd: "8500000282",
+      thresholds: [th(TH_DNG_HGHT, -1.9), th(TH_FLD_HGHT, 0), th(TH_STRT_HGHT, -4.01)] },
+    { id: "kw10", name: "間宮（函南観音川 / 函南町間宮）", lat: 35.0875, lon: 138.9383333, obsCd13: "0563300400169",
+      thresholds: [] /* 国交省から基準水位が未公表 */ },
+    { id: "kw11", name: "徳倉（狩野川 / 清水町下徳倉）", lat: 35.0922222, lon: 138.9005556, obsCd13: "2182600400007",
+      thresholds: [th(TH_DNG, 7.2), th(TH_SPCLWARN, 6.8), th(TH_MOBLZD, 4.6), th(TH_WARN, 4), th(TH_RSRV, 3)] }
   ];
   var KAWABOU_CAMERA_SITES_RAW = [
     { id: "kc01", name: "境川排水機場屋上（狩野川 / 三島市）", lat: 35.0854083, lon: 138.9080278,
@@ -912,7 +954,8 @@
       sourceType: "kawabou-water",
       sourceNote: s.shizuokaCamtype ? KAWABOU_SHIZUOKA_CAM_SOURCE_NOTE : (s.kind === "swstg" ? KAWABOU_SWSTG_SOURCE_NOTE : KAWABOU_WATER_SOURCE_NOTE),
       shizuokaCamtype: s.shizuokaCamtype || null,
-      normalImageUrl: s.normalImageUrl || null, hasWater: true, hasPower: false
+      normalImageUrl: s.normalImageUrl || null, hasWater: true, hasPower: false,
+      thresholds: s.thresholds || []
     };
   });
   KAWABOU_CAMERA_SITES_RAW.forEach(function (s) {
@@ -940,7 +983,10 @@
   var WARN_BAT_VOLTAGE = 12.0;
   var CRITICAL_BAT_VOLTAGE = 11.5;
 
-  var FETCH_INTERVAL_MS = 5 * 60 * 1000; // 5分間隔(元の間隔に戻す)
+  // ブラウザ側のライブ取得間隔。「取得が遅すぎる」というご要望を受け、5分→1分に短縮。
+  // (なお、サーバー側(GitHub Actions)の自動保存は無料枠のcronの都合上5分が最短のため、
+  // これ以上は短縮できない。ブラウザでこのページを開いている間の体感速度はこの値で決まる。)
+  var FETCH_INTERVAL_MS = 60 * 1000;
   var MAX_CHART_POINTS = 288;
   var CHART_WINDOW_MS = 24 * 60 * 60 * 1000;
   var MAX_STORED_POINTS = 2016;
@@ -948,7 +994,7 @@
   // 大場ポンプ場流入水路・神川都市下水路・徳倉都市下水路の3拠点のみ、画像・水位データともに2分間隔で取得する
   // (この3拠点は他拠点と同じtest.cgiから画像・水位を同時に取得するため、取得間隔を上げるだけで両方が2分更新になる)。
   var FAST_POLL_SITE_IDS = ["cam39", "cam50", "cam51"];
-  var FAST_POLL_INTERVAL_MS = 2 * 60 * 1000;
+  var FAST_POLL_INTERVAL_MS = 30 * 1000; // 通常間隔(1分)より短い、この3拠点向けの高頻度間隔
   // GitHub Actions側(scripts/poll.mjs)がサーバー側で定期取得し、data/recent.csvへ書き出した
   // 過去データ。ページを開いた直後にこれを読み込み、ブラウザを閉じていた間の履歴もグラフへ反映する。
   var SERVER_HISTORY_URL = "data/recent.csv";
@@ -959,12 +1005,27 @@
     return isDark() ? {
       textPrimary: "#eaf6fb", textSecondary: "#a9c3cf", textMuted: "#7e97a2",
       gridline: "#1c3641", baseline: "#2c4a56", surface: "#0f2733",
-      pv: "#3987e5", bat: "#d95926", rated: "#e66767", water: "#3987e5"
+      pv: "#3987e5", bat: "#d95926", rated: "#e66767", water: "#3987e5", rain: "#4fd1e5"
     } : {
       textPrimary: "#0b1c24", textSecondary: "#4c6672", textMuted: "#7d99a3",
       gridline: "#cfe6ee", baseline: "#a9cbd6", surface: "#f3fafd",
-      pv: "#2a78d6", bat: "#eb6834", rated: "#d63b3b", water: "#2a78d6"
+      pv: "#2a78d6", bat: "#eb6834", rated: "#d63b3b", water: "#2a78d6", rain: "#0ea5b3"
     };
+  }
+  function niceRainMaxMm(v) {
+    if (!(v > 0)) return 5;
+    var candidates = [5, 10, 15, 20, 30, 50, 75, 100, 150, 200, 300, 500];
+    for (var i = 0; i < candidates.length; i++) if (v <= candidates[i]) return candidates[i];
+    return Math.ceil(v / 100) * 100;
+  }
+  function buildLegendChipEl(color, text) {
+    var chip = document.createElement("span");
+    chip.className = "chart-legend-chip";
+    var dot = document.createElement("span"); dot.className = "chart-legend-dot"; dot.style.background = color;
+    chip.appendChild(dot);
+    var label = document.createElement("span"); label.textContent = text;
+    chip.appendChild(label);
+    return chip;
   }
 
   /* =====================================================================
@@ -1327,9 +1388,10 @@
       "background:var(--surface-1);border:1px solid var(--gridline);border-radius:8px;padding:6px 10px;" +
       "font-size:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.12);z-index:2;";
     container.appendChild(tooltip);
+    var legendEl = document.getElementById(containerId + "-legend");
     var H = 220;
     var marginLeft = 54, marginRight = 60, marginTop = 12, marginBottom = 24;
-    var lastPoints = [], lastBaseline = null;
+    var lastPoints = [], lastBaseline = null, lastThresholds = [];
     function currentW() {
       var rect = container.getBoundingClientRect();
       if (rect.width > 0 && rect.height > 0) return H * (rect.width / rect.height);
@@ -1354,22 +1416,42 @@
       return { min: niceLo, max: niceHi, ticks: ticks };
     }
     function el(tag, attrs) { var e = document.createElementNS(svgNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
-    function render(points, baseline) {
+    function render(points, baseline, thresholds) {
       lastPoints = points; lastBaseline = typeof baseline === "number" ? baseline : null;
+      lastThresholds = Array.isArray(thresholds) ? thresholds : [];
       var W = currentW();
       var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
       while (svg.firstChild) svg.removeChild(svg.firstChild);
       svg.setAttribute("viewBox", "0 0 " + W + " " + H);
       svg.setAttribute("preserveAspectRatio", "none");
       tooltip.style.opacity = 0;
-      if (!points.length) return;
+      if (!points.length) { if (legendEl) legendEl.innerHTML = ""; return; }
       var pal = palette();
       var n = points.length;
       var vals = points.map(function (p) { return p.value; });
-      var allVals = typeof lastBaseline === "number" ? vals.concat([lastBaseline]) : vals;
+      var thVals = lastThresholds.map(function (th) { return th.value; });
+      var allVals = vals.concat(typeof lastBaseline === "number" ? [lastBaseline] : []).concat(thVals);
       var scale = niceScale(Math.min.apply(null, allVals), Math.max.apply(null, allVals), lastBaseline);
       function xAt(i) { return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW; }
       function yAt(v) { return marginTop + plotH - ((v - scale.min) / (scale.max - scale.min)) * plotH; }
+      // ---- 雨量オーバーレイ(国交省 雨量計、上部の帯に半透明の棒グラフとして重ねる) ----
+      var rainVals = points.map(function (p) { return typeof p.rainMm === "number" ? p.rainMm : null; });
+      var hasRain = rainVals.some(function (v) { return v !== null; });
+      var rainMax = 0, rainBandTop = marginTop, rainBandH = plotH * 0.32;
+      if (hasRain) {
+        rainVals.forEach(function (v) { if (v !== null && v > rainMax) rainMax = v; });
+        rainMax = niceRainMaxMm(rainMax);
+        var barW = Math.max(2, Math.min(14, (plotW / n) * 0.6));
+        rainVals.forEach(function (v, i) {
+          if (v === null || v <= 0) return;
+          var h = (v / rainMax) * rainBandH;
+          svg.appendChild(el("rect", { x: (xAt(i) - barW / 2).toFixed(2), y: rainBandTop.toFixed(2), width: barW.toFixed(2), height: h.toFixed(2), fill: pal.rain, opacity: 0.55, rx: 1 }));
+        });
+        var rainAxisTopLabel = el("text", { x: W - marginRight + 6, y: rainBandTop + 4, "dominant-baseline": "hanging", fill: pal.rain, "font-size": 10, "font-family": "system-ui, -apple-system, sans-serif" });
+        rainAxisTopLabel.textContent = rainMax + "mm"; svg.appendChild(rainAxisTopLabel);
+        var rainAxisBottomLabel = el("text", { x: W - marginRight + 6, y: rainBandTop + rainBandH, "dominant-baseline": "auto", fill: pal.textMuted, "font-size": 10, "font-family": "system-ui, -apple-system, sans-serif" });
+        rainAxisBottomLabel.textContent = "0mm(雨量)"; svg.appendChild(rainAxisBottomLabel);
+      }
       scale.ticks.forEach(function (t) {
         var y = yAt(t);
         svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: y, y2: y, stroke: pal.gridline, "stroke-width": 1 }));
@@ -1390,6 +1472,21 @@
         svg.appendChild(el("rect", { x: marginLeft + 4, y: by - 17, width: baseLabelWidth, height: 15, fill: pal.surface, opacity: 0.85 }));
         var baseLabelEl = el("text", { x: marginLeft + 8, y: by - 10, "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 10, "font-family": "system-ui, -apple-system, sans-serif" });
         baseLabelEl.textContent = baseLabelText; svg.appendChild(baseLabelEl);
+      }
+      // ---- 国交省公表の公式基準水位(観測開始水位・氾濫開始水位など)を色別の線で表示 ----
+      lastThresholds.forEach(function (th) {
+        if (th.value < scale.min || th.value > scale.max) return;
+        var ty = yAt(th.value);
+        svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: ty, y2: ty, stroke: th.color, "stroke-width": 1.5, "stroke-dasharray": "6 3", opacity: 0.9 }));
+      });
+      // ---- 凡例(雨量・公式基準水位) ----
+      if (legendEl) {
+        while (legendEl.firstChild) legendEl.removeChild(legendEl.firstChild);
+        if (hasRain) legendEl.appendChild(buildLegendChipEl(pal.rain, "雨量(三島観測所、10分雨量)"));
+        lastThresholds.forEach(function (th) {
+          legendEl.appendChild(buildLegendChipEl(th.color, th.label + " " + th.value.toFixed(2) + "m"));
+        });
+        legendEl.style.display = (hasRain || lastThresholds.length) ? "" : "none";
       }
       var d = vals.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
       svg.appendChild(el("path", { d: d, fill: "none", stroke: pal.water, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
@@ -1427,6 +1524,12 @@
         line1.style.cssText = "color:var(--text-primary);font-weight:600;";
         line1.textContent = "水位 " + vals[idx2].toFixed(2) + " m";
         tooltip.appendChild(line1);
+        if (typeof points[idx2].rainMm === "number") {
+          var line2 = document.createElement("div");
+          line2.style.cssText = "color:" + pal.rain + ";";
+          line2.textContent = "雨量 " + points[idx2].rainMm.toFixed(1) + " mm/10分";
+          tooltip.appendChild(line2);
+        }
         var containerRect = container.getBoundingClientRect();
         var tipX = (px / W) * containerRect.width;
         var tipY = (py / H) * containerRect.height;
@@ -1438,7 +1541,10 @@
       hitRect.addEventListener("pointermove", pointerMove);
       hitRect.addEventListener("pointerleave", pointerLeave);
     }
-    return { setData: function (points, baseline) { render(points, baseline); }, redraw: function () { render(lastPoints, lastBaseline); } };
+    return {
+      setData: function (points, baseline, thresholds) { render(points, baseline, thresholds); },
+      redraw: function () { render(lastPoints, lastBaseline, lastThresholds); }
+    };
   }
 
   // ミニスパークライン(河川パネルの拠点カード用)
@@ -1492,15 +1598,46 @@
   });
   // 「最低水位」の点線は、保持している過去データ(サーバー履歴読込み分+セッション中の取得分)全体から
   // 実際の最低値を都度計算し直す(初回取得値で固定してしまわないようにする)。
+  // 多呂樋管(cam14)は過去データからの自動算出ではなく、ご指定の固定値0.06mを基準水位とする。
+  var FIXED_BASELINE_OVERRIDE = { cam14: 0.06 };
   function recomputeBaseline(site) {
     if (!site.hasWater) return;
     var s = siteStates[site.id];
+    if (Object.prototype.hasOwnProperty.call(FIXED_BASELINE_OVERRIDE, site.id)) {
+      s.baselineLevelM = FIXED_BASELINE_OVERRIDE[site.id];
+      return;
+    }
     var min = null;
     s.points.forEach(function (p) {
       if (typeof p.waterLevelM === "number" && (min === null || p.waterLevelM < min)) min = p.waterLevelM;
     });
     s.baselineLevelM = min;
   }
+
+  // 短時間(直近60分)の水位上昇幅が大きい拠点を検出する(マップ上のアイコン強調用)。
+  var RISE_ALERT_WINDOW_MS = 60 * 60 * 1000;
+  var RISE_ALERT_THRESHOLD_M = 0.2;
+  function recentRiseM(site) {
+    if (!site.hasWater) return null;
+    var s = siteStates[site.id];
+    if (!s) return null;
+    var pts = s.points.filter(function (p) { return typeof p.waterLevelM === "number"; });
+    if (pts.length < 2) return null;
+    var latest = pts[pts.length - 1];
+    var cutoff = latest.fetchedAt.getTime() - RISE_ALERT_WINDOW_MS;
+    var earliest = null;
+    for (var i = 0; i < pts.length; i++) {
+      if (pts[i].fetchedAt.getTime() >= cutoff) { earliest = pts[i]; break; }
+    }
+    if (!earliest || earliest === latest) return null;
+    return latest.waterLevelM - earliest.waterLevelM;
+  }
+  function isRisingFast(site) {
+    var d = recentRiseM(site);
+    return typeof d === "number" && d >= RISE_ALERT_THRESHOLD_M;
+  }
+  // 国交省「川の防災情報」拠点(kawabou-water)のみ公式基準水位(thresholds)を持つ。それ以外の拠点は空配列。
+  function getThresholdsForSite(site) { return site.thresholds || []; }
 
   /* =====================================================================
    * 5. 河川グルーピング (MAP_SITES対象: 水位センサー拠点+座標のある電源専用拠点)
@@ -1527,7 +1664,12 @@
     return a.localeCompare(b, "ja");
   });
   // 上流(北=緯度大)→下流(南=緯度小)の順。ご指摘いただいた「北が上流」に基づく参考順序。
-  riverNames.forEach(function (name) { riverGroups[name].sort(function (a, b) { return b.lat - a.lat; }); });
+  // ただし狩野川は例外(伊豆方面の南から北の駿河湾へ流れるため、上流=南=緯度小)。
+  var REVERSED_FLOW_RIVERS = ["狩野川"];
+  riverNames.forEach(function (name) {
+    var reversed = REVERSED_FLOW_RIVERS.indexOf(name) >= 0;
+    riverGroups[name].sort(function (a, b) { return reversed ? (a.lat - b.lat) : (b.lat - a.lat); });
+  });
   // 「河川別拠点一覧」と同じ表示順(河川の並び→各河川内は上流→下流)のID配列。
   // ライブカメラ一覧・水位変化グラフ一覧の並び順をこれに揃えるために使用する。
   var RIVER_ORDER_SITES = [];
@@ -1668,9 +1810,16 @@
     if (html !== undefined) e.innerHTML = html;
     return e;
   }
-  document.getElementById("powerSubtitle").textContent = POWER_SITES.length + "拠点を5分ごとに自動取得・mV → V に換算（起動時は即時取得）";
+  document.getElementById("powerSubtitle").textContent = POWER_SITES.length + "拠点を1分ごとに自動取得・mV → V に換算（起動時は即時取得）";
 
-  POWER_SITES.forEach(function (site) {
+  // 電源監視ページのカード表示順を、ライブカメラ一覧・水位変化グラフ一覧と同じ順序
+  // (河川別拠点一覧と同じ、河川ごとに上流→下流)に揃える。対象拠点(POWER_SITES)自体は変えない。
+  var powerSiteIdSet = {};
+  POWER_SITES.forEach(function (s) { powerSiteIdSet[s.id] = true; });
+  var POWER_SITES_DISPLAY_ORDER = RIVER_ORDER_SITES.filter(function (s) { return powerSiteIdSet[s.id]; });
+  POWER_SITES.forEach(function (s) { if (POWER_SITES_DISPLAY_ORDER.indexOf(s) === -1) POWER_SITES_DISPLAY_ORDER.push(s); });
+
+  POWER_SITES_DISPLAY_ORDER.forEach(function (site) {
     var card = el2("div", { class: "card" });
     var header = el2("div", { class: "site-card-header" });
     var titleWrap = el2("div", { class: "site-title-wrap" });
@@ -1913,17 +2062,18 @@
     return result;
   }
   var RIVER_LINE_COLOR = "#ff3b30", RIVER_LINE_HALO = "#ffffff";
-  function buildMarkerIcon(number, isSelected) {
+  function buildMarkerIcon(number, isSelected, isRisingFastFlag) {
+    var cls = "site-marker-wrap" + (isSelected ? " selected" : "") + (isRisingFastFlag ? " rising-fast" : "");
     return L.divIcon({
       className: "",
-      html: '<div class="site-marker-wrap' + (isSelected ? " selected" : "") + '"><div class="site-marker-pulse"></div><div class="site-marker-badge">' + number + '</div></div>',
+      html: '<div class="' + cls + '"><div class="site-marker-pulse"></div><div class="site-marker-badge">' + number + '</div></div>',
       iconSize: [26, 26], iconAnchor: [13, 13]
     });
   }
   function updateRiverMapMarkerSelection() {
     Object.keys(currentRiverMarkers).forEach(function (id) {
       var entry = currentRiverMarkers[id];
-      entry.marker.setIcon(buildMarkerIcon(entry.idx + 1, id === selectedSiteIdOnMap));
+      entry.marker.setIcon(buildMarkerIcon(entry.idx + 1, id === selectedSiteIdOnMap, entry.site ? isRisingFast(entry.site) : false));
     });
   }
   function showMapLoadError(elId, label) {
@@ -1958,16 +2108,27 @@
       L.polyline(smoothed, { color: RIVER_LINE_COLOR, weight: 4, opacity: 0.95, dashArray: "1 9", lineCap: "round", lineJoin: "round" }).addTo(group);
     }
     sites.forEach(function (site, idx) {
-      var icon = buildMarkerIcon(idx + 1, site.id === selectedSiteIdOnMap);
+      var icon = buildMarkerIcon(idx + 1, site.id === selectedSiteIdOnMap, isRisingFast(site));
       var marker = L.marker([site.lat, site.lon], { icon: icon }).addTo(group).bindPopup((idx + 1) + ". " + site.name);
       marker.on("click", function () { selectSiteInRiverPanel(site.id, { scroll: true }); });
-      currentRiverMarkers[site.id] = { marker: marker, idx: idx };
+      currentRiverMarkers[site.id] = { marker: marker, idx: idx, site: site };
     });
     group.addTo(riverMap);
     riverMapLayer = group;
     if (latlngs.length === 1) riverMap.setView(latlngs[0], 16);
     else riverMap.fitBounds(L.latLngBounds(latlngs), { padding: [30, 30] });
     setTimeout(function () { riverMap.invalidateSize(); }, 50);
+  }
+  function refreshMarkerRisingState(site) {
+    if (!site.hasWater) return;
+    var flag = isRisingFast(site);
+    var riverEntry = currentRiverMarkers[site.id];
+    if (riverEntry) riverEntry.marker.setIcon(buildMarkerIcon(riverEntry.idx + 1, site.id === selectedSiteIdOnMap, flag));
+    var allEntry = allSitesMarkers[site.id];
+    if (allEntry) {
+      allEntry.marker.setIcon(buildMarkerIcon(allEntry.idx + 1, false, flag));
+      updateAllSitesLabelVisibility();
+    }
   }
   function refreshRiverCard(site) {
     var s = siteStates[site.id];
@@ -2069,7 +2230,21 @@
    * 10. 全拠点マップビュー
    * ===================================================================== */
   var allSitesMapReady = false, allSitesMap, allSitesMarkers = {};
-  document.getElementById("allSitesMapSub").textContent = MAP_SITES.length + "拠点すべての位置を表示します。マーカーを押すと、その拠点の詳細へ移動します。";
+  // 拠点名の常時表示(permanentツールチップ)は、広域表示時に文字同士が重なり視認性を著しく損なうため、
+  // 一定以上ズームした時だけ常時表示し、それ未満ではマーカーにカーソルを合わせた時だけ表示する。
+  // ただし、短時間の水位上昇が大きい拠点(isRisingFast)は、広域表示中でも見逃されないよう常に名前を表示する。
+  var ALL_SITES_LABEL_ZOOM = 14;
+  document.getElementById("allSitesMapSub").textContent = MAP_SITES.length + "拠点すべての位置を表示します。ズームすると拠点名が表示されます。マーカーを押すと、その拠点の詳細へ移動します。";
+  function updateAllSitesLabelVisibility() {
+    if (!allSitesMap) return;
+    var zoomedIn = typeof allSitesMap.getZoom === "function" && allSitesMap.getZoom() >= ALL_SITES_LABEL_ZOOM;
+    Object.keys(allSitesMarkers).forEach(function (id) {
+      var entry = allSitesMarkers[id];
+      var forceShow = zoomedIn || isRisingFast(entry.site);
+      if (typeof entry.marker.openTooltip !== "function" || typeof entry.marker.closeTooltip !== "function") return;
+      if (forceShow) entry.marker.openTooltip(); else entry.marker.closeTooltip();
+    });
+  }
   function allSitesPopupHtml(site) {
     if (!site.hasWater) {
       var note = site.hasPower ? "（水位センサー非搭載・電源監視のみ）" : "（カメラ映像のみ・水位データ非搭載）";
@@ -2079,6 +2254,44 @@
     var levelText = lvl.length ? lvl[lvl.length - 1].waterLevelM.toFixed(2) + " m" : "取得中…";
     return "<b>" + site.name + "</b><br>現在水位: " + levelText + '<br><a href="#" data-goto-site="' + site.id + '">この拠点の詳細へ移動 →</a>';
   }
+  /* ---- 雨雲(気象庁 高解像度降水ナウキャスト)オーバーレイ ----
+   * 気象庁の公開タイル(出典表記のみで利用可、CORS開放済み)を半透明で重ね、雨雲の様子を地図上で把握できるようにする。
+   * 観測時刻は5分おきに更新されるため、同じ間隔で最新時刻を取得し直しタイルを差し替える。 */
+  var NOWCAST_TILE_URL_TMPL = "https://www.jma.go.jp/bosai/jmatile/data/nowc/{basetime}/none/{validtime}/surf/hrpns/{z}/{x}/{y}.png";
+  var NOWCAST_TIMES_URL = "https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N1.json";
+  var NOWCAST_REFRESH_MS = 5 * 60 * 1000;
+  var nowcastLayer = null, nowcastRefreshTimer = null, nowcastEnabled = true;
+  function applyNowcastLayer(time) {
+    if (!allSitesMap) return;
+    if (nowcastLayer) { allSitesMap.removeLayer(nowcastLayer); nowcastLayer = null; }
+    if (!nowcastEnabled || !time) return;
+    var url = NOWCAST_TILE_URL_TMPL.replace("{basetime}", time.basetime).replace("{validtime}", time.validtime);
+    nowcastLayer = L.tileLayer(url, {
+      opacity: 0.55, maxNativeZoom: 10, minZoom: 5, maxZoom: 19,
+      attribution: "雨雲: 気象庁 高解像度降水ナウキャスト"
+    });
+    nowcastLayer.addTo(allSitesMap);
+  }
+  function refreshNowcastLayer() {
+    if (!nowcastEnabled) return;
+    fetch(NOWCAST_TIMES_URL)
+      .then(function (r) { if (!r.ok) throw new Error("nowcast targetTimes fetch failed: " + r.status); return r.json(); })
+      .then(function (list) {
+        if (!Array.isArray(list) || !list.length) throw new Error("nowcast targetTimes empty");
+        applyNowcastLayer(list[0]); // 先頭が最新(観測)時刻
+      })
+      .catch(function (e) { console.warn("雨雲(ナウキャスト)データの取得に失敗しました:", e); });
+  }
+  function setNowcastEnabled(enabled) {
+    nowcastEnabled = enabled;
+    if (enabled) refreshNowcastLayer();
+    else if (allSitesMap && nowcastLayer) { allSitesMap.removeLayer(nowcastLayer); nowcastLayer = null; }
+  }
+  var nowcastToggleEl = document.getElementById("nowcastToggle");
+  if (nowcastToggleEl) {
+    nowcastEnabled = nowcastToggleEl.checked;
+    nowcastToggleEl.addEventListener("change", function () { setNowcastEnabled(nowcastToggleEl.checked); });
+  }
   function ensureAllSitesMap() {
     if (allSitesMapReady) { setTimeout(function () { allSitesMap.invalidateSize(); }, 50); return; }
     try {
@@ -2087,26 +2300,26 @@
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(allSitesMap);
+      refreshNowcastLayer();
+      if (!nowcastRefreshTimer) nowcastRefreshTimer = setInterval(refreshNowcastLayer, NOWCAST_REFRESH_MS);
       MAP_SITES.forEach(function (site, idx) {
-        var icon = L.divIcon({
-          className: "", html: '<div class="site-marker-wrap"><div class="site-marker-badge">' + (idx + 1) + '</div></div>',
-          iconSize: [26, 26], iconAnchor: [13, 13]
-        });
+        var icon = buildMarkerIcon(idx + 1, false, isRisingFast(site));
         var marker = L.marker([site.lat, site.lon], { icon: icon })
           .addTo(allSitesMap)
-          .bindTooltip(site.name, { permanent: true, direction: "top", offset: [0, -14], className: "site-tooltip" })
+          .bindTooltip(site.name, { permanent: false, direction: "top", offset: [0, -14], className: "site-tooltip" })
           .bindPopup(function () { return allSitesPopupHtml(site); });
         marker.on("popupopen", function (e) {
           var popupEl = e.popup.getElement();
           var linkEl = popupEl && popupEl.querySelector("[data-goto-site]");
           if (linkEl) linkEl.addEventListener("click", function (evt) { evt.preventDefault(); showView("site"); openSiteDetail(site.id); });
         });
-        allSitesMarkers[site.id] = marker;
+        allSitesMarkers[site.id] = { marker: marker, idx: idx, site: site };
       });
       var allBounds = L.latLngBounds(MAP_SITES.map(function (s) { return [s.lat, s.lon]; }));
       allSitesMap.fitBounds(allBounds, { padding: [24, 24] });
+      if (typeof allSitesMap.on === "function") allSitesMap.on("zoomend", updateAllSitesLabelVisibility);
       allSitesMapReady = true;
-      setTimeout(function () { allSitesMap.invalidateSize(); }, 200);
+      setTimeout(function () { allSitesMap.invalidateSize(); updateAllSitesLabelVisibility(); }, 200);
     } catch (mapErr) { showMapLoadError("allSitesMap", "全拠点マップ"); }
   }
 
@@ -2182,7 +2395,7 @@
     var cutoff = Date.now() - CHART_WINDOW_MS;
     var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && typeof p.waterLevelM === "number"; });
     if (recent.length > MAX_CHART_POINTS) recent = recent.slice(-MAX_CHART_POINTS);
-    detailChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.waterLevelM }; }), s.baselineLevelM);
+    detailChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.waterLevelM, rainMm: findNearestRainMm(p.fetchedAt) }; }), s.baselineLevelM, getThresholdsForSite(s.site));
   }
   function updateDetailDataList() {
     var s = siteStates[activeDetailSiteId];
@@ -2244,7 +2457,7 @@
   var CAMLIST_SITES = RIVER_ORDER_SITES.filter(function (site) {
     return (site.hasWater || CAMLIST_INCLUDE_EXTRA_IDS.indexOf(site.id) >= 0) && CAMLIST_EXCLUDE_IDS.indexOf(site.id) < 0;
   });
-  document.getElementById("camlistSubtitle").textContent = "全" + CAMLIST_SITES.length + "拠点のライブカメラ映像のみを一覧表示します（5分ごとに自動更新）。";
+  document.getElementById("camlistSubtitle").textContent = "全" + CAMLIST_SITES.length + "拠点のライブカメラ映像のみを一覧表示します（1分ごとに自動更新）。";
   CAMLIST_SITES.forEach(function (site) {
     var card = document.createElement("div"); card.className = "simple-card"; card.dataset.siteId = site.id;
     var header = document.createElement("div"); header.className = "site-card-header";
@@ -2280,7 +2493,7 @@
   var graphlistStatusText = document.getElementById("graphlistStatusText");
   // 表示順は「河川別拠点一覧」と同じ(河川の並び→上流→下流)にする。
   var GRAPHLIST_SITES = RIVER_ORDER_SITES.filter(function (site) { return site.hasWater; });
-  document.getElementById("graphlistSubtitle").textContent = "全" + GRAPHLIST_SITES.length + "拠点の水位変化グラフのみを一覧表示します（5分ごとに自動取得。破線は基準(最低)水位です）。";
+  document.getElementById("graphlistSubtitle").textContent = "全" + GRAPHLIST_SITES.length + "拠点の水位変化グラフのみを一覧表示します（1分ごとに自動取得。破線は基準(最低)水位です）。";
   GRAPHLIST_SITES.forEach(function (site) {
     var card = document.createElement("div"); card.className = "simple-card"; card.dataset.siteId = site.id;
     var header = document.createElement("div"); header.className = "site-card-header";
@@ -2297,6 +2510,7 @@
     nowRow.appendChild(nowLabel); nowRow.appendChild(nowValue);
 
     var graphBox = document.createElement("div"); graphBox.className = "graph-box"; graphBox.id = "gchart-" + site.id;
+    var graphLegend = document.createElement("div"); graphLegend.className = "chart-legend"; graphLegend.id = "gchart-" + site.id + "-legend";
 
     var forecastRow = document.createElement("div"); forecastRow.className = "forecast-row";
     forecastRow.style.cssText = "display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:var(--text-secondary);margin-top:6px;";
@@ -2307,7 +2521,7 @@
     var caption = document.createElement("button"); caption.type = "button"; caption.className = "card-caption"; caption.textContent = "詳細を見る →";
     caption.addEventListener("click", function () { showView("site"); openSiteDetail(site.id); });
 
-    card.appendChild(header); card.appendChild(nowRow); card.appendChild(graphBox); card.appendChild(forecastRow); card.appendChild(caption);
+    card.appendChild(header); card.appendChild(nowRow); card.appendChild(graphBox); card.appendChild(graphLegend); card.appendChild(forecastRow); card.appendChild(caption);
     graphGrid.appendChild(card);
 
     var s = siteStates[site.id];
@@ -2324,7 +2538,7 @@
       var last = waterPoints[waterPoints.length - 1];
       s.graphNowValueEl.innerHTML = last.waterLevelM.toFixed(2) + '<span class="unit">m</span>';
       s.graphLabelEl.textContent = "最終取得 " + fmtClock(new Date());
-      s.graphChart.setData(waterPoints.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.waterLevelM }; }), s.baselineLevelM);
+      s.graphChart.setData(waterPoints.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.waterLevelM, rainMm: findNearestRainMm(p.fetchedAt) }; }), s.baselineLevelM, getThresholdsForSite(site));
     }
     updateForecastReadouts(site);
   }
@@ -2395,7 +2609,7 @@
     };
     s.points.push(point);
     if (s.points.length > MAX_STORED_POINTS) s.points.splice(0, s.points.length - MAX_STORED_POINTS);
-    if (site.hasWater && typeof point.waterLevelM === "number") recomputeBaseline(site);
+    if (site.hasWater && typeof point.waterLevelM === "number") { recomputeBaseline(site); refreshMarkerRisingState(site); }
 
     var d = siteData[site.id];
     if (typeof reading.pv === "number") d.pv = reading.pv;
@@ -2466,6 +2680,7 @@
     }
     var queue = sites.slice();
     var remaining = queue.length;
+    if (remaining === 0) { if (opts.onDone) opts.onDone(); return; }
     function runNext() {
       var site = queue.shift();
       if (!site) return;
@@ -2473,9 +2688,12 @@
       setTimeout(function () {
         pollSite(site).then(function () {
           remaining--;
-          if (remaining <= 0 && showStatus) {
-            camlistStatusText.textContent = "最終取得完了 " + fmtClock(new Date());
-            graphlistStatusText.textContent = "最終取得完了 " + fmtClock(new Date());
+          if (remaining <= 0) {
+            if (showStatus) {
+              camlistStatusText.textContent = "最終取得完了 " + fmtClock(new Date());
+              graphlistStatusText.textContent = "最終取得完了 " + fmtClock(new Date());
+            }
+            if (opts.onDone) opts.onDone();
           }
           runNext();
         });
@@ -2483,9 +2701,14 @@
     }
     for (var i = 0; i < POLL_CONCURRENCY; i++) runNext();
   }
-  // 通常グループ(5分間隔) - 2分間隔の高頻度グループは別枠(pollFastSites)で回すため、二重取得を避けて除外する。
+  // 通常グループ(1分間隔) - 高頻度グループは別枠(pollFastSites)で回すため、二重取得を避けて除外する。
+  // 取得間隔を短縮した際、前回サイクルが終わる前に次のsetIntervalが発火して二重に走らないようガードする。
+  var pollAllInProgress = false;
   function pollAll() {
-    pollSites(ALL_SITES.filter(function (s) { return FAST_POLL_SITE_IDS.indexOf(s.id) < 0; }));
+    if (pollAllInProgress) return;
+    pollAllInProgress = true;
+    var targets = ALL_SITES.filter(function (s) { return FAST_POLL_SITE_IDS.indexOf(s.id) < 0; });
+    pollSites(targets, { onDone: function () { pollAllInProgress = false; } });
   }
   // 高頻度グループ(2分間隔): 大場ポンプ場流入水路・神川都市下水路・徳倉都市下水路
   function pollFastSites() {
@@ -2861,9 +3084,10 @@
    * を主信号とし、気象庁(JMA)が公開しているAMeDAS観測点(三島市中心付近に最も近い地点)の直近降水量から
    * 算出した簡易な補正係数を掛け合わせているだけです。安全上の判断・避難判断には使用しないでください。
    *
-   * 国土交通省(MLIT)の「川の防災情報」および「水防災オープンデータ提供サービス」については、本セッションの
-   * 調査で、クライアント側から単純にfetchできるCORS対応の公開JSON APIが見つからなかった(利用登録・データ
-   * 提供に関する協定等が必要な形式であった)ため、本実装には統合していません。
+   * (2026-08-22追記: 国土交通省「川の防災情報」の雨量計データ自体はCORS開放されたJSON APIとして取得できることを
+   * 確認済みで、下記15eで水位変化グラフへの雨量オーバーレイとして統合しています。本予測ロジックがAMeDAS(JMA)を
+   * 使い続けているのは、雨量計1地点(三島)よりも面的なAMeDAS観測網の方がこの簡易予測の趣旨に合っているためで、
+   * 技術的な取得可否とは別の設計判断です。)
    * ===================================================================== */
   var FORECAST_TREND_WINDOW_MS = 2 * 60 * 60 * 1000; // 直近2時間の水位データでトレンド(傾き)を算出
   var FORECAST_MIN_POINTS = 3; // これ未満は「データ不足」として予測を出さない
@@ -3007,6 +3231,74 @@
   }
   function refreshAllForecasts() { WATER_SITES.forEach(updateForecastReadouts); }
 
+  /* =====================================================================
+   * 15e. 水位変化グラフ: 国交省「川の防災情報」雨量計データのオーバーレイ
+   * -----------------------------------------------------------------------
+   * 各拠点個別の雨量計は「川の防災情報」側にリンクが無い(rw/list/obs APIが空)ため、
+   * 三島市中心付近の共有雨量観測所1地点(「三島」、obsCd13=0563300100034)のデータを
+   * 全拠点共通の雨量として、水位変化グラフ(詳細ビュー・グラフ一覧)に半透明の棒グラフで重ねて表示する。
+   * ===================================================================== */
+  var MISHIMA_RAIN_OBS_CD13 = "0563300100034"; // 「三島」雨量観測所
+  var RAIN_FETCH_TIMEOUT_MS = 8000;
+  var RAIN_REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 雨量計データ自体が10分間隔更新のため、5分毎の再取得で十分
+  var RAIN_MATCH_TOLERANCE_MS = 30 * 60 * 1000; // 水位データ点との対応付けは前後30分以内のみ有効とする
+  var MAX_RAIN_POINTS = 500; // 10分間隔で約3.5日分。無制限に溜め込まないための上限
+  var rainfallState = { points: [] }; // [{time: Date, rn10m: number}] time昇順、共有(全拠点共通)
+  function rainTimeUrlParts(d) {
+    var ymd = d.getFullYear() + pad2(d.getMonth() + 1) + pad2(d.getDate());
+    var flooredMin = Math.floor(d.getMinutes() / 10) * 10;
+    var hhmm = pad2(d.getHours()) + pad2(flooredMin);
+    return { ymd: ymd, hhmm: hhmm };
+  }
+  function mergeRainPoints(newPoints) {
+    var byTime = {};
+    rainfallState.points.forEach(function (p) { byTime[p.time.getTime()] = p; });
+    newPoints.forEach(function (p) { if (p.time && typeof p.rn10m === "number") byTime[p.time.getTime()] = p; });
+    var merged = Object.keys(byTime).map(function (k) { return byTime[k]; }).sort(function (a, b) { return a.time - b.time; });
+    if (merged.length > MAX_RAIN_POINTS) merged = merged.slice(merged.length - MAX_RAIN_POINTS);
+    rainfallState.points = merged;
+  }
+  function findNearestRainMm(time) {
+    var pts = rainfallState.points;
+    if (!pts.length || !time) return null;
+    var t = time.getTime(), best = null, bestDiff = Infinity;
+    for (var i = 0; i < pts.length; i++) {
+      var diff = Math.abs(pts[i].time.getTime() - t);
+      if (diff < bestDiff) { bestDiff = diff; best = pts[i]; }
+    }
+    if (!best || bestDiff > RAIN_MATCH_TOLERANCE_MS) return null;
+    return best.rn10m;
+  }
+  function refreshAllGraphsForRainfall() {
+    WATER_SITES.forEach(function (site) {
+      refreshGraphlistCard(site);
+      refreshDetailIfActive(site);
+    });
+  }
+  function pollRainfallGauge() {
+    var now = new Date();
+    var parts = rainTimeUrlParts(now);
+    var url = "https://www.river.go.jp/kawabou/file/files/tmlist/rn/" + parts.ymd + "/" + parts.hhmm + "/" + MISHIMA_RAIN_OBS_CD13 + ".json";
+    return fetchWithTimeout(url, RAIN_FETCH_TIMEOUT_MS)
+      .then(function (res) { return res.json(); })
+      .then(function (json) {
+        var newPoints = [];
+        if (json && Array.isArray(json.min10Values)) {
+          json.min10Values.forEach(function (v) {
+            if (v && v.obsTime && typeof v.rn10m === "number") newPoints.push({ time: new Date(v.obsTime), rn10m: v.rn10m });
+          });
+        }
+        if (json && json.obsValue && json.obsValue.obsTime && typeof json.obsValue.rn10m === "number") {
+          newPoints.push({ time: new Date(json.obsValue.obsTime), rn10m: json.obsValue.rn10m });
+        }
+        mergeRainPoints(newPoints);
+        refreshAllGraphsForRainfall();
+      })
+      .catch(function (err) {
+        console.warn("国交省 雨量計データの取得に失敗しました(雨量オーバーレイなしで継続します):", err && err.message);
+      });
+  }
+
   if (window.matchMedia) {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
       ALL_SITES.forEach(function (site) {
@@ -3033,6 +3325,8 @@
   setInterval(pollFastSites, FAST_POLL_INTERVAL_MS);
   updateRainfallSignal().then(refreshAllForecasts);
   setInterval(function () { updateRainfallSignal().then(refreshAllForecasts); }, AMEDAS_REFRESH_INTERVAL_MS);
+  pollRainfallGauge();
+  setInterval(pollRainfallGauge, RAIN_REFRESH_INTERVAL_MS);
 
   /* ---------------------------------------------------------------------
    * 17. アクセスカウンター(ホームページ公開時用)
@@ -3074,7 +3368,27 @@
     fetchKawabouWaterReading: fetchKawabouWaterReading,
     kawabouWaterJsonUrl: kawabouWaterJsonUrl, kawabouSwstgJsonUrl: kawabouSwstgJsonUrl,
     updateErrorTicker: updateErrorTicker, updateFetchAlertFrame: updateFetchAlertFrame,
-    setSiteDots: setSiteDots, riverGroupOf: riverGroupOf, riverGroups: riverGroups
+    setSiteDots: setSiteDots, riverGroupOf: riverGroupOf, riverGroups: riverGroups,
+    addPoint: addPoint, MAP_SITES: MAP_SITES, RIVER_ORDER_SITES: RIVER_ORDER_SITES,
+    POWER_SITES: POWER_SITES, POWER_SITES_DISPLAY_ORDER: POWER_SITES_DISPLAY_ORDER,
+    FIXED_BASELINE_OVERRIDE: FIXED_BASELINE_OVERRIDE, FETCH_INTERVAL_MS: FETCH_INTERVAL_MS,
+    recentRiseM: recentRiseM, isRisingFast: isRisingFast,
+    RISE_ALERT_WINDOW_MS: RISE_ALERT_WINDOW_MS, RISE_ALERT_THRESHOLD_M: RISE_ALERT_THRESHOLD_M,
+    buildMarkerIcon: buildMarkerIcon, ensureAllSitesMap: ensureAllSitesMap, ensureRiverMap: ensureRiverMap,
+    setActiveRiver: setActiveRiver, getActiveRiver: function () { return activeRiver; },
+    getAllSitesMarkers: function () { return allSitesMarkers; },
+    getCurrentRiverMarkers: function () { return currentRiverMarkers; },
+    getAllSitesMap: function () { return allSitesMap; },
+    ALL_SITES_LABEL_ZOOM: ALL_SITES_LABEL_ZOOM, updateAllSitesLabelVisibility: updateAllSitesLabelVisibility,
+    refreshNowcastLayer: refreshNowcastLayer, setNowcastEnabled: setNowcastEnabled,
+    getNowcastLayer: function () { return nowcastLayer; }, isNowcastEnabled: function () { return nowcastEnabled; },
+    NOWCAST_TIMES_URL: NOWCAST_TIMES_URL,
+    getThresholdsForSite: getThresholdsForSite, pollRainfallGauge: pollRainfallGauge,
+    findNearestRainMm: findNearestRainMm, mergeRainPoints: mergeRainPoints,
+    getRainfallState: function () { return rainfallState; },
+    MISHIMA_RAIN_OBS_CD13: MISHIMA_RAIN_OBS_CD13, RAIN_MATCH_TOLERANCE_MS: RAIN_MATCH_TOLERANCE_MS,
+    updateDetailChart: updateDetailChart, getDetailChart: function () { return detailChart; },
+    getActiveDetailSiteId: function () { return activeDetailSiteId; }
   };
 })();
 </script>
