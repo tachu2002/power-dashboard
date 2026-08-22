@@ -1,11 +1,11 @@
 // 三島カメラ 水位・電源監視ダッシュボード - サーバー側データ取得スクリプト
 // GitHub Actions のスケジュール実行から呼び出され、水位・電源データを持つ全拠点
-// (matsuhisa.info系27拠点 + 国交省「川の防災情報」水位3拠点 = 計30拠点)へ
+// (matsuhisa.info系27拠点 + 国交省「川の防災情報」水位11拠点 = 計38拠点)へ
 // サーバー側から直接アクセスし(ブラウザのようなCORS制限を受けない)、結果を
 // data/history.csv（全期間・追記のみ）、data/recent.csv（直近分のみ・毎回作り直し）、
 // data/latest.json（各拠点の最新状態・失敗時は前回成功値を保持）へ書き込む。
 //
-// あわせて、水位・電源データを持たない画像専用拠点(kc01〜kc08)を含む全38拠点の
+// あわせて、水位・電源データを持たない画像専用拠点(kc01〜kc08)を含む全46拠点の
 // カメラ画像を取得し、data/images/<拠点ID>/配下へ保存する(直近IMAGE_RETENTION_DAYS日分のみ保持、
 // それより古いものは自動削除)。data/images/manifest.jsonに拠点ごとの保存済み画像一覧を書き出し、
 // ダッシュボードの「データダウンロード」画面はこれを読み込んでZIPダウンロードを提供する。
@@ -24,7 +24,7 @@ const LATEST_JSON_PATH = path.join(DATA_DIR, "latest.json");
 const IMAGES_DIR = path.join(DATA_DIR, "images");
 const IMAGE_MANIFEST_PATH = path.join(IMAGES_DIR, "manifest.json");
 // 画像は1週間ではなく直近5日分のみ保持する(リポジトリの肥大化を抑えるための運用上の判断。
-// 日々の増分は5分間隔・全38拠点で1日あたり数百MB規模になり得るため、保持期間はなるべく短くしている。
+// 日々の増分は5分間隔・全46拠点で1日あたり数百MB規模になり得るため、保持期間はなるべく短くしている。
 // なお git の性質上、削除しても過去コミットの履歴には画像バイトが残り続けるため、リポジトリの
 // 「.git」自体のサイズは長期的には増加し続ける。厳密にサイズを一定に保つには、履歴を持たない
 // 専用ブランチをforce-pushで定期的に作り直す等の追加対応が必要(今回はスコープ外)。
@@ -79,12 +79,24 @@ const MATSUHISA_SITES = [
 
 // 国交省「川の防災情報」水位拠点(水位は計算式による補正を行わない生値)
 // shizuokaCamtypeは、この拠点の画像取得(静岡県「川の防災情報」河川監視カメラ)に使う識別子。
+// kind省略(既定"stg")=通常の水位観測所(obsCd13使用)。kind:"swstg"=危機管理型水位計(obsCd使用、
+// URLパスが"stg"ではなく"swstg"、値はobsValue.stgHght(堤防天端からの高さ)を採用。ダッシュボード
+// 本体(mishima_dashboard_v1.html)のfetchKawabouWaterReadingと同じ仕様)。
 const KAWABOU_WATER_SITES = [
   { id: "kw01", name: "下神川橋（大場川 / 三島市加茂川町）", obsCd13: "0563300400016", shizuokaCamtype: "2036" },
   { id: "kw02", name: "中村橋（大場川 / 三島市中）", obsCd13: "0563300400156", shizuokaCamtype: "2089" },
-  { id: "kw03", name: "下御殿橋（御殿川 / 三島市青木）", obsCd13: "0563300400157", shizuokaCamtype: "2090" }
+  { id: "kw03", name: "下御殿橋（御殿川 / 三島市青木）", obsCd13: "0563300400157", shizuokaCamtype: "2090" },
+  // --- ここから8拠点追加(2026-08-22、国土交通省「川の防災情報」より。カメラ画像は無くいずれも水位のみ) ---
+  { id: "kw04", name: "青木橋（大場川 / 長泉町中土狩）", obsCd13: "0563300400020" },
+  { id: "kw05", name: "境川（境川 / 栄町）", kind: "swstg", obsCd: "2200000022" },
+  { id: "kw06", name: "島田橋（三島山田川 / 川原ケ谷）", kind: "swstg", obsCd: "2200000031" },
+  { id: "kw07", name: "夏梅木橋（夏梅木川 / 谷田）", kind: "swstg", obsCd: "2200000025" },
+  { id: "kw08", name: "大場（大場川 / 函南町間宮）", obsCd13: "2182600400010" },
+  { id: "kw09", name: "大場川左岸2.3k+44（大場川 / 函南町間宮）", kind: "swstg", obsCd: "8500000282" },
+  { id: "kw10", name: "間宮（函南観音川 / 函南町間宮）", obsCd13: "0563300400169" },
+  { id: "kw11", name: "徳倉（狩野川 / 清水町下徳倉）", obsCd13: "2182600400007" }
 ].map(function (s) {
-  return Object.assign({ sourceType: "kawabou-water" }, s);
+  return Object.assign({ sourceType: "kawabou-water", kind: s.kind || "stg" }, s);
 });
 
 const SITES = MATSUHISA_SITES.concat(KAWABOU_WATER_SITES);
@@ -191,6 +203,16 @@ function kawabouWaterJsonUrl(obsCd13, d) {
   const timePart = p2(p.h) + p2(flooredMin);
   return "https://www.river.go.jp/kawabou/file/files/tmlist/stg/" + datePart + "/" + timePart + "/" + obsCd13 + ".json";
 }
+// 危機管理型水位計(kind:"swstg")用。URLパスが"stg"ではなく"swstg"、コードも13桁のobsCd13ではなく
+// 生のobsCd(10桁)を使う点のみ通常拠点と異なる(2026-08-22 8拠点追加分)。
+function kawabouSwstgJsonUrl(obsCd, d) {
+  const p = toJstParts(d);
+  const flooredMin = p.mi - (p.mi % 5);
+  const p2 = function (n) { return String(n).padStart(2, "0"); };
+  const datePart = p.y + p2(p.mo + 1) + p2(p.day);
+  const timePart = p2(p.h) + p2(flooredMin);
+  return "https://www.river.go.jp/kawabou/file/files/tmlist/swstg/" + datePart + "/" + timePart + "/" + obsCd + ".json";
+}
 // "2026-08-19T13:25:01+09:00" 形式 → "2026-08-19 13:25:01" に整形(他拠点のmeasureTime表記に合わせる)
 function fmtKawabouIsoTime(iso) {
   if (!iso) return null;
@@ -224,10 +246,16 @@ async function fetchMatsuhisaReading(site) {
 }
 
 async function fetchKawabouWaterReading(site) {
-  const url = kawabouWaterJsonUrl(site.obsCd13, new Date());
+  const isSwstg = site.kind === "swstg";
+  const url = isSwstg ? kawabouSwstgJsonUrl(site.obsCd, new Date()) : kawabouWaterJsonUrl(site.obsCd13, new Date());
   const res = await fetchWithTimeout(url, { "Accept": "application/json" });
   const json = await res.json();
   const v = json && json.obsValue;
+  if (isSwstg) {
+    // 危機管理型水位計は堤防天端からの高さ(stgHght, m)を「水位」として採用する(ダッシュボード表示の主要数値と同じ)。
+    if (!v || typeof v.stgHght !== "number") throw new Error("水位データなし");
+    return { pv: null, bat: null, measureTime: fmtKawabouIsoTime(v.obsTime || v.tmObsTime), waterLevelM: v.stgHght, via: VIA_LABEL_KAWABOU };
+  }
   if (!v || typeof v.stg !== "number") throw new Error("水位データなし");
   return { pv: null, bat: null, measureTime: fmtKawabouIsoTime(v.obsTime), waterLevelM: v.stg, via: VIA_LABEL_KAWABOU };
 }
@@ -236,7 +264,7 @@ function fetchReading(site) {
   return site.sourceType === "kawabou-water" ? fetchKawabouWaterReading(site) : fetchMatsuhisaReading(site);
 }
 
-// ---- 画像アーカイブ(全38拠点、直近IMAGE_RETENTION_DAYS日分のみ保持) ----
+// ---- 画像アーカイブ(全46拠点、直近IMAGE_RETENTION_DAYS日分のみ保持) ----
 
 // 静岡県「川の防災情報」河川監視カメラ(cam.shizuoka4.jp)のライブ画像URLをobsdateから組み立てる
 // (kw01〜kw03専用。ダッシュボード本体のshizuokaLiveImageUrlFromObsdateと同等)。
@@ -299,7 +327,7 @@ async function saveSiteImage(site, buffer, fetchedAt) {
   return "data/images/" + site.id + "/" + fileName;
 }
 
-// 全38拠点(matsuhisa 27 + kawabou-water 3 + kawabou-camera 8)の画像取得・保存・
+// 全46拠点(matsuhisa 27 + kawabou-water 11 + kawabou-camera 8)の画像取得・保存・
 // 直近IMAGE_RETENTION_DAYS日分以外の削除・manifest更新を行う。データ本体の取得成否とは独立した
 // ベストエフォート処理であり、拠点単位の失敗はログのみで全体を失敗させない。
 // readingsBySiteId: matsuhisa拠点についてはメインのデータ取得で既に得たimageUrlを再利用する
@@ -518,4 +546,7 @@ runPromise.catch(function (err) {
   console.error(err);
   process.exit(1);
 });
-export { runPromise, SITES, main, KAWABOU_CAMERA_SITES, IMAGE_RETENTION_DAYS, IMAGES_DIR, IMAGE_MANIFEST_PATH };
+export {
+  runPromise, SITES, main, KAWABOU_CAMERA_SITES, KAWABOU_WATER_SITES, IMAGE_RETENTION_DAYS, IMAGES_DIR, IMAGE_MANIFEST_PATH,
+  fetchKawabouWaterReading, kawabouWaterJsonUrl, kawabouSwstgJsonUrl
+};
