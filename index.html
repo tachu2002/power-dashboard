@@ -380,6 +380,38 @@
   }
   .nowcast-toggle input { cursor: pointer; }
 
+  /* ---- 直近4日間の天気ストリップ(全拠点マップ上部) ---- */
+  .weather-strip { display: flex; gap: 8px; margin: 0 0 10px; flex-wrap: wrap; }
+  .weather-day-card {
+    flex: 1 1 120px; min-width: 110px; background: var(--page-plane); border: 1px solid var(--border);
+    border-radius: 8px; padding: 8px 10px; text-align: center;
+  }
+  .weather-day-card.today { border-color: var(--series-pv); box-shadow: inset 0 0 0 1px var(--series-pv); }
+  .weather-day-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
+  .weather-day-date { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
+  .weather-day-icon { font-size: 26px; line-height: 1.2; margin: 2px 0; }
+  .weather-day-temp { font-size: 12px; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+  .weather-day-temp .hi { font-weight: 700; }
+  .weather-day-temp .lo { color: var(--text-secondary); }
+  .weather-day-precip { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .weather-strip-status { font-size: 11px; color: var(--text-muted); margin: -2px 0 8px; }
+
+  /* ---- ナウキャストの将来コマ送り再生(全拠点マップ) ---- */
+  .nowcast-playback-row { display: flex; align-items: center; gap: 10px; margin: -4px 0 10px; flex-wrap: wrap; }
+  .nowcast-playback-row button { font-size: 12px; padding: 4px 10px; }
+  .nowcast-play-status { font-size: 11.5px; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+
+  /* ---- ライブカメラのタイムラプス再生 ---- */
+  .image-frame { position: relative; }
+  .playback-badge {
+    position: absolute; left: 8px; bottom: 8px; background: rgba(0,0,0,0.65); color: #fff;
+    font-size: 12px; padding: 3px 9px; border-radius: 5px; font-variant-numeric: tabular-nums;
+    pointer-events: none; letter-spacing: 0.02em;
+  }
+  .playback-controls { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
+  .playback-controls button { font-size: 12px; padding: 4px 10px; }
+  .playback-status { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
   .all-sites-map-panel { display: flex; flex-direction: column; height: calc(100vh - 130px); min-height: 560px; }
   .all-sites-map-panel .map-box { flex: 1 1 auto; height: auto; }
 
@@ -587,7 +619,13 @@
         <div class="panel all-sites-map-panel">
           <h2 class="panel-title">■ 全拠点マップ</h2>
           <p class="panel-sub" id="allSitesMapSub">全拠点の位置を表示します。マーカーを押すと、その拠点の詳細へ移動します。</p>
+          <div class="weather-strip" id="weatherStrip"></div>
+          <p class="weather-strip-status" id="weatherStripStatus">天気情報を取得中…</p>
           <label class="nowcast-toggle"><input type="checkbox" id="nowcastToggle" checked> 雨雲(気象庁ナウキャスト)を表示</label>
+          <div class="nowcast-playback-row">
+            <button type="button" id="nowcastPlayBtn">▶ この先1時間の雨雲を再生</button>
+            <span class="nowcast-play-status" id="nowcastPlayStatus"></span>
+          </div>
           <div class="map-box all-sites-map" id="allSitesMap"></div>
         </div>
       </div>
@@ -616,8 +654,15 @@
         <div class="top-row">
           <div class="panel">
             <h2 class="panel-title">■ ライブカメラ映像</h2>
-            <div class="image-frame"><img id="liveImg" alt="ライブカメラ映像"></div>
+            <div class="image-frame">
+              <img id="liveImg" alt="ライブカメラ映像">
+              <div class="playback-badge" id="livePlaybackBadge" style="display:none"></div>
+            </div>
             <div class="panel-caption" id="liveCaption">取得中…</div>
+            <div class="playback-controls">
+              <button type="button" id="livePlaybackBtn">▶ 保存済み画像を再生</button>
+              <span class="playback-status" id="livePlaybackStatus"></span>
+            </div>
           </div>
           <div class="panel">
             <h2 class="panel-title">■ 正常時映像</h2>
@@ -1758,6 +1803,8 @@
   var currentView = "power";
   function showView(name) {
     currentView = name;
+    if (name !== "allmap" && typeof nowcastPlaybackActive !== "undefined" && nowcastPlaybackActive) stopNowcastPlayback();
+    if (name !== "site" && typeof livePlaybackActive !== "undefined" && livePlaybackActive) stopLivePlayback(false);
     viewIds.forEach(function (id) {
       var el = document.getElementById("view-" + id);
       if (el) el.classList.toggle("show", id === name);
@@ -2259,18 +2306,36 @@
    * 観測時刻は5分おきに更新されるため、同じ間隔で最新時刻を取得し直しタイルを差し替える。 */
   var NOWCAST_TILE_URL_TMPL = "https://www.jma.go.jp/bosai/jmatile/data/nowc/{basetime}/none/{validtime}/surf/hrpns/{z}/{x}/{y}.png";
   var NOWCAST_TIMES_URL = "https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N1.json";
+  // targetTimes_N2.json は同じhrpnsタイルの「これから60分先まで」の予測コマ(5分刻み、basetimeは固定・validtimeが未来へ進む)。
+  // targetTimes_N1.jsonは逆に「直近の観測」のみ(basetime===validtime)で将来分は含まれない。実機のレスポンスで確認済み。
+  var NOWCAST_N2_TIMES_URL = "https://www.jma.go.jp/bosai/jmatile/data/nowc/targetTimes_N2.json";
   var NOWCAST_REFRESH_MS = 5 * 60 * 1000;
-  var nowcastLayer = null, nowcastRefreshTimer = null, nowcastEnabled = true;
-  function applyNowcastLayer(time) {
-    if (!allSitesMap) return;
-    if (nowcastLayer) { allSitesMap.removeLayer(nowcastLayer); nowcastLayer = null; }
+  // 気象庁の高解像度降水ナウキャストは250mメッシュが実データの解像度上限のため、maxNativeZoom(=10)より
+  // 先はJMA側にも本物の詳細データが存在しない。z5〜10の範囲では、地図をズームするたびにLeafletのタイル
+  // レイヤーが自動的にその時のズームレベル用のタイルを取得し直すため、目は自然に細かくなる(実機確認済み)。
+  var NOWCAST_TILE_OPTS = { opacity: 0.55, maxNativeZoom: 10, minZoom: 5, maxZoom: 19, attribution: "雨雲: 気象庁 高解像度降水ナウキャスト" };
+  var nowcastRefreshTimer = null, nowcastEnabled = true, lastNowcastTime = null;
+  // 複数の地図(全拠点マップ・拠点詳細マップ)へ同じナウキャストタイルを重ねられるよう、
+  // レイヤーを地図ごとのレジストリで管理する(1つのfetch結果を全登録先へ配る)。
+  var nowcastOverlays = [];
+  function applyNowcastTimeToOverlay(o, time) {
+    var map = o.getMap();
+    if (!map) return;
+    if (o.layer) { map.removeLayer(o.layer); o.layer = null; }
     if (!nowcastEnabled || !time) return;
     var url = NOWCAST_TILE_URL_TMPL.replace("{basetime}", time.basetime).replace("{validtime}", time.validtime);
-    nowcastLayer = L.tileLayer(url, {
-      opacity: 0.55, maxNativeZoom: 10, minZoom: 5, maxZoom: 19,
-      attribution: "雨雲: 気象庁 高解像度降水ナウキャスト"
-    });
-    nowcastLayer.addTo(allSitesMap);
+    o.layer = L.tileLayer(url, NOWCAST_TILE_OPTS);
+    o.layer.addTo(map);
+  }
+  function registerNowcastOverlay(mapGetter) {
+    var o = { getMap: mapGetter, layer: null };
+    nowcastOverlays.push(o);
+    if (lastNowcastTime) applyNowcastTimeToOverlay(o, lastNowcastTime);
+    return o;
+  }
+  function applyNowcastLayer(time) {
+    lastNowcastTime = time;
+    nowcastOverlays.forEach(function (o) { applyNowcastTimeToOverlay(o, time); });
   }
   function refreshNowcastLayer() {
     if (!nowcastEnabled) return;
@@ -2282,16 +2347,138 @@
       })
       .catch(function (e) { console.warn("雨雲(ナウキャスト)データの取得に失敗しました:", e); });
   }
+  function ensureNowcastRefreshRunning() {
+    refreshNowcastLayer();
+    if (!nowcastRefreshTimer) nowcastRefreshTimer = setInterval(refreshNowcastLayer, NOWCAST_REFRESH_MS);
+  }
   function setNowcastEnabled(enabled) {
     nowcastEnabled = enabled;
     if (enabled) refreshNowcastLayer();
-    else if (allSitesMap && nowcastLayer) { allSitesMap.removeLayer(nowcastLayer); nowcastLayer = null; }
+    else nowcastOverlays.forEach(function (o) { var map = o.getMap(); if (map && o.layer) { map.removeLayer(o.layer); o.layer = null; } });
   }
   var nowcastToggleEl = document.getElementById("nowcastToggle");
   if (nowcastToggleEl) {
     nowcastEnabled = nowcastToggleEl.checked;
     nowcastToggleEl.addEventListener("change", function () { setNowcastEnabled(nowcastToggleEl.checked); });
   }
+
+  /* ---- ナウキャストの将来コマ送り再生(全拠点マップ、この先60分先まで) ---- */
+  var nowcastPlayBtn = document.getElementById("nowcastPlayBtn");
+  var nowcastPlayStatus = document.getElementById("nowcastPlayStatus");
+  var NOWCAST_PLAYBACK_FRAME_MS = 1000;
+  var nowcastPlaybackTimer = null, nowcastPlaybackActive = false;
+  function fmtNowcastValidTime(vt) {
+    // "20260827235000" -> "23:50"
+    if (typeof vt !== "string" || vt.length < 12) return vt;
+    return vt.slice(8, 10) + ":" + vt.slice(10, 12);
+  }
+  function stopNowcastPlayback(restoreLive) {
+    if (nowcastPlaybackTimer) { clearInterval(nowcastPlaybackTimer); nowcastPlaybackTimer = null; }
+    nowcastPlaybackActive = false;
+    if (nowcastPlayBtn) nowcastPlayBtn.textContent = "▶ この先1時間の雨雲を再生";
+    if (nowcastPlayStatus) nowcastPlayStatus.textContent = "";
+    if (restoreLive !== false) refreshNowcastLayer(); // 現在(実況)へ戻す
+  }
+  function startNowcastPlayback() {
+    if (nowcastPlayStatus) nowcastPlayStatus.textContent = "将来の雨雲データを取得中…";
+    fetch(NOWCAST_N2_TIMES_URL)
+      .then(function (r) { if (!r.ok) throw new Error("nowcast N2 targetTimes fetch failed: " + r.status); return r.json(); })
+      .then(function (list) {
+        if (!Array.isArray(list) || !list.length) throw new Error("nowcast N2 targetTimes empty");
+        var frames = list.slice().sort(function (a, b) { return a.validtime < b.validtime ? -1 : a.validtime > b.validtime ? 1 : 0; });
+        nowcastPlaybackActive = true;
+        if (nowcastPlayBtn) nowcastPlayBtn.textContent = "■ 停止";
+        var i = 0;
+        function showFrame() {
+          if (!nowcastPlaybackActive) return;
+          if (i >= frames.length) { stopNowcastPlayback(); return; }
+          var f = frames[i++];
+          applyNowcastLayer(f);
+          if (nowcastPlayStatus) nowcastPlayStatus.textContent = "予測時刻 " + fmtNowcastValidTime(f.validtime) + "（" + i + "/" + frames.length + "）";
+        }
+        showFrame();
+        nowcastPlaybackTimer = setInterval(showFrame, NOWCAST_PLAYBACK_FRAME_MS);
+      })
+      .catch(function (e) {
+        console.warn("将来の雨雲(ナウキャスト予測)データの取得に失敗しました:", e);
+        if (nowcastPlayStatus) nowcastPlayStatus.textContent = "取得に失敗しました。";
+        nowcastPlaybackActive = false;
+        if (nowcastPlayBtn) nowcastPlayBtn.textContent = "▶ この先1時間の雨雲を再生";
+      });
+  }
+  if (nowcastPlayBtn) {
+    nowcastPlayBtn.addEventListener("click", function () {
+      if (nowcastPlaybackActive) stopNowcastPlayback(); else startNowcastPlayback();
+    });
+  }
+
+  /* ---- 全拠点マップ上部: 直近4日間(前日・本日・翌日・翌々日)の天気 ----
+   * 気象庁の公式JSON APIには「前日の実況」を簡単に取得できるエンドポイントが無いため、
+   * 過去実績・予報を同一APIでまとめて取得できるOpen-Meteo(無料・APIキー不要・CORS開放)を採用する。
+   * 三島市中心付近の1地点の代表値であり、拠点ごとの個別値ではない(雨量オーバーレイと同様の割り切り)。 */
+  var WEATHER_LAT = 35.1216, WEATHER_LON = 138.9107;
+  var WEATHER_API_URL = "https://api.open-meteo.com/v1/forecast?latitude=" + WEATHER_LAT + "&longitude=" + WEATHER_LON +
+    "&daily=weathercode,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia%2FTokyo&past_days=1&forecast_days=3";
+  var WEATHER_REFRESH_MS = 60 * 60 * 1000; // 天気は1時間毎の更新で十分
+  var WEEKDAY_JA = ["日", "月", "火", "水", "木", "金", "土"];
+  var WEATHER_DAY_LABELS = ["前日", "本日", "翌日", "翌々日"];
+  var weatherStripEl = document.getElementById("weatherStrip");
+  var weatherStripStatusEl = document.getElementById("weatherStripStatus");
+  // WMO weathercode(Open-Meteo)を絵文字・日本語表記へ変換する簡易マップ。
+  function weatherIconFor(code) {
+    if (code === 0) return { icon: "☀️", text: "快晴" };
+    if (code === 1) return { icon: "🌤️", text: "晴れ" };
+    if (code === 2) return { icon: "⛅", text: "薄曇り" };
+    if (code === 3) return { icon: "☁️", text: "曇り" };
+    if (code === 45 || code === 48) return { icon: "🌫️", text: "霧" };
+    if (code >= 51 && code <= 57) return { icon: "🌦️", text: "霧雨" };
+    if (code >= 61 && code <= 67) return { icon: "🌧️", text: "雨" };
+    if (code >= 71 && code <= 77) return { icon: "🌨️", text: "雪" };
+    if (code >= 80 && code <= 82) return { icon: "🌦️", text: "にわか雨" };
+    if (code === 85 || code === 86) return { icon: "🌨️", text: "にわか雪" };
+    if (code >= 95) return { icon: "⛈️", text: "雷雨" };
+    return { icon: "🌡️", text: "-" };
+  }
+  function renderWeatherStrip(data) {
+    if (!weatherStripEl) return;
+    var daily = data && data.daily;
+    if (!daily || !Array.isArray(daily.time) || !daily.time.length) throw new Error("天気データの形式が不正です");
+    weatherStripEl.innerHTML = "";
+    daily.time.forEach(function (dateStr, i) {
+      var parts = dateStr.split("-");
+      var d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+      var label = WEATHER_DAY_LABELS[i] || "";
+      var w = weatherIconFor(daily.weathercode ? daily.weathercode[i] : null);
+      var card = document.createElement("div");
+      card.className = "weather-day-card" + (label === "本日" ? " today" : "");
+      var lbl = document.createElement("div"); lbl.className = "weather-day-label"; lbl.textContent = label;
+      var dt = document.createElement("div"); dt.className = "weather-day-date";
+      dt.textContent = (d.getMonth() + 1) + "/" + d.getDate() + "(" + WEEKDAY_JA[d.getDay()] + ")";
+      var icon = document.createElement("div"); icon.className = "weather-day-icon"; icon.textContent = w.icon; icon.title = w.text;
+      var temp = document.createElement("div"); temp.className = "weather-day-temp";
+      var hi = daily.temperature_2m_max ? daily.temperature_2m_max[i] : null;
+      var lo = daily.temperature_2m_min ? daily.temperature_2m_min[i] : null;
+      temp.innerHTML = (typeof hi === "number" ? '<span class="hi">' + hi.toFixed(0) + "°</span>" : "-") +
+        " / " + (typeof lo === "number" ? '<span class="lo">' + lo.toFixed(0) + "°</span>" : "-");
+      var precip = document.createElement("div"); precip.className = "weather-day-precip";
+      var pr = daily.precipitation_sum ? daily.precipitation_sum[i] : null;
+      precip.textContent = "降水量 " + (typeof pr === "number" ? pr.toFixed(1) : "-") + "mm";
+      card.appendChild(lbl); card.appendChild(dt); card.appendChild(icon); card.appendChild(temp); card.appendChild(precip);
+      weatherStripEl.appendChild(card);
+    });
+    if (weatherStripStatusEl) weatherStripStatusEl.textContent = "三島市付近の天気（前日〜翌々日、参考値）。1時間ごとに更新します。";
+  }
+  function refreshWeatherStrip() {
+    fetch(WEATHER_API_URL)
+      .then(function (r) { if (!r.ok) throw new Error("weather fetch failed: " + r.status); return r.json(); })
+      .then(renderWeatherStrip)
+      .catch(function (e) {
+        console.warn("天気データの取得に失敗しました:", e);
+        if (weatherStripStatusEl) weatherStripStatusEl.textContent = "天気情報を取得できませんでした。";
+      });
+  }
+
+  var allSitesNowcastOverlay = null;
   function ensureAllSitesMap() {
     if (allSitesMapReady) { setTimeout(function () { allSitesMap.invalidateSize(); }, 50); return; }
     try {
@@ -2300,8 +2487,8 @@
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(allSitesMap);
-      refreshNowcastLayer();
-      if (!nowcastRefreshTimer) nowcastRefreshTimer = setInterval(refreshNowcastLayer, NOWCAST_REFRESH_MS);
+      if (!allSitesNowcastOverlay) allSitesNowcastOverlay = registerNowcastOverlay(function () { return allSitesMap; });
+      ensureNowcastRefreshRunning();
       MAP_SITES.forEach(function (site, idx) {
         var icon = buildMarkerIcon(idx + 1, false, isRisingFast(site));
         var marker = L.marker([site.lat, site.lon], { icon: icon })
@@ -2335,6 +2522,54 @@
   var NORMAL_IMG_CAPTION_DEFAULT = "水DXサイト（河川水位・画像情報一覧）掲載の参考画像です";
   attachImageErrorFallback(liveImg, liveFrameEl);
   attachImageErrorFallback(normalImg, normalFrameEl);
+
+  /* ---- ライブカメラ映像のタイムラプス再生(サーバー保存画像を1秒間隔でコマ送り) ----
+   * data/images/manifest.json (画像データダウンロード機能で使用しているものと同一)から、
+   * 選択中の拠点に保存されている画像を古い順に1秒ごとに切り替えて表示する。
+   * 表示中のコマの実際の撮影時刻を必ずバッジで重ねて表示する。 */
+  var livePlaybackBtn = document.getElementById("livePlaybackBtn");
+  var livePlaybackStatus = document.getElementById("livePlaybackStatus");
+  var livePlaybackBadge = document.getElementById("livePlaybackBadge");
+  var LIVE_PLAYBACK_FRAME_MS = 1000;
+  var livePlaybackTimer = null, livePlaybackActive = false, livePlaybackSiteId = null;
+  function stopLivePlayback(restoreLive) {
+    if (livePlaybackTimer) { clearInterval(livePlaybackTimer); livePlaybackTimer = null; }
+    livePlaybackActive = false;
+    livePlaybackSiteId = null;
+    if (livePlaybackBtn) livePlaybackBtn.textContent = "▶ 保存済み画像を再生";
+    if (livePlaybackBadge) { livePlaybackBadge.style.display = "none"; livePlaybackBadge.textContent = ""; }
+    if (livePlaybackStatus) livePlaybackStatus.textContent = "";
+    if (restoreLive !== false) renderSiteDetail(); // ライブ映像表示へ戻す
+  }
+  function startLivePlayback() {
+    var siteId = activeDetailSiteId;
+    if (!imageManifest) { if (livePlaybackStatus) livePlaybackStatus.textContent = "画像一覧を読み込み中です。少し待ってからお試しください。"; return; }
+    var entry = imageManifest.sites ? imageManifest.sites[siteId] : null;
+    var files = entry && entry.files ? entry.files.slice() : [];
+    if (!files.length) { if (livePlaybackStatus) livePlaybackStatus.textContent = "この拠点にはサーバー保存済みの画像がありません。"; return; }
+    files.sort(function (a, b) { return new Date(a.ts).getTime() - new Date(b.ts).getTime(); });
+    livePlaybackActive = true;
+    livePlaybackSiteId = siteId;
+    if (livePlaybackBtn) livePlaybackBtn.textContent = "■ 停止";
+    if (livePlaybackBadge) livePlaybackBadge.style.display = "block";
+    var i = 0;
+    function showFrame() {
+      if (!livePlaybackActive || activeDetailSiteId !== livePlaybackSiteId) { stopLivePlayback(false); return; }
+      if (i >= files.length) { stopLivePlayback(true); return; }
+      var f = files[i++];
+      liveImg.style.display = "";
+      liveImg.src = f.file;
+      if (livePlaybackBadge) livePlaybackBadge.textContent = fmtTime(new Date(f.ts));
+      if (livePlaybackStatus) livePlaybackStatus.textContent = i + " / " + files.length + "枚を再生中";
+    }
+    showFrame();
+    livePlaybackTimer = setInterval(showFrame, LIVE_PLAYBACK_FRAME_MS);
+  }
+  if (livePlaybackBtn) {
+    livePlaybackBtn.addEventListener("click", function () {
+      if (livePlaybackActive) stopLivePlayback(true); else startLivePlayback();
+    });
+  }
   var waterNowValue = document.getElementById("waterNowValue");
   var waterNowDelta = document.getElementById("waterNowDelta");
   var dataListBody = document.getElementById("dataListBody");
@@ -2347,6 +2582,7 @@
       : { radius: 6, color: "#ffffff", weight: 1.5, fillColor: "#2a78d6", fillOpacity: 0.85 };
   }
   var siteMapReady = false, siteMap, siteMapMarkers = {};
+  var siteMapNowcastOverlay = null;
   function ensureSiteDetailMap() {
     if (siteMapReady) return;
     try {
@@ -2355,6 +2591,11 @@
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
         maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(siteMap);
+      // 全拠点マップと同じ雨雲(ナウキャスト)オーバーレイをこの拠点位置マップにも重ねる。
+      // ズームすればLeafletが自動的にそのズーム用のタイルを取得し直すため、全拠点マップと同様に
+      // z10(気象庁の実データ上限=250mメッシュ)まで自然に細かくなる。
+      if (!siteMapNowcastOverlay) siteMapNowcastOverlay = registerNowcastOverlay(function () { return siteMap; });
+      ensureNowcastRefreshRunning();
       MAP_SITES.forEach(function (site) {
         var cm = L.circleMarker([site.lat, site.lon], siteMarkerStyle(site.id === activeDetailSiteId)).addTo(siteMap).bindPopup(site.name);
         siteMapMarkers[site.id] = cm;
@@ -2434,6 +2675,7 @@
   }
   function openSiteDetail(id) {
     if (!SITE_CATALOG[id]) return;
+    if (livePlaybackActive && id !== activeDetailSiteId) stopLivePlayback(false);
     activeDetailSiteId = id;
     renderSiteDetail();
   }
@@ -3327,6 +3569,8 @@
   setInterval(function () { updateRainfallSignal().then(refreshAllForecasts); }, AMEDAS_REFRESH_INTERVAL_MS);
   pollRainfallGauge();
   setInterval(pollRainfallGauge, RAIN_REFRESH_INTERVAL_MS);
+  refreshWeatherStrip();
+  setInterval(refreshWeatherStrip, WEATHER_REFRESH_MS);
 
   /* ---------------------------------------------------------------------
    * 17. アクセスカウンター(ホームページ公開時用)
@@ -3381,14 +3625,25 @@
     getAllSitesMap: function () { return allSitesMap; },
     ALL_SITES_LABEL_ZOOM: ALL_SITES_LABEL_ZOOM, updateAllSitesLabelVisibility: updateAllSitesLabelVisibility,
     refreshNowcastLayer: refreshNowcastLayer, setNowcastEnabled: setNowcastEnabled,
-    getNowcastLayer: function () { return nowcastLayer; }, isNowcastEnabled: function () { return nowcastEnabled; },
-    NOWCAST_TIMES_URL: NOWCAST_TIMES_URL,
+    getNowcastLayer: function () { return allSitesNowcastOverlay ? allSitesNowcastOverlay.layer : null; },
+    getSiteMapNowcastLayer: function () { return siteMapNowcastOverlay ? siteMapNowcastOverlay.layer : null; },
+    isNowcastEnabled: function () { return nowcastEnabled; },
+    NOWCAST_TIMES_URL: NOWCAST_TIMES_URL, NOWCAST_N2_TIMES_URL: NOWCAST_N2_TIMES_URL,
+    getNowcastOverlays: function () { return nowcastOverlays; },
+    startNowcastPlayback: startNowcastPlayback, stopNowcastPlayback: stopNowcastPlayback,
+    isNowcastPlaybackActive: function () { return nowcastPlaybackActive; },
     getThresholdsForSite: getThresholdsForSite, pollRainfallGauge: pollRainfallGauge,
     findNearestRainMm: findNearestRainMm, mergeRainPoints: mergeRainPoints,
     getRainfallState: function () { return rainfallState; },
     MISHIMA_RAIN_OBS_CD13: MISHIMA_RAIN_OBS_CD13, RAIN_MATCH_TOLERANCE_MS: RAIN_MATCH_TOLERANCE_MS,
     updateDetailChart: updateDetailChart, getDetailChart: function () { return detailChart; },
-    getActiveDetailSiteId: function () { return activeDetailSiteId; }
+    getActiveDetailSiteId: function () { return activeDetailSiteId; },
+    refreshWeatherStrip: refreshWeatherStrip, weatherIconFor: weatherIconFor,
+    WEATHER_API_URL: WEATHER_API_URL,
+    ensureSiteDetailMap: ensureSiteDetailMap, getSiteMap: function () { return siteMap; },
+    startLivePlayback: startLivePlayback, stopLivePlayback: stopLivePlayback,
+    isLivePlaybackActive: function () { return livePlaybackActive; },
+    getLivePlaybackSiteId: function () { return livePlaybackSiteId; }
   };
 })();
 </script>
