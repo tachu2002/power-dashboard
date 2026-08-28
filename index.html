@@ -8,8 +8,8 @@
 <style>
   :root {
     color-scheme: light;
-    --surface-1:      #f3fafd;
-    --page-plane:     #dcf0f7;
+    --surface-1:      #ffffff;
+    --page-plane:     #eef6fb;
     --text-primary:   #0b1c24;
     --text-secondary: #4c6672;
     --text-muted:     #7d99a3;
@@ -24,6 +24,12 @@
     --warn-bg:        #fff6e0;
     --critical-border:#d03b3b;
     --critical-bg:    #fbe9e7;
+    /* 参考サイト(mishima-waterdx.com)の実際のCSSから抽出した水色系アクセント(#29b6f6/#008ac0系統)を
+       ベースにした配色。ヘッダーの帯や選択状態のハイライトなど「配色・背景のイメージ」にのみ用いる。 */
+    --accent:         #1394bd;
+    --accent-strong:  #007ba8;
+    --accent-bright:  #29b6f6;
+    --accent-contrast:#ffffff;
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
@@ -44,6 +50,10 @@
       --warn-bg:        #3a2f0f;
       --critical-border:#e05c5c;
       --critical-bg:    #3a1f1a;
+      --accent:         #3fb8dd;
+      --accent-strong:  #0c5c78;
+      --accent-bright:  #1c8fb8;
+      --accent-contrast:#ffffff;
     }
   }
   :root[data-theme="dark"] {
@@ -58,6 +68,10 @@
     --border:         rgba(255,255,255,0.12);
     --series-pv:      #3987e5;
     --series-bat:     #d95926;
+    --accent:         #3fb8dd;
+    --accent-strong:  #0c5c78;
+    --accent-bright:  #1c8fb8;
+    --accent-contrast:#ffffff;
     --danger-bg:      #3a1f1a;
     --danger-text:    #f3b5a8;
     --warn-border:    #eda100;
@@ -167,11 +181,24 @@
   }
 
   /* ===================== 全体レイアウト: 上部ヘッダー + 左サイドバー + メインコンテンツ ===================== */
+  /* ヘッダーは参考サイト(mishima-waterdx.com)の水色系グラデーションを模した帯状の背景にする
+     (配色・背景のイメージのみの変更で、構成・機能は従来通り)。帯の中だけ配色トークンを上書きし、
+     子要素(サイドバー切替ボタン・アクセスカウンター等)が自動的に白系の配色へ追従するようにしている。 */
   .top-header {
-    padding: 4px 8px 16px;
-    border-bottom: 1px solid var(--border);
-    margin-bottom: 16px;
+    padding: 16px 20px;
+    border-bottom: none;
+    border-radius: 14px;
+    margin-bottom: 18px;
     display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    background: linear-gradient(100deg, var(--accent-strong), var(--accent-bright));
+    color: var(--accent-contrast);
+    box-shadow: 0 4px 16px rgba(0,70,100,0.22);
+    --text-primary:   var(--accent-contrast);
+    --text-secondary: rgba(255,255,255,0.88);
+    --text-muted:     rgba(255,255,255,0.72);
+    --border:         rgba(255,255,255,0.35);
+    --surface-1:      rgba(255,255,255,0.16);
+    --page-plane:     rgba(255,255,255,0.28);
   }
   .top-header h1 { font-size: 22px; font-weight: 700; margin: 0 0 4px; }
   .top-header .subtitle { color: var(--text-secondary); font-size: 12px; margin: 0; line-height: 1.5; }
@@ -221,7 +248,7 @@
     background: transparent; color: var(--text-primary); cursor: pointer;
   }
   .river-menu-btn:hover { background: var(--page-plane); }
-  .river-menu-btn.active { background: var(--series-pv); color: #fff; font-weight: 700; }
+  .river-menu-btn.active { background: var(--accent); color: #fff; font-weight: 700; }
   .river-menu-count { font-size: 11px; color: var(--text-muted); flex: none; }
   .river-menu-btn.active .river-menu-count { color: rgba(255,255,255,0.85); }
   .all-sites-menu-btn { font-weight: 700; margin-bottom: 4px; }
@@ -238,7 +265,7 @@
     cursor: pointer; line-height: 1.3;
   }
   .river-menu-site-btn:hover { background: var(--page-plane); color: var(--text-primary); }
-  .river-menu-site-btn.selected { background: var(--page-plane); color: var(--series-bat); font-weight: 700; }
+  .river-menu-site-btn.selected { background: var(--page-plane); color: var(--accent); font-weight: 700; }
 
   /* データダウンロード配下のサブメニュー(河川ツリーの拠点ボタンと同じ見た目、常時展開) */
   .download-menu-sites {
@@ -252,7 +279,7 @@
     cursor: pointer; line-height: 1.3;
   }
   .download-menu-btn:hover { background: var(--page-plane); color: var(--text-primary); }
-  .download-menu-btn.selected { background: var(--page-plane); color: var(--series-bat); font-weight: 700; }
+  .download-menu-btn.selected { background: var(--page-plane); color: var(--accent); font-weight: 700; }
 
   /* ===================== モバイル表示: サイドバーをオーバーレイ式の折りたたみメニューにする ===================== */
   @media (max-width: 900px) {
@@ -378,7 +405,7 @@
     display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary);
     margin: -4px 0 10px; cursor: pointer; user-select: none;
   }
-  .nowcast-toggle input { cursor: pointer; }
+  .nowcast-toggle input { cursor: pointer; accent-color: var(--accent); }
 
   /* ---- 直近4日間の天気ストリップ(全拠点マップ上部) ---- */
   .weather-strip { display: flex; gap: 8px; margin: 0 0 10px; flex-wrap: wrap; }
@@ -386,7 +413,7 @@
     flex: 1 1 120px; min-width: 110px; background: var(--page-plane); border: 1px solid var(--border);
     border-radius: 8px; padding: 8px 10px; text-align: center;
   }
-  .weather-day-card.today { border-color: var(--series-pv); box-shadow: inset 0 0 0 1px var(--series-pv); }
+  .weather-day-card.today { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
   .weather-day-label { font-size: 11px; font-weight: 700; color: var(--text-secondary); }
   .weather-day-date { font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
   .weather-day-icon { font-size: 26px; line-height: 1.2; margin: 2px 0; }
@@ -411,6 +438,8 @@
   .playback-controls { display: flex; align-items: center; gap: 10px; margin-top: 6px; flex-wrap: wrap; }
   .playback-controls button { font-size: 12px; padding: 4px 10px; }
   .playback-status { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+  .playback-seek { flex: 1 1 140px; min-width: 90px; accent-color: var(--accent); cursor: pointer; }
+  .playback-seek:disabled { opacity: 0.4; cursor: not-allowed; }
 
   .all-sites-map-panel { display: flex; flex-direction: column; height: calc(100vh - 130px); min-height: 560px; }
   .all-sites-map-panel .map-box { flex: 1 1 auto; height: auto; }
@@ -450,7 +479,7 @@
     outline: 0 solid transparent; outline-offset: 2px; transition: outline-color 0.2s, background 0.2s; cursor: pointer;
   }
   .site-order-item.jump-highlight { outline: 3px solid var(--series-bat); background: var(--surface-1); }
-  .site-order-badge { flex: none; width: 39px; height: 39px; border-radius: 50%; background: var(--series-pv); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; }
+  .site-order-badge { flex: none; width: 39px; height: 39px; border-radius: 50%; background: var(--accent); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 17px; font-weight: 700; }
   .site-order-body { flex: 1 1 220px; min-width: 195px; }
   .site-order-name { font-size: 18px; font-weight: 600; color: var(--text-primary); }
   .site-order-coords { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
@@ -464,10 +493,10 @@
   .mini-chart-placeholder { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; color: var(--text-muted); text-align: center; padding: 5px; }
 
   .site-order-link {
-    flex: none; font-size: 12px; font-weight: 600; color: var(--series-pv); text-decoration: none;
-    border: 1px solid var(--series-pv); border-radius: 8px; padding: 6px 10px; white-space: nowrap; background: none; cursor: pointer;
+    flex: none; font-size: 12px; font-weight: 600; color: var(--accent); text-decoration: none;
+    border: 1px solid var(--accent); border-radius: 8px; padding: 6px 10px; white-space: nowrap; background: none; cursor: pointer;
   }
-  .site-order-link:hover { background: var(--series-pv); color: #fff; }
+  .site-order-link:hover { background: var(--accent); color: #fff; }
   .flow-arrow { text-align: center; color: var(--text-muted); font-size: 13px; margin: -4px 0; }
 
   @media (max-width: 1100px) {
@@ -509,7 +538,7 @@
   table.data-list-table { width: 100%; border-collapse: collapse; font-size: 12px; }
   table.data-list-table thead th { position: sticky; top: 0; text-align: left; font-weight: 600; color: var(--text-secondary); background: var(--surface-1); padding: 6px 8px; border-bottom: 1px solid var(--gridline); }
   table.data-list-table tbody td { padding: 5px 8px; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; color: var(--text-primary); white-space: nowrap; }
-  table.data-list-table tbody tr:first-child td { font-weight: 700; color: var(--series-pv); }
+  table.data-list-table tbody tr:first-child td { font-weight: 700; color: var(--accent); }
   .data-list-empty { padding: 12px 8px; font-size: 12px; color: var(--text-muted); }
 
   /* ===================== ライブカメラ一覧 / 水位グラフ一覧 ===================== */
@@ -661,6 +690,7 @@
             <div class="panel-caption" id="liveCaption">取得中…</div>
             <div class="playback-controls">
               <button type="button" id="livePlaybackBtn">▶ 保存済み画像を再生</button>
+              <input type="range" class="playback-seek" id="livePlaybackSeek" min="0" max="0" step="1" value="0" disabled aria-label="再生位置シークバー">
               <span class="playback-status" id="livePlaybackStatus"></span>
             </div>
           </div>
@@ -1034,7 +1064,9 @@
   var FETCH_INTERVAL_MS = 60 * 1000;
   var MAX_CHART_POINTS = 288;
   var CHART_WINDOW_MS = 24 * 60 * 60 * 1000;
-  var MAX_STORED_POINTS = 2016;
+  // 30日分(5分間隔)を保持できるだけの余裕を持たせる(従来は7日分=2016)。
+  // 水位データを1か月分読み込めるようにするための拡張。表示グラフの範囲(CHART_WINDOW_MS=1日)は変更しない。
+  var MAX_STORED_POINTS = 8640;
   var POLL_CONCURRENCY = 3;
   // 大場ポンプ場流入水路・神川都市下水路・徳倉都市下水路の3拠点のみ、画像・水位データともに2分間隔で取得する
   // (この3拠点は他拠点と同じtest.cgiから画像・水位を同時に取得するため、取得間隔を上げるだけで両方が2分更新になる)。
@@ -1043,6 +1075,10 @@
   // GitHub Actions側(scripts/poll.mjs)がサーバー側で定期取得し、data/recent.csvへ書き出した
   // 過去データ。ページを開いた直後にこれを読み込み、ブラウザを閉じていた間の履歴もグラフへ反映する。
   var SERVER_HISTORY_URL = "data/recent.csv";
+  // 水位データのみ直近1か月分を保持したファイル(scripts/poll.mjs側で生成、無ければ従来通り無視)。
+  // ページを開いた直後にrecent.csvと並行して読み込み、水位グラフの元データに1か月分反映する
+  // (グラフの表示範囲自体はCHART_WINDOW_MS=1日のまま変更しない)。
+  var SERVER_WATER_HISTORY_URL = "data/recent_water.csv";
   var IMAGE_MANIFEST_URL = "data/images/manifest.json";
 
   function isDark() { return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
@@ -2526,41 +2562,83 @@
   /* ---- ライブカメラ映像のタイムラプス再生(サーバー保存画像を1秒間隔でコマ送り) ----
    * data/images/manifest.json (画像データダウンロード機能で使用しているものと同一)から、
    * 選択中の拠点に保存されている画像を古い順に1秒ごとに切り替えて表示する。
-   * 表示中のコマの実際の撮影時刻を必ずバッジで重ねて表示する。 */
+   * 表示中のコマの実際の撮影時刻を必ずバッジで重ねて表示する。
+   * 隣に再生シークバー(range input)を設置し、ドラッグで任意のコマへ直接移動できる。 */
   var livePlaybackBtn = document.getElementById("livePlaybackBtn");
   var livePlaybackStatus = document.getElementById("livePlaybackStatus");
   var livePlaybackBadge = document.getElementById("livePlaybackBadge");
+  var livePlaybackSeek = document.getElementById("livePlaybackSeek");
   var LIVE_PLAYBACK_FRAME_MS = 1000;
   var livePlaybackTimer = null, livePlaybackActive = false, livePlaybackSiteId = null;
+  var livePlaybackIndex = 0; // シークバー・再生の両方で共有する現在のコマ位置
+  function getSortedPlaybackFiles(siteId) {
+    if (!imageManifest) return null; // 未読込(呼び出し側でnullを区別してメッセージ出し分け)
+    var entry = imageManifest.sites ? imageManifest.sites[siteId] : null;
+    var files = entry && entry.files ? entry.files.slice() : [];
+    files.sort(function (a, b) { return new Date(a.ts).getTime() - new Date(b.ts).getTime(); });
+    return files;
+  }
+  function renderPlaybackFrame(files, idx) {
+    if (!files || !files.length) return;
+    if (idx < 0) idx = 0;
+    if (idx > files.length - 1) idx = files.length - 1;
+    livePlaybackIndex = idx;
+    var f = files[idx];
+    liveImg.style.display = "";
+    liveImg.src = f.file;
+    if (livePlaybackBadge) { livePlaybackBadge.style.display = "block"; livePlaybackBadge.textContent = fmtTime(new Date(f.ts)); }
+    if (livePlaybackStatus) {
+      livePlaybackStatus.textContent = (idx + 1) + " / " + files.length + "枚" + (livePlaybackActive ? "を再生中" : "（一時停止）");
+    }
+    if (livePlaybackSeek) {
+      livePlaybackSeek.max = String(Math.max(0, files.length - 1));
+      livePlaybackSeek.disabled = false;
+      livePlaybackSeek.value = String(idx);
+    }
+  }
+  // 再生中でなければ、拠点詳細の再描画のたびにシークバーの範囲(コマ数)を最新化する。
+  // 再生中に呼ばれても状態を壊さないよう、再生中は何もしない。
+  function refreshLivePlaybackSeekUI() {
+    if (livePlaybackActive || !livePlaybackSeek) return;
+    var files = getSortedPlaybackFiles(activeDetailSiteId);
+    if (!files || !files.length) {
+      livePlaybackSeek.max = "0"; livePlaybackSeek.value = "0"; livePlaybackSeek.disabled = true;
+      return;
+    }
+    livePlaybackSeek.max = String(files.length - 1);
+    livePlaybackSeek.disabled = false;
+    var idx = Math.min(livePlaybackIndex || 0, files.length - 1);
+    livePlaybackSeek.value = String(idx);
+  }
   function stopLivePlayback(restoreLive) {
     if (livePlaybackTimer) { clearInterval(livePlaybackTimer); livePlaybackTimer = null; }
     livePlaybackActive = false;
     livePlaybackSiteId = null;
     if (livePlaybackBtn) livePlaybackBtn.textContent = "▶ 保存済み画像を再生";
-    if (livePlaybackBadge) { livePlaybackBadge.style.display = "none"; livePlaybackBadge.textContent = ""; }
-    if (livePlaybackStatus) livePlaybackStatus.textContent = "";
-    if (restoreLive !== false) renderSiteDetail(); // ライブ映像表示へ戻す
+    if (restoreLive !== false) {
+      livePlaybackIndex = 0;
+      if (livePlaybackBadge) { livePlaybackBadge.style.display = "none"; livePlaybackBadge.textContent = ""; }
+      if (livePlaybackStatus) livePlaybackStatus.textContent = "";
+      renderSiteDetail(); // ライブ映像表示へ戻す(内部でrefreshLivePlaybackSeekUIも呼ばれる)
+    }
+    // restoreLive===false: 拠点切替などによる内部停止。表示は呼び出し元に委ねる。
   }
   function startLivePlayback() {
     var siteId = activeDetailSiteId;
-    if (!imageManifest) { if (livePlaybackStatus) livePlaybackStatus.textContent = "画像一覧を読み込み中です。少し待ってからお試しください。"; return; }
-    var entry = imageManifest.sites ? imageManifest.sites[siteId] : null;
-    var files = entry && entry.files ? entry.files.slice() : [];
+    var files = getSortedPlaybackFiles(siteId);
+    if (files === null) { if (livePlaybackStatus) livePlaybackStatus.textContent = "画像一覧を読み込み中です。少し待ってからお試しください。"; return; }
     if (!files.length) { if (livePlaybackStatus) livePlaybackStatus.textContent = "この拠点にはサーバー保存済みの画像がありません。"; return; }
-    files.sort(function (a, b) { return new Date(a.ts).getTime() - new Date(b.ts).getTime(); });
     livePlaybackActive = true;
     livePlaybackSiteId = siteId;
     if (livePlaybackBtn) livePlaybackBtn.textContent = "■ 停止";
     if (livePlaybackBadge) livePlaybackBadge.style.display = "block";
-    var i = 0;
+    // 末尾まで再生し終わっている場合や未指定の場合は最初から、それ以外(シークで移動済み)はその位置から再開する。
+    var i = (typeof livePlaybackIndex === "number" && livePlaybackIndex < files.length - 1) ? livePlaybackIndex : 0;
     function showFrame() {
       if (!livePlaybackActive || activeDetailSiteId !== livePlaybackSiteId) { stopLivePlayback(false); return; }
       if (i >= files.length) { stopLivePlayback(true); return; }
-      var f = files[i++];
-      liveImg.style.display = "";
-      liveImg.src = f.file;
-      if (livePlaybackBadge) livePlaybackBadge.textContent = fmtTime(new Date(f.ts));
-      if (livePlaybackStatus) livePlaybackStatus.textContent = i + " / " + files.length + "枚を再生中";
+      renderPlaybackFrame(files, i);
+      i++;
     }
     showFrame();
     livePlaybackTimer = setInterval(showFrame, LIVE_PLAYBACK_FRAME_MS);
@@ -2568,6 +2646,22 @@
   if (livePlaybackBtn) {
     livePlaybackBtn.addEventListener("click", function () {
       if (livePlaybackActive) stopLivePlayback(true); else startLivePlayback();
+    });
+  }
+  if (livePlaybackSeek) {
+    livePlaybackSeek.addEventListener("input", function () {
+      var siteId = activeDetailSiteId;
+      var files = getSortedPlaybackFiles(siteId);
+      if (!files || !files.length) return;
+      if (livePlaybackActive) {
+        // ドラッグ操作中は自動送りを一時停止し、その場に留める(ライブ映像へは戻さない)。
+        if (livePlaybackTimer) { clearInterval(livePlaybackTimer); livePlaybackTimer = null; }
+        livePlaybackActive = false;
+        if (livePlaybackBtn) livePlaybackBtn.textContent = "▶ 保存済み画像を再生";
+      }
+      livePlaybackSiteId = siteId; // 再生ボタンでこの拠点・この位置から再開できるようにする
+      var idx = parseInt(livePlaybackSeek.value, 10) || 0;
+      renderPlaybackFrame(files, idx);
     });
   }
   var waterNowValue = document.getElementById("waterNowValue");
@@ -2672,10 +2766,12 @@
     updateDetailChart();
     updateDetailDataList();
     updateSiteDetailMapHighlight();
+    refreshLivePlaybackSeekUI();
   }
   function openSiteDetail(id) {
     if (!SITE_CATALOG[id]) return;
     if (livePlaybackActive && id !== activeDetailSiteId) stopLivePlayback(false);
+    if (id !== activeDetailSiteId) livePlaybackIndex = 0; // 拠点切替時はシーク位置をリセット
     activeDetailSiteId = id;
     renderSiteDetail();
   }
@@ -3070,6 +3166,19 @@
         return 0;
       });
   }
+  // data/recent_water.csv(水位データのみ・直近1か月分)を読み込み、水位グラフの元データへ反映する。
+  // recent.csvと同じmergeServerHistory/parseCsvRoutesを再利用するため、水位を持たない拠点の行や
+  // ファイル自体が存在しない場合(GitHub Actions未設定・poll.mjs未更新)は従来通り黙ってスキップする。
+  function loadServerWaterHistory() {
+    var url = SERVER_WATER_HISTORY_URL + "?_ts=" + Date.now();
+    return fetch(url, { cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.text(); })
+      .then(function (text) { return mergeServerHistory(parseCsvRows(text)); })
+      .catch(function (err) {
+        console.warn("サーバー側の水位1か月分データを読み込めませんでした(未対応のサーバーでは正常です):", err && err.message);
+        return 0;
+      });
+  }
   function downloadCsv() {
     var blob = new Blob([buildCsvContent()], { type: "text/csv;charset=utf-8" });
     var url = URL.createObjectURL(blob);
@@ -3232,11 +3341,13 @@
       imageManifest = json;
       imageManifestFailed = false;
       updateImageDataStatus();
+      refreshLivePlaybackSeekUI(); // manifest到着後にシークバーの範囲(コマ数)を反映する
     }).catch(function (err) {
       console.warn("画像アーカイブ一覧(manifest.json)の読み込みに失敗しました:", err && err.message);
       imageManifest = { sites: {} };
       imageManifestFailed = true;
       updateImageDataStatus();
+      refreshLivePlaybackSeekUI();
     });
   }
   loadImageManifest();
@@ -3561,6 +3672,7 @@
   setActiveRiver(activeRiver);
   activeDetailSiteId = WATER_SITES[0].id;
   loadServerHistory(); // サーバー側(GitHub Actions)の過去データ読み込みはライブ取得と並行して行う(失敗しても無視)
+  loadServerWaterHistory(); // 水位データの1か月分読み込み(同上、失敗しても無視)
   pollAll();
   pollFastSites();
   setInterval(pollAll, FETCH_INTERVAL_MS);
@@ -3605,7 +3717,9 @@
     showView: showView, openSiteDetail: openSiteDetail,
     pollFastSites: pollFastSites, FAST_POLL_SITE_IDS: FAST_POLL_SITE_IDS, FAST_POLL_INTERVAL_MS: FAST_POLL_INTERVAL_MS,
     setSidebarCollapsed: setSidebarCollapsed, isMobileSidebarWidth: isMobileSidebarWidth,
-    loadServerHistory: loadServerHistory, mergeServerHistory: mergeServerHistory, parseCsvRows: parseCsvRows,
+    loadServerHistory: loadServerHistory, loadServerWaterHistory: loadServerWaterHistory,
+    mergeServerHistory: mergeServerHistory, parseCsvRows: parseCsvRows,
+    SERVER_WATER_HISTORY_URL: SERVER_WATER_HISTORY_URL, MAX_STORED_POINTS: MAX_STORED_POINTS,
     SERVER_HISTORY_URL: SERVER_HISTORY_URL, recomputeBaseline: recomputeBaseline,
     loadImageManifest: loadImageManifest, IMAGE_MANIFEST_URL: IMAGE_MANIFEST_URL,
     getImageManifest: function () { return imageManifest; },
@@ -3643,7 +3757,10 @@
     ensureSiteDetailMap: ensureSiteDetailMap, getSiteMap: function () { return siteMap; },
     startLivePlayback: startLivePlayback, stopLivePlayback: stopLivePlayback,
     isLivePlaybackActive: function () { return livePlaybackActive; },
-    getLivePlaybackSiteId: function () { return livePlaybackSiteId; }
+    getLivePlaybackSiteId: function () { return livePlaybackSiteId; },
+    getLivePlaybackIndex: function () { return livePlaybackIndex; },
+    getLivePlaybackSeekEl: function () { return livePlaybackSeek; },
+    refreshLivePlaybackSeekUI: refreshLivePlaybackSeekUI
   };
 })();
 </script>
