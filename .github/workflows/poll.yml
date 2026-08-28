@@ -36,7 +36,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/history.csv data/recent.csv data/latest.json data/images
+          git add data/history.csv data/recent.csv data/recent_water.csv data/latest.json data/images
           if git diff --cached --quiet; then
             echo "変更なし。コミットをスキップします。"
             exit 0
