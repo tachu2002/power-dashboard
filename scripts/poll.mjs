@@ -2,7 +2,10 @@
 // GitHub Actions のスケジュール実行から呼び出され、水位・電源データを持つ全拠点
 // (matsuhisa.info系27拠点 + 国交省「川の防災情報」水位11拠点 = 計38拠点)へ
 // サーバー側から直接アクセスし(ブラウザのようなCORS制限を受けない)、結果を
-// data/history.csv（全期間・追記のみ）、data/recent.csv（直近分のみ・毎回作り直し）、
+// data/history.csv（全期間・追記のみ）、data/recent.csv（直近3日分のみ・毎回作り直し）、
+// data/recent_water.csv（水位(m)列が入っている行のみを対象に、直近1か月分を毎回作り直し。
+// ダッシュボード起動直後に水位データだけ長めの過去分を読み込めるようにするためのもの。
+// グラフの表示範囲自体は従来通り直近1日分のまま変更しない)、
 // data/latest.json（各拠点の最新状態・失敗時は前回成功値を保持）へ書き込む。
 //
 // あわせて、水位・電源データを持たない画像専用拠点(kc01〜kc08)を含む全46拠点の
@@ -20,6 +23,7 @@ const ROOT = path.join(__dirname, "..");
 const DATA_DIR = path.join(ROOT, "data");
 const HISTORY_CSV_PATH = path.join(DATA_DIR, "history.csv");
 const RECENT_CSV_PATH = path.join(DATA_DIR, "recent.csv");
+const WATER_RECENT_CSV_PATH = path.join(DATA_DIR, "recent_water.csv");
 const LATEST_JSON_PATH = path.join(DATA_DIR, "latest.json");
 const IMAGES_DIR = path.join(DATA_DIR, "images");
 const IMAGE_MANIFEST_PATH = path.join(IMAGES_DIR, "manifest.json");
@@ -41,6 +45,7 @@ const VIA_LABEL_MATSUHISA = "サーバー(直接取得)";
 const VIA_LABEL_KAWABOU = "サーバー(国交省 川の防災情報)";
 const FETCH_TIMEOUT_MS = 15000;
 const RECENT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // 水位グラフに十分な直近3日分を保持
+const WATER_RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 水位データのみ直近1か月分を別途保持
 const CONCURRENCY = 5;
 
 // ---- 拠点一覧(ダッシュボード本体 mishima_dashboard_v1.html の SITE_CATALOG と同じもの) ----
@@ -397,7 +402,7 @@ async function archiveImages(readingsBySiteId) {
 // ---- データファイルの初期化 ----
 async function ensureDataFiles() {
   await mkdir(DATA_DIR, { recursive: true });
-  for (const p of [HISTORY_CSV_PATH, RECENT_CSV_PATH]) {
+  for (const p of [HISTORY_CSV_PATH, RECENT_CSV_PATH, WATER_RECENT_CSV_PATH]) {
     try {
       await readFile(p, "utf8");
     } catch (e) {
@@ -452,6 +457,37 @@ async function rebuildRecentCsv(newRows) {
   });
   const combined = kept.concat(newRows);
   await writeFile(RECENT_CSV_PATH, CSV_HEADER + "\n" + combined.join("\n") + (combined.length ? "\n" : ""), "utf8");
+}
+
+// data/recent_water.csv は、水位(m)列(7列中6列目、0始まりindex5)に値が入っている行だけを
+// 対象に、直近1か月分を毎回作り直す(recent.csvと同じ7列フォーマットを流用し、クライアント側の
+// 既存パーサー(parseCsvRows)をそのまま再利用できるようにしている)。電源のみの拠点(cam01等)や、
+// 水位が取得できなかった行は自然に除外される。data/history.csv自体は従来通り全期間・無制限に
+// 保持し続けるため、この関数はあくまで「起動直後にクライアントへ渡す水位の窓」を作るためのもの。
+function isWaterRow(line) {
+  const cols = line.split(",");
+  if (cols.length !== CSV_COLUMNS) return false; // 旧形式(6列)の行は対象外
+  return cols[5] !== undefined && cols[5] !== "";
+}
+async function rebuildRecentWaterCsv(newRows) {
+  let existingLines = [];
+  try {
+    const text = await readFile(WATER_RECENT_CSV_PATH, "utf8");
+    existingLines = text.split(/\r?\n/).filter(function (l) { return l.trim().length; });
+    if (existingLines.length && existingLines[0].indexOf("拠点") === 0) existingLines.shift();
+  } catch (e) {
+    existingLines = [];
+  }
+  const cutoff = Date.now() - WATER_RECENT_WINDOW_MS;
+  const kept = existingLines.filter(function (line) {
+    if (!isWaterRow(line)) return false;
+    const cols = line.split(",");
+    const t = Date.parse(cols[1]);
+    return !isNaN(t) && t >= cutoff;
+  });
+  const newWaterRows = newRows.filter(isWaterRow);
+  const combined = kept.concat(newWaterRows);
+  await writeFile(WATER_RECENT_CSV_PATH, CSV_HEADER + "\n" + combined.join("\n") + (combined.length ? "\n" : ""), "utf8");
 }
 
 // 同時実行数を絞って全拠点を取得する(サーバー側相手に過度な同時アクセスをしないため)
@@ -525,6 +561,7 @@ async function main() {
     await appendFile(HISTORY_CSV_PATH, rowStrings.join("\n") + "\n", "utf8");
   }
   await rebuildRecentCsv(rowStrings);
+  await rebuildRecentWaterCsv(rowStrings);
   await writeFile(LATEST_JSON_PATH, JSON.stringify(latest, null, 2) + "\n", "utf8");
 
   const okCount = Object.values(latest.sites).filter(function (s) { return s.lastFetchOk; }).length;
@@ -548,5 +585,6 @@ runPromise.catch(function (err) {
 });
 export {
   runPromise, SITES, main, KAWABOU_CAMERA_SITES, KAWABOU_WATER_SITES, IMAGE_RETENTION_DAYS, IMAGES_DIR, IMAGE_MANIFEST_PATH,
-  fetchKawabouWaterReading, kawabouWaterJsonUrl, kawabouSwstgJsonUrl
+  fetchKawabouWaterReading, kawabouWaterJsonUrl, kawabouSwstgJsonUrl,
+  WATER_RECENT_CSV_PATH, WATER_RECENT_WINDOW_MS
 };
