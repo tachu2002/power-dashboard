@@ -422,6 +422,16 @@
   .weather-day-temp .lo { color: var(--text-secondary); }
   .weather-day-precip { font-size: 10.5px; color: var(--text-muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
   .weather-strip-status { font-size: 11px; color: var(--text-muted); margin: -2px 0 8px; }
+  /* モバイル幅では折り返して縦積みにならないよう、常に4列(横並び)のグリッドに固定する。
+     カード自体の余白・文字サイズも4列に収まるよう縮小する。 */
+  @media (max-width: 900px) {
+    .weather-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .weather-day-card { min-width: 0; padding: 6px 4px; }
+    .weather-day-label, .weather-day-date { font-size: 10px; }
+    .weather-day-icon { font-size: 20px; margin: 1px 0; }
+    .weather-day-temp { font-size: 11px; }
+    .weather-day-precip { font-size: 9.5px; }
+  }
 
   /* ---- ナウキャストの将来コマ送り再生(全拠点マップ) ---- */
   .nowcast-playback-row { display: flex; align-items: center; gap: 10px; margin: -4px 0 10px; flex-wrap: wrap; }
@@ -706,7 +716,7 @@
         </div>
         <div class="bottom-row">
           <div class="panel chart-panel">
-            <h2 class="panel-title">■ 水位変化グラフ（直近24時間）</h2>
+            <h2 class="panel-title" id="waterChartTitle">■ 水位変化グラフ（直近24時間）</h2>
             <div class="water-now">
               <div class="water-now-label">現在水位</div>
               <div class="water-now-value" id="waterNowValue">–<span class="unit">m</span></div>
@@ -716,7 +726,7 @@
             <div class="chart-legend" id="waterChart-legend"></div>
           </div>
           <div class="panel list-panel">
-            <h2 class="panel-title">■ 取得データ一覧（1分毎）</h2>
+            <h2 class="panel-title" id="dataListTitle">■ 取得データ一覧</h2>
             <div class="data-list-scroll">
               <table class="data-list-table">
                 <thead><tr><th>日時</th><th>水位(m)</th></tr></thead>
@@ -1064,6 +1074,13 @@
   var FETCH_INTERVAL_MS = 60 * 1000;
   var MAX_CHART_POINTS = 288;
   var CHART_WINDOW_MS = 24 * 60 * 60 * 1000;
+  // GitHub Actions(サーバー側の定期取得)は無料枠の「ベストエフォート」スケジュールのため、
+  // 実際の実行間隔が設定上の5分間隔よりはるかに広く(実測で数時間〜半日程度)なることがある。
+  // このため直近24時間の枠内に点が数えるほどしか無く、電源監視・拠点詳細の水位グラフが
+  // 「過去データを参照していないように見える」問題が起きていた。この最小点数を下回る場合は、
+  // 24時間という窓に固執せず、保存されている直近のデータ(MAX_CHART_POINTS件まで)を使って
+  // 意味のある推移グラフを表示するようにする(selectRecentForChart参照)。
+  var MIN_MEANINGFUL_CHART_POINTS = 6;
   // 30日分(5分間隔)を保持できるだけの余裕を持たせる(従来は7日分=2016)。
   // 水位データを1か月分読み込めるようにするための拡張。表示グラフの範囲(CHART_WINDOW_MS=1日)は変更しない。
   var MAX_STORED_POINTS = 8640;
@@ -1992,6 +2009,22 @@
     else s.batAlertLineEl.textContent = "";
   }
 
+  // 直近CHART_WINDOW_MS(24時間)以内の点をまず試し、それがMIN_MEANINGFUL_CHART_POINTS未満しか
+  // 無い場合(サーバー側の取得間隔が実際には数時間おきになっている等)は、24時間という枠に
+  // こだわらず保存されている直近のデータ(最大MAX_CHART_POINTS件)を使って意味のある推移を表示する。
+  // 戻り値のexpandedがtrueの場合、呼び出し側で「24時間より広い範囲を表示中」である旨を示せる。
+  function selectRecentForChart(points, filterFn) {
+    var cutoff = Date.now() - CHART_WINDOW_MS;
+    var windowed = points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && filterFn(p); });
+    if (windowed.length >= MIN_MEANINGFUL_CHART_POINTS) {
+      if (windowed.length > MAX_CHART_POINTS) windowed = windowed.slice(windowed.length - MAX_CHART_POINTS);
+      return { points: windowed, expanded: false };
+    }
+    var all = points.filter(filterFn);
+    if (all.length > MAX_CHART_POINTS) all = all.slice(all.length - MAX_CHART_POINTS);
+    return { points: all, expanded: all.length > windowed.length };
+  }
+
   function refreshPowerCard(site) {
     var s = siteStates[site.id];
     if (!site.hasPower || !s.powerCardEl) return;
@@ -2007,9 +2040,8 @@
       s.batDeltaEl.textContent = (dBat >= 0 ? "▲ " : "▼ ") + Math.abs(dBat).toFixed(1) + " V";
     }
     updateBatAlertState(site, last.bat);
-    var cutoff = Date.now() - CHART_WINDOW_MS;
-    var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && typeof p.pv === "number" && typeof p.bat === "number"; });
-    if (recent.length > MAX_CHART_POINTS) recent = recent.slice(-MAX_CHART_POINTS);
+    var sel = selectRecentForChart(s.points, function (p) { return typeof p.pv === "number" && typeof p.bat === "number"; });
+    var recent = sel.points;
     s.pvChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.pv }; }));
     s.batChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.bat }; }));
   }
@@ -2667,6 +2699,8 @@
   var waterNowValue = document.getElementById("waterNowValue");
   var waterNowDelta = document.getElementById("waterNowDelta");
   var dataListBody = document.getElementById("dataListBody");
+  var waterChartTitleEl = document.getElementById("waterChartTitle");
+  var dataListTitleEl = document.getElementById("dataListTitle");
   var siteDetailTitle = document.getElementById("siteDetailTitle");
   var detailChart = createLevelChart("waterChart");
   var activeDetailSiteId = null;
@@ -2725,18 +2759,32 @@
       waterNowDelta.textContent = (d >= 0 ? "▲ " : "▼ ") + Math.abs(d).toFixed(2) + " m";
     } else { waterNowDelta.innerHTML = "&nbsp;"; }
   }
+  function waterLevelFilter(p) { return typeof p.waterLevelM === "number"; }
+  // 拠点詳細の水位グラフ・データ一覧は同じ選定結果(24時間 or 拡大表示)を共有する。
+  // renderSiteDetail()内でupdateDetailChart→updateDetailDataListの順に呼ばれるたびに再計算する
+  // (双方とも軽量なfilter/sliceのみのため、都度計算しても負荷は問題にならない)。
+  function selectDetailWaterPoints() {
+    var s = siteStates[activeDetailSiteId];
+    return selectRecentForChart(s.points, waterLevelFilter);
+  }
+  function updateWaterChartTitles(sel) {
+    if (waterChartTitleEl) {
+      waterChartTitleEl.textContent = sel.expanded
+        ? "■ 水位変化グラフ（直近のデータ・取得間隔が広いため範囲を拡大表示中）"
+        : "■ 水位変化グラフ（直近24時間）";
+    }
+    if (dataListTitleEl) dataListTitleEl.textContent = "■ 取得データ一覧";
+  }
   function updateDetailChart() {
     var s = siteStates[activeDetailSiteId];
-    var cutoff = Date.now() - CHART_WINDOW_MS;
-    var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && typeof p.waterLevelM === "number"; });
-    if (recent.length > MAX_CHART_POINTS) recent = recent.slice(-MAX_CHART_POINTS);
+    var sel = selectDetailWaterPoints();
+    var recent = sel.points;
+    updateWaterChartTitles(sel);
     detailChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.waterLevelM, rainMm: findNearestRainMm(p.fetchedAt) }; }), s.baselineLevelM, getThresholdsForSite(s.site));
   }
   function updateDetailDataList() {
-    var s = siteStates[activeDetailSiteId];
-    var cutoff = Date.now() - CHART_WINDOW_MS;
-    var recent = s.points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && typeof p.waterLevelM === "number"; });
-    var rows = recent.slice().reverse();
+    var sel = selectDetailWaterPoints();
+    var rows = sel.points.slice().reverse();
     if (!rows.length) {
       dataListBody.innerHTML = "";
       var emptyRow = document.createElement("tr");
@@ -3628,12 +3676,26 @@
       refreshDetailIfActive(site);
     });
   }
+  // 雨量計データ(tmlist/rn/...)は、水位データ(tmlist/stg・swstg)とは異なり国交省サーバー側でCORSが
+  // 開放されていないことを実機検証で確認済み(同一オリジンのriver.go.jp上からは200で取得できるが、
+  // 本ダッシュボード(tachu2002.github.io)からの直接fetchは"Failed to fetch"で必ず失敗する)。
+  // そのため、静岡県カメラのobsdate取得(Phase C)と同じ手法で、CORS開放済みのr.jina.aiプロキシ経由で
+  // 取得する(プロキシはJSONを「Markdown Content:」以下にそのまま出力するテキスト形式で返すため、
+  // その区切り以降をJSON.parseする。区切りが見つからない場合は念のため全文をそのままparseを試みる)。
+  function extractJsonFromJinaProxyText(text) {
+    var marker = "Markdown Content:\n";
+    var idx = text.indexOf(marker);
+    var jsonPart = idx >= 0 ? text.slice(idx + marker.length) : text;
+    return JSON.parse(jsonPart.trim());
+  }
   function pollRainfallGauge() {
     var now = new Date();
     var parts = rainTimeUrlParts(now);
-    var url = "https://www.river.go.jp/kawabou/file/files/tmlist/rn/" + parts.ymd + "/" + parts.hhmm + "/" + MISHIMA_RAIN_OBS_CD13 + ".json";
-    return fetchWithTimeout(url, RAIN_FETCH_TIMEOUT_MS)
-      .then(function (res) { return res.json(); })
+    var targetUrl = "https://www.river.go.jp/kawabou/file/files/tmlist/rn/" + parts.ymd + "/" + parts.hhmm + "/" + MISHIMA_RAIN_OBS_CD13 + ".json";
+    var proxyUrl = "https://r.jina.ai/" + targetUrl;
+    return fetchWithTimeout(proxyUrl, RAIN_FETCH_TIMEOUT_MS)
+      .then(function (res) { return res.text(); })
+      .then(function (text) { return extractJsonFromJinaProxyText(text); })
       .then(function (json) {
         var newPoints = [];
         if (json && Array.isArray(json.min10Values)) {
@@ -3760,7 +3822,13 @@
     getLivePlaybackSiteId: function () { return livePlaybackSiteId; },
     getLivePlaybackIndex: function () { return livePlaybackIndex; },
     getLivePlaybackSeekEl: function () { return livePlaybackSeek; },
-    refreshLivePlaybackSeekUI: refreshLivePlaybackSeekUI
+    refreshLivePlaybackSeekUI: refreshLivePlaybackSeekUI,
+    selectRecentForChart: selectRecentForChart, MIN_MEANINGFUL_CHART_POINTS: MIN_MEANINGFUL_CHART_POINTS,
+    CHART_WINDOW_MS: CHART_WINDOW_MS, MAX_CHART_POINTS: MAX_CHART_POINTS,
+    getWaterChartTitleEl: function () { return waterChartTitleEl; },
+    getDataListTitleEl: function () { return dataListTitleEl; },
+    extractJsonFromJinaProxyText: extractJsonFromJinaProxyText,
+    refreshPowerCard: refreshPowerCard
   };
 })();
 </script>
