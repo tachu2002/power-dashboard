@@ -1197,7 +1197,7 @@
   var POWER_CSV_TAIL_BYTES = 120000;
   var POWER_CSV_FULL_REFETCH_MS = 30 * 60 * 1000;
   // 中継サーバーの拠点名 → このダッシュボードの拠点ID。
-  // (中継サーバー側にしか無い拠点「開発室」「白滝公園」「宗光寺」は対象外。)
+  // (中継サーバー側にしか無い拠点「開発室」「宗光寺」は対象外。)
   var POWER_SOURCE_NAME_TO_ID = {
     "うるおい広場": "cam01", "中郷第１樋管": "cam02", "中郷第1樋管": "cam02",
     "北沢アンダー": "cam03", "中郷第２樋管": "cam04", "中郷第2樋管": "cam04",
@@ -1208,7 +1208,16 @@
     "竹倉用水路": "cam45", "清住緑地": "cam46", "中郷温水地": "cam47", "中郷温水池": "cam47",
     "島田浄水場": "cam48", "徳倉下水路": "cam50", "神川下水路": "cam51", "中村橋": "cam52",
     "中島樋管第１": "cam53", "中島樋管第1": "cam53", "幸原山橋": "cam55", "中島樋管３号": "cam54",
-    "中島樋管3号": "cam54"
+    "中島樋管3号": "cam54",
+  // 中継サーバーの「白滝公園」はダッシュボードのcam42(桜川（大宮町）)に対応する。
+  // 名称が一致しないため当初は対象外になっており、桜川だけ発電が表示されなかった。
+  // 実データで次の通り確認済み:
+  //   ・対照: 中継の「こも池」01:19JST=12.568V に対し、cam41は23:20JST=12.590V→04:20JST=12.537V(整合)
+  //   ・中継の「白滝公園」01:19JST=11.574V に対し、cam42は23:10JST=11.627V→04:20JST=11.508V(内挿で約11.57V)
+  //   ・cam42は全拠点中で最も電圧が低く、中継側でも「白滝公園」が最も低い
+  //   ・桜川は白滝公園を水源とする川で、cam42の座標も白滝公園の位置と一致する
+  //   ・これにより当方の27拠点がすべて中継側の拠点と1対1で対応する(残りは中継側のみの開発室・宗光寺)
+    "白滝公園": "cam42"
   };
 
   /* ---------------------------------------------------------------------
@@ -2079,6 +2088,7 @@
     currentView = name;
     if (name !== "allmap" && typeof nowcastPlaybackActive !== "undefined" && nowcastPlaybackActive) stopNowcastPlayback();
     if (name !== "site" && typeof livePlaybackActive !== "undefined" && livePlaybackActive) stopLivePlayback(false);
+    if (name !== "camlist" && typeof camlistPlaybackState !== "undefined" && camlistPlaybackState.siteId) stopCamlistPlayback(true);
     viewIds.forEach(function (id) {
       var el = document.getElementById("view-" + id);
       if (el) el.classList.toggle("show", id === name);
@@ -3225,7 +3235,11 @@
   var CAMLIST_SITES = RIVER_ORDER_SITES.filter(function (site) {
     return (site.hasWater || CAMLIST_INCLUDE_EXTRA_IDS.indexOf(site.id) >= 0) && CAMLIST_EXCLUDE_IDS.indexOf(site.id) < 0;
   });
-  document.getElementById("camlistSubtitle").textContent = "全" + CAMLIST_SITES.length + "拠点のライブカメラ映像のみを一覧表示します（10分ごとに自動更新）。";
+  var CAMLIST_PLAY_LABEL = "▶ 再生";
+  var CAMLIST_STOP_LABEL = "■ 停止";
+  // 一覧で再生できるのは常に1拠点のみ(siteIdがnullなら全カードがライブ表示)。
+  var camlistPlaybackState = { siteId: null, timer: null, active: false, index: 0 };
+  document.getElementById("camlistSubtitle").textContent = "全" + CAMLIST_SITES.length + "拠点のライブカメラ映像のみを一覧表示します（10分ごとに自動更新。各カードの「▶ 再生」で保存済み画像のタイムラプスを再生できます）。";
   CAMLIST_SITES.forEach(function (site) {
     var card = document.createElement("div"); card.className = "simple-card"; card.dataset.siteId = site.id;
     var header = document.createElement("div"); header.className = "site-card-header";
@@ -3238,19 +3252,149 @@
     var frame = document.createElement("div"); frame.className = "image-frame";
     var img = document.createElement("img"); img.alt = "ライブカメラ映像"; frame.appendChild(img);
     attachImageErrorFallback(img, frame);
+    // タイムラプス再生中に表示中コマの撮影時刻を出すバッジ(拠点詳細と同じ仕組み)
+    var badge = document.createElement("div"); badge.className = "playback-badge"; badge.style.display = "none";
+    frame.appendChild(badge);
+    // 再生コントロール(再生/停止ボタン + シークバー + 状態表示)
+    var controls = document.createElement("div"); controls.className = "playback-controls";
+    var playBtn = document.createElement("button"); playBtn.type = "button"; playBtn.className = "camlist-play-btn";
+    playBtn.textContent = CAMLIST_PLAY_LABEL;
+    var seek = document.createElement("input");
+    seek.type = "range"; seek.className = "playback-seek"; seek.min = "0"; seek.max = "0"; seek.step = "1";
+    seek.value = "0"; seek.disabled = true; seek.setAttribute("aria-label", site.name + " の再生位置シークバー");
+    var status = document.createElement("span"); status.className = "playback-status";
+    controls.appendChild(playBtn); controls.appendChild(seek); controls.appendChild(status);
+    playBtn.addEventListener("click", function () { toggleCamlistPlayback(site.id); });
+    seek.addEventListener("input", function () { onCamlistSeek(site.id); });
     var caption = document.createElement("button"); caption.type = "button"; caption.className = "card-caption"; caption.textContent = "詳細を見る →";
     caption.addEventListener("click", function () { showView("site"); openSiteDetail(site.id); });
-    card.appendChild(header); card.appendChild(frame); card.appendChild(caption);
+    card.appendChild(header); card.appendChild(frame); card.appendChild(controls); card.appendChild(caption);
     camGrid.appendChild(card);
     siteStates[site.id].camDotEl = dot; siteStates[site.id].camLabelEl = statusLabel; siteStates[site.id].camImgEl = img; siteStates[site.id].camFrameEl = frame;
     siteStates[site.id].camCardEl = card;
+    siteStates[site.id].camPlayBtnEl = playBtn; siteStates[site.id].camSeekEl = seek;
+    siteStates[site.id].camPlayStatusEl = status; siteStates[site.id].camBadgeEl = badge;
   });
   function refreshCamlistCard(site) {
     var s = siteStates[site.id];
     if (!s.camImgEl) return;
+    // タイムラプス再生・一時停止中のカードは、定期取得のライブ画像で上書きしない
+    // (再生中の画像が勝手に最新の映像へ差し替わってしまうため)。
+    if (camlistPlaybackState.siteId === site.id) { refreshCamlistSeekUI(site.id); return; }
     var url = siteData[site.id].imageUrl ? (siteData[site.id].imageUrl + (siteData[site.id].imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now()) : null;
     showImageOrNoData(s.camImgEl, s.camFrameEl, url, liveImageFailed(site));
     if (url) s.camLabelEl.textContent = "最終取得 " + fmtClock(new Date());
+    refreshCamlistSeekUI(site.id);
+  }
+
+  /* ---------------------------------------------------------------------
+   * ライブカメラ一覧のタイムラプス再生
+   * -----------------------------------------------------------------------
+   * 拠点詳細と同じ画像マニフェスト(直近2日分)を使い、一覧の各カードでも
+   * 保存済み画像を1秒間隔で再生できるようにする。多数のカードが同時に再生すると
+   * 通信・描画の負荷が高くなるため、再生できるのは常に1拠点のみとし、別のカードで
+   * 再生を始めた時点で前のカードは自動的にライブ表示へ戻す。
+   * --------------------------------------------------------------------- */
+  function refreshAllCamlistSeekUI() {
+    CAMLIST_SITES.forEach(function (site) { refreshCamlistSeekUI(site.id); });
+  }
+  function refreshCamlistSeekUI(siteId) {
+    var s = siteStates[siteId];
+    if (!s || !s.camSeekEl) return;
+    if (camlistPlaybackState.siteId === siteId) return; // 再生・一時停止中は触らない
+    var files = getSortedPlaybackFiles(siteId);
+    if (!files || !files.length) {
+      s.camSeekEl.max = "0"; s.camSeekEl.value = "0"; s.camSeekEl.disabled = true;
+      return;
+    }
+    s.camSeekEl.max = String(files.length - 1);
+    s.camSeekEl.value = String(files.length - 1);
+    s.camSeekEl.disabled = false;
+  }
+  function renderCamlistFrame(siteId, files, idx) {
+    var s = siteStates[siteId];
+    if (!s || !s.camImgEl || !files || !files.length) return;
+    if (idx < 0) idx = 0;
+    if (idx > files.length - 1) idx = files.length - 1;
+    camlistPlaybackState.index = idx;
+    var f = files[idx];
+    if (s.camFrameEl) {
+      var nd = s.camFrameEl.querySelector(".img-nodata");
+      if (nd) nd.style.display = "none";
+    }
+    s.camImgEl.style.display = "";
+    s.camImgEl.src = f.file;
+    if (s.camBadgeEl) { s.camBadgeEl.style.display = "block"; s.camBadgeEl.textContent = fmtTime(new Date(f.ts)); }
+    if (s.camPlayStatusEl) {
+      s.camPlayStatusEl.textContent = (idx + 1) + " / " + files.length + "枚" +
+        (camlistPlaybackState.active ? "を再生中" : "（一時停止）");
+    }
+    if (s.camSeekEl) {
+      s.camSeekEl.max = String(Math.max(0, files.length - 1));
+      s.camSeekEl.disabled = false;
+      s.camSeekEl.value = String(idx);
+    }
+  }
+  function stopCamlistPlayback(restoreLive) {
+    var siteId = camlistPlaybackState.siteId;
+    if (camlistPlaybackState.timer) { clearInterval(camlistPlaybackState.timer); camlistPlaybackState.timer = null; }
+    camlistPlaybackState.active = false;
+    if (!siteId) return;
+    var s = siteStates[siteId];
+    if (s && s.camPlayBtnEl) s.camPlayBtnEl.textContent = CAMLIST_PLAY_LABEL;
+    if (restoreLive !== false) {
+      camlistPlaybackState.siteId = null;
+      camlistPlaybackState.index = 0;
+      if (s && s.camBadgeEl) { s.camBadgeEl.style.display = "none"; s.camBadgeEl.textContent = ""; }
+      if (s && s.camPlayStatusEl) s.camPlayStatusEl.textContent = "";
+      var site = SITE_CATALOG[siteId];
+      if (site) refreshCamlistCard(site); // ライブ映像へ戻す
+    }
+    // restoreLive===false: シークによる一時停止など。表示は呼び出し元に委ねる。
+  }
+  function startCamlistPlayback(siteId) {
+    var s = siteStates[siteId];
+    if (!s || !s.camPlayBtnEl) return;
+    var files = getSortedPlaybackFiles(siteId);
+    if (files === null) { if (s.camPlayStatusEl) s.camPlayStatusEl.textContent = "画像一覧を読み込み中です"; return; }
+    if (!files.length) { if (s.camPlayStatusEl) s.camPlayStatusEl.textContent = "保存済みの画像がありません"; return; }
+    // 同時に再生するのは1拠点のみ(別拠点が再生中なら先に停止してライブへ戻す)
+    if (camlistPlaybackState.siteId && camlistPlaybackState.siteId !== siteId) stopCamlistPlayback(true);
+    var resumeFrom = (camlistPlaybackState.siteId === siteId &&
+      typeof camlistPlaybackState.index === "number" &&
+      camlistPlaybackState.index < files.length - 1) ? camlistPlaybackState.index : 0;
+    camlistPlaybackState.siteId = siteId;
+    camlistPlaybackState.active = true;
+    s.camPlayBtnEl.textContent = CAMLIST_STOP_LABEL;
+    var i = resumeFrom;
+    function showFrame() {
+      if (!camlistPlaybackState.active || camlistPlaybackState.siteId !== siteId) { stopCamlistPlayback(false); return; }
+      if (i >= files.length) { stopCamlistPlayback(true); return; }
+      renderCamlistFrame(siteId, files, i);
+      i++;
+    }
+    showFrame();
+    camlistPlaybackState.timer = setInterval(showFrame, LIVE_PLAYBACK_FRAME_MS);
+  }
+  function toggleCamlistPlayback(siteId) {
+    if (camlistPlaybackState.active && camlistPlaybackState.siteId === siteId) stopCamlistPlayback(true);
+    else startCamlistPlayback(siteId);
+  }
+  function onCamlistSeek(siteId) {
+    var s = siteStates[siteId];
+    if (!s || !s.camSeekEl) return;
+    var files = getSortedPlaybackFiles(siteId);
+    if (!files || !files.length) return;
+    // 別拠点が再生中ならそちらを止めてから、この拠点の操作へ切り替える
+    if (camlistPlaybackState.siteId && camlistPlaybackState.siteId !== siteId) stopCamlistPlayback(true);
+    if (camlistPlaybackState.active) {
+      // ドラッグ中は自動送りを一時停止(その時点の画像・時刻表示は維持し、ライブへは戻さない)
+      if (camlistPlaybackState.timer) { clearInterval(camlistPlaybackState.timer); camlistPlaybackState.timer = null; }
+      camlistPlaybackState.active = false;
+      if (s.camPlayBtnEl) s.camPlayBtnEl.textContent = CAMLIST_PLAY_LABEL;
+    }
+    camlistPlaybackState.siteId = siteId;
+    renderCamlistFrame(siteId, files, parseInt(s.camSeekEl.value, 10) || 0);
   }
   document.getElementById("camlistRefreshBtn").addEventListener("click", function () { pollEverythingNow(); });
 
@@ -4176,12 +4320,14 @@
       imageManifestFailed = false;
       updateImageDataStatus();
       refreshLivePlaybackSeekUI(); // manifest到着後にシークバーの範囲(コマ数)を反映する
+      refreshAllCamlistSeekUI();   // ライブカメラ一覧側のシークバーにも反映する
     }).catch(function (err) {
       console.warn("画像アーカイブ一覧(manifest.json)の読み込みに失敗しました:", err && err.message);
       imageManifest = { sites: {} };
       imageManifestFailed = true;
       updateImageDataStatus();
       refreshLivePlaybackSeekUI();
+      refreshAllCamlistSeekUI();
     });
   }
   loadImageManifest();
@@ -4565,6 +4711,12 @@
 
   // テストハーネス/デバッグ専用のフック(本番動作には影響しない)。
   window.__dashboardDebug = {
+    // --- Request N (2026-09-13): ライブカメラ一覧のタイムラプス・桜川の発電対応 ---
+    getCamlistPlaybackState: function () { return camlistPlaybackState; },
+    startCamlistPlayback: startCamlistPlayback, stopCamlistPlayback: stopCamlistPlayback,
+    toggleCamlistPlayback: toggleCamlistPlayback, renderCamlistFrame: renderCamlistFrame,
+    refreshCamlistCard: refreshCamlistCard, refreshAllCamlistSeekUI: refreshAllCamlistSeekUI,
+    CAMLIST_SITES: CAMLIST_SITES,
     // --- Request M (2026-09-13): バッテリー残量%・ナウキャスト時刻修正・地図リセット・秒非表示 ---
     batteryPercentFor: batteryPercentFor, batteryEmptyVoltageFor: batteryEmptyVoltageFor,
     batteryGaugeSvg: batteryGaugeSvg, updateBatteryGauge: updateBatteryGauge,
