@@ -3973,6 +3973,9 @@
   var DEFAULT_RAIN_RESPONSE_M_PER_MM = 0.01;
   var DEFAULT_WATER_RECESSION = 0.15;
   var BAT_PREDICT_MIN = 10.5, BAT_PREDICT_MAX = 14.2;
+  // 1コマ(最大1時間)あたりの電圧変化の上限。回帰係数が外れ値に引っ張られても、
+  // 予測の折れ線が実測から段差になって飛ばないようにするための保険。
+  var BAT_MAX_STEP_V = 0.6;
   var forecastState = { hours: [], fetchedAt: null, error: null };
   var predictionCache = {};
 
@@ -4084,8 +4087,11 @@
     var recentVals = pts.slice(-200).map(function (p) { return p.waterLevelM; });
     var lo = Math.min.apply(null, recentVals) - 1, hi = Math.max.apply(null, recentVals) + 1;
     var v = last.waterLevelM;
+    var prevTw = nowMs;
     return hours.map(function (h) {
-      v = v + a * h.rain - b * (v - baseline);
+      var dtH = Math.min(2, Math.max(0, (h.t - prevTw) / HOUR_MS));
+      prevTw = h.t;
+      v = v + (a * h.rain - b * (v - baseline)) * dtH;
       v = Math.min(Math.max(v, lo), hi);
       return { t: h.t, value: Math.round(v * 1000) / 1000, predicted: true, fitted: fitted, rainMm: h.rain };
     });
@@ -4104,16 +4110,25 @@
       }));
       if (sol && isFinite(sol.a) && isFinite(sol.b)) {
         c = Math.min(Math.max(sol.a, 0), 0.01);
-        d = Math.min(Math.max(sol.b, 0), 1);
+        d = Math.min(Math.max(sol.b, 0), 0.5); // 消費による1時間あたりの電圧降下の上限
         fitted = true;
       }
     }
     var nowMs = last.fetchedAt.getTime();
     var hours = futureWeatherHours(nowMs, PREDICTION_HORIZON_MS);
     if (!hours.length) return [];
+    // 最新の実測値を起点に、各コマまでの「実際の経過時間」ぶんだけ変化させる。
+    // (最初のコマまでの間隔は1時間とは限らないため、常に1時間分を足すと最新実測値から
+    //  不自然に飛んだ値になってしまう。)
     var v = last.bat;
+    var prevT = nowMs;
     return hours.map(function (h) {
-      v = v + c * h.rad - d;
+      var dtH = Math.min(2, Math.max(0, (h.t - prevT) / HOUR_MS));
+      prevT = h.t;
+      var delta = (c * h.rad - d) * dtH;
+      // 1コマあたりの変化量に上限を設け、回帰係数が極端になった場合でも段差にならないようにする。
+      delta = Math.min(BAT_MAX_STEP_V, Math.max(-BAT_MAX_STEP_V, delta));
+      v = v + delta;
       v = Math.min(Math.max(v, BAT_PREDICT_MIN), BAT_PREDICT_MAX);
       return { t: h.t, value: Math.round(v * 100) / 100, predicted: true, fitted: fitted };
     });
@@ -4139,15 +4154,27 @@
       return { t: h.t, value: Math.max(0, Math.round(k * h.rad * 100) / 100), predicted: true, fitted: true };
     });
   }
+  var PREDICTION_VALUE_KEY = { water: "waterLevelM", bat: "bat", pv: "pv" };
   // 予測は拠点ごとに一定時間キャッシュする(毎回の再描画で回帰計算をやり直さない)。
+  // ただし予測は必ず「最新の実測値からの続き」でなければならないため、最後の実測点(時刻・値)が
+  // 変わった場合は、キャッシュの有効期間内であっても必ず計算し直す。
+  // (これを行わないと、新しいデータが届いたあとも古い実測値を起点とした予測が表示され続け、
+  //  実測の折れ線と予測の点線がつながらない状態になる。)
+  function predictionAnchorStamp(site, kind) {
+    var s = siteStates[site.id];
+    var key = PREDICTION_VALUE_KEY[kind];
+    var lastPt = s ? lastPointWith(s.points, key) : null;
+    return lastPt ? (lastPt.fetchedAt.getTime() + ":" + lastPt[key]) : "none";
+  }
   function cachedPrediction(site, kind) {
     var key = site.id + ":" + kind;
+    var stamp = predictionAnchorStamp(site, kind);
     var hit = predictionCache[key];
-    if (hit && Date.now() - hit.computedAt < PREDICTION_CACHE_MS) return hit.series;
+    if (hit && hit.stamp === stamp && Date.now() - hit.computedAt < PREDICTION_CACHE_MS) return hit.series;
     var series = kind === "water" ? predictWaterSeries(site)
       : kind === "bat" ? predictBatterySeries(site)
       : predictPvSeries(site);
-    predictionCache[key] = { computedAt: Date.now(), series: series };
+    predictionCache[key] = { computedAt: Date.now(), stamp: stamp, series: series };
     return series;
   }
   function refreshAllPredictionCharts() {
