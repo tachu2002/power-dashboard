@@ -579,7 +579,7 @@
       <button type="button" class="sidebar-toggle-btn" id="sidebarToggleBtn" aria-label="メニューの表示切替" title="メニューの表示切替">☰</button>
       <div>
         <h1>水位・電源監視ダッシュボード</h1>
-        <p class="subtitle" id="subtitleText">拠点の電源(PV/BAT)と水位を1分ごとに自動取得（起動時は即時取得）</p>
+        <p class="subtitle" id="subtitleText">拠点の電源(発電W/BAT)と水位を10分ごとに自動取得（高頻度3拠点は2分ごと・起動時は即時取得）</p>
       </div>
     </div>
     <div class="error-ticker" id="errorTicker" aria-live="polite">
@@ -623,7 +623,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">⚡ 電源監視</h1>
-            <p class="subtitle" id="powerSubtitle">拠点を1分ごとに自動取得・mV → V に換算（起動時は即時取得）</p>
+            <p class="subtitle" id="powerSubtitle">拠点を10分ごとに自動取得（発電はmini.lhlab-vps.netの発電(PV)値）</p>
           </div>
           <div class="header-toolbars">
             <div class="toolbar">
@@ -640,7 +640,7 @@
           <div class="table-scroll">
             <table>
               <thead>
-                <tr><th>拠点</th><th>取得時刻</th><th>機器の計測時刻</th><th>PV (V)</th><th>BAT (V)</th><th>水位 (m)</th><th>取得方法</th></tr>
+                <tr><th>拠点</th><th>取得時刻</th><th>機器の計測時刻</th><th>発電 PV (W)</th><th>BAT (V)</th><th>水位 (m)</th><th>取得方法</th></tr>
               </thead>
               <tbody id="tableBody"></tbody>
             </table>
@@ -742,7 +742,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">📷 ライブカメラ一覧</h1>
-            <p class="subtitle" id="camlistSubtitle">全拠点のライブカメラ映像のみを一覧表示します（1分ごとに自動更新）。</p>
+            <p class="subtitle" id="camlistSubtitle">全拠点のライブカメラ映像のみを一覧表示します（10分ごとに自動更新）。</p>
           </div>
           <div class="toolbar">
             <span id="camlistStatusText">読み込み中…</span>
@@ -757,7 +757,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">📈 水位変化グラフ一覧</h1>
-            <p class="subtitle" id="graphlistSubtitle">全拠点の水位変化グラフのみを一覧表示します（1分ごとに自動取得。破線は基準(最低)水位です）。</p>
+            <p class="subtitle" id="graphlistSubtitle">全拠点の水位変化グラフのみを一覧表示します（10分ごとに自動取得。破線は基準(最低)水位です）。</p>
           </div>
           <div class="toolbar">
             <span id="graphlistStatusText">読み込み中…</span>
@@ -791,7 +791,7 @@
           </div>
         </div>
         <footer>
-          「履歴ファイルと連携」でパソコン内のCSVファイルを選択すると、以後の取得結果が全拠点分まとめて自動的にそのファイルへ保存され、次回このページを開いて同じファイルを選び直せば続きから記録できます（Chrome / Edge対応、File System Access API使用）。連携していない場合は、5分ごとに自動でCSVファイルがダウンロードされます。CSVの形式は電源監視ビューで取得しているデータと同じです。
+          「履歴ファイルと連携」でパソコン内のCSVファイルを選択すると、以後の取得結果が全拠点分まとめて自動的にそのファイルへ保存され、次回このページを開いて同じファイルを選び直せば続きから記録できます（Chrome / Edge対応、File System Access API使用）。CSVの形式は電源監視ビューで取得しているデータと同じです。
         </footer>
       </div>
 
@@ -800,7 +800,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">💧 水位データ</h1>
-            <p class="subtitle" id="waterDataSubtitle">全拠点の水位測定値を蓄積した履歴です（ページ表示中は1分ごと、サーバー側では5分ごとに自動収集）。CSVでダウンロードできます。</p>
+            <p class="subtitle" id="waterDataSubtitle">全拠点の水位測定値を蓄積した履歴です（ページ表示中は10分ごと、サーバー側でも10分ごとに自動収集）。CSVでダウンロードできます。</p>
           </div>
           <div class="toolbar">
             <div class="status" id="waterDataStatusText">件数: 0件</div>
@@ -1068,10 +1068,10 @@
   var WARN_BAT_VOLTAGE = 12.0;
   var CRITICAL_BAT_VOLTAGE = 11.5;
 
-  // ブラウザ側のライブ取得間隔。「取得が遅すぎる」というご要望を受け、5分→1分に短縮。
-  // (なお、サーバー側(GitHub Actions)の自動保存は無料枠のcronの都合上5分が最短のため、
-  // これ以上は短縮できない。ブラウザでこのページを開いている間の体感速度はこの値で決まる。)
-  var FETCH_INTERVAL_MS = 60 * 1000;
+  // ブラウザ側のライブ取得間隔。ご要望により、カメラ・水位計ともに10分間隔へ変更(従来1分)。
+  // (サーバー側(GitHub Actions)の自動保存も同じく10分間隔に揃えている。ただし後述の通り
+  //  GitHub側の無料枠cronはベストエフォートのため、実際の実行間隔はこれより広がることがある。)
+  var FETCH_INTERVAL_MS = 10 * 60 * 1000;
   var MAX_CHART_POINTS = 288;
   var CHART_WINDOW_MS = 24 * 60 * 60 * 1000;
   // GitHub Actions(サーバー側の定期取得)は無料枠の「ベストエフォート」スケジュールのため、
@@ -1088,7 +1088,7 @@
   // 大場ポンプ場流入水路・神川都市下水路・徳倉都市下水路の3拠点のみ、画像・水位データともに2分間隔で取得する
   // (この3拠点は他拠点と同じtest.cgiから画像・水位を同時に取得するため、取得間隔を上げるだけで両方が2分更新になる)。
   var FAST_POLL_SITE_IDS = ["cam39", "cam50", "cam51"];
-  var FAST_POLL_INTERVAL_MS = 30 * 1000; // 通常間隔(1分)より短い、この3拠点向けの高頻度間隔
+  var FAST_POLL_INTERVAL_MS = 2 * 60 * 1000; // 通常間隔(10分)より短い、この3拠点向けの高頻度間隔(2分)
   // GitHub Actions側(scripts/poll.mjs)がサーバー側で定期取得し、data/recent.csvへ書き出した
   // 過去データ。ページを開いた直後にこれを読み込み、ブラウザを閉じていた間の履歴もグラフへ反映する。
   var SERVER_HISTORY_URL = "data/recent.csv";
@@ -1097,6 +1097,57 @@
   // (グラフの表示範囲自体はCHART_WINDOW_MS=1日のまま変更しない)。
   var SERVER_WATER_HISTORY_URL = "data/recent_water.csv";
   var IMAGE_MANIFEST_URL = "data/images/manifest.json";
+  // タイムラプス再生の対象期間(直近2日分)。サーバー側の画像保持期間(poll.mjsのIMAGE_RETENTION_DAYS)も2日。
+  var TIMELAPSE_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+
+  /* ---------------------------------------------------------------------
+   * 電源データ(発電PV・バッテリーBAT)の取得元
+   * -----------------------------------------------------------------------
+   * 従来は各拠点のmatsuhisa.info/mishima-camXX/test.cgiから拠点ごとに個別取得していたが、
+   * 中継サーバー(mini.lhlab-vps.net)が全拠点分の電源データを1本のCSVで公開しているため、
+   * 電源データはこちらを正式な取得元とする(ご要望「発電はmini.lhlab-vps.net/powerサイトの
+   * 『発電（PV）』の値へ変更」への対応)。
+   *   URL: https://mini.lhlab-vps.net/power/logs/power-YYYY-MM-DD.csv (JSTの日付)
+   *   列 : timestamp,id,name,source,status,detail,age_s,pv_mv,pv_ma,pv_w,bat_mv,
+   *        bat_charge_ma,bat_discharge_ma,bat_net_ma,ld1_ma,ld2_ma,ld3_ma,load_w,
+   *        gen_wh_today,load_wh_today
+   *   1行 = 1拠点 × 1チェック。約5分間隔で1日分がまとめて記録されている。
+   * このため1回の取得で「当日分の全拠点・全時刻」の履歴がまとめて手に入る。GitHub Actionsの
+   * 実行が遅れてもグラフが疎にならない(Phase Kで対処した症状の根本解決)。
+   * 「発電(PV)」は同サイトの表示に合わせて電力(W)を採用する(従来は発電電圧V)。
+   * --------------------------------------------------------------------- */
+  var POWER_CSV_BASE_URL = "https://mini.lhlab-vps.net/power/logs/";
+  // 1日分のCSVは1MB前後あるため、定期更新時は末尾のみをRangeリクエストで取得する。
+  // (Rangeに対応していないサーバーの場合は全文が返るため、その場合は取得頻度を落として帯域を抑える。)
+  var POWER_CSV_TAIL_BYTES = 120000;
+  var POWER_CSV_FULL_REFETCH_MS = 30 * 60 * 1000;
+  // 中継サーバーの拠点名 → このダッシュボードの拠点ID。
+  // (中継サーバー側にしか無い拠点「開発室」「白滝公園」「宗光寺」は対象外。)
+  var POWER_SOURCE_NAME_TO_ID = {
+    "うるおい広場": "cam01", "中郷第１樋管": "cam02", "中郷第1樋管": "cam02",
+    "北沢アンダー": "cam03", "中郷第２樋管": "cam04", "中郷第2樋管": "cam04",
+    "宮川橋": "cam08", "梅名樋管２号": "cam09", "梅名樋管2号": "cam09",
+    "祇園大橋": "cam11", "安間樋管": "cam12", "上町樋管": "cam13", "多呂樋管": "cam14",
+    "梅名樋管１号": "cam36", "梅名樋管1号": "cam36", "大場ポンプ場": "cam39",
+    "藤代橋": "cam40", "こも池": "cam41", "芝橋": "cam43", "ほたるの里": "cam44",
+    "竹倉用水路": "cam45", "清住緑地": "cam46", "中郷温水地": "cam47", "中郷温水池": "cam47",
+    "島田浄水場": "cam48", "徳倉下水路": "cam50", "神川下水路": "cam51", "中村橋": "cam52",
+    "中島樋管第１": "cam53", "中島樋管第1": "cam53", "幸原山橋": "cam55", "中島樋管３号": "cam54",
+    "中島樋管3号": "cam54"
+  };
+
+  /* ---------------------------------------------------------------------
+   * 未来予測(水位・バッテリー・発電)
+   * -----------------------------------------------------------------------
+   * Open-Meteoの1時間ごとの気象データ(実績+予報)と、蓄積済みの実測値の関係を
+   * その場で回帰的に当てはめ、PREDICTION_HORIZON_MS先までの値を予測する。
+   * グラフでは現在時刻より右側を点線で描画する(あくまで参考値)。
+   * --------------------------------------------------------------------- */
+  var PREDICTION_HORIZON_MS = 12 * 60 * 60 * 1000;
+  // 予測を表示する場合、現在時刻がグラフの中央に来るよう、過去側も同じ長さを表示する。
+  var CHART_PAST_WINDOW_WITH_FORECAST_MS = PREDICTION_HORIZON_MS;
+  // 回帰に必要な最低限の実測点数(これを下回る場合は同時刻帯の平均値による簡易予測にフォールバック)。
+  var MIN_POINTS_FOR_REGRESSION = 12;
 
   function isDark() { return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
   function palette() {
@@ -1349,7 +1400,76 @@
    * ===================================================================== */
   // PV・BATを左右2つの単系列グラフに分けて表示するためのチャート(旧createCombinedChartを置き換え)。
   // seriesKeyは "pv" または "bat" (palette()の色キーと対応)。ratedValueは定格電圧の破線参照値。
-  function createPowerSeriesChart(containerId, seriesKey, ratedValue, ratedLabel) {
+  /* ---------------------------------------------------------------------
+   * グラフ共通ヘルパー(時間軸配置・実測/予測の描き分け)
+   * -----------------------------------------------------------------------
+   * 従来、折れ線グラフのX座標は「点の番号(等間隔)」で決めていたため、取得間隔が不規則な
+   * 場合や、未来の予測値(1時間刻み)を右側に継ぎ足した場合に時間の進み方が実態と合わなかった。
+   * 各点が t(時刻) を持つ場合は時間に比例した位置へ配置し、持たない場合は従来通り等間隔にする。
+   * --------------------------------------------------------------------- */
+  function pointTimeMs(p) {
+    if (!p) return NaN;
+    var t = p.t != null ? p.t : p.time;
+    if (t == null) return NaN;
+    return t instanceof Date ? t.getTime() : Number(t);
+  }
+  function computeXPositions(points, marginLeft, plotW) {
+    var n = points.length;
+    var times = points.map(pointTimeMs);
+    var allTimed = n > 0 && times.every(function (t) { return isFinite(t); });
+    var span = allTimed ? (times[n - 1] - times[0]) : 0;
+    if (!allTimed || !(span > 0)) {
+      return points.map(function (_, i) {
+        return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW;
+      });
+    }
+    return times.map(function (t) { return marginLeft + ((t - times[0]) / span) * plotW; });
+  }
+  // 実測区間は実線、予測区間(p.predicted===true)は点線で描く。境界は連続させる。
+  function buildSplitPathData(points, xs, yAt) {
+    var solid = [], dashed = [];
+    var boundary = -1;
+    for (var i = 0; i < points.length; i++) { if (points[i].predicted) { boundary = i; break; } }
+    points.forEach(function (p, i) {
+      var seg = (xs[i]).toFixed(2) + "," + yAt(p.value).toFixed(2);
+      if (boundary < 0 || i < boundary) solid.push((solid.length === 0 ? "M" : "L") + seg);
+      else dashed.push((dashed.length === 0 ? "M" : "L") + seg);
+    });
+    // 実線の最終点から点線を始めることで、境界で線が途切れないようにする。
+    if (boundary > 0 && dashed.length) {
+      dashed.unshift("M" + xs[boundary - 1].toFixed(2) + "," + yAt(points[boundary - 1].value).toFixed(2));
+      dashed[1] = "L" + dashed[1].slice(1);
+    }
+    return { solid: solid.join(" "), dashed: dashed.join(" "), boundaryIndex: boundary };
+  }
+  // X軸ラベルは「点の番号」ではなくX座標が等間隔になるよう選ぶ。
+  // (時間軸配置では取得間隔が不規則なため、番号で選ぶとラベルが左右に偏って重なってしまう。)
+  function pickLabelIndices(xs, count) {
+    var n = xs.length;
+    if (n === 0) return [];
+    if (n <= count) return xs.map(function (_, i) { return i; });
+    var minX = xs[0], maxX = xs[n - 1];
+    var out = [];
+    for (var k = 0; k < count; k++) {
+      var targetX = count === 1 ? minX : minX + (k / (count - 1)) * (maxX - minX);
+      var idx = nearestIndexForX(xs, targetX);
+      if (out.indexOf(idx) < 0) out.push(idx);
+    }
+    return out;
+  }
+  function nearestIndexForX(xs, targetX) {
+    var best = 0, bestDist = Infinity;
+    for (var i = 0; i < xs.length; i++) {
+      var dist = Math.abs(xs[i] - targetX);
+      if (dist < bestDist) { bestDist = dist; best = i; }
+    }
+    return best;
+  }
+
+  // unit: 値の単位("W" / "V" など。既定は"V")。
+  // points[i]に t(ミリ秒またはDate) があれば時間軸で、無ければ従来通り等間隔(インデックス)で描画する。
+  // points[i].predicted === true の区間は「未来の予測値」として点線で描画する。
+  function createPowerSeriesChart(containerId, seriesKey, ratedValue, ratedLabel, unit) {
     var svgNS = "http://www.w3.org/2000/svg";
     var container = document.getElementById(containerId);
     var svg = document.createElementNS(svgNS, "svg");
@@ -1364,6 +1484,7 @@
     var marginLeft = 52, marginRight = 16, marginTop = 12, marginBottom = 26;
     var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
     var lastPoints = [];
+    var valueUnit = unit || "V";
     function niceScale(dataMin, dataMax) {
       if (dataMin === dataMax) { dataMin -= 1; dataMax += 1; }
       var range = dataMax - dataMin, pad = range * 0.15;
@@ -1401,7 +1522,8 @@
       var allVals = vals.slice();
       if (typeof ratedValue === "number") allVals.push(ratedValue);
       var scale = niceScale(Math.min.apply(null, allVals), Math.max.apply(null, allVals));
-      function xAt(i) { return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW; }
+      var xs = computeXPositions(points, marginLeft, plotW);
+      function xAt(i) { return xs[i]; }
       function yAt(v) { return marginTop + plotH - ((v - scale.min) / (scale.max - scale.min)) * plotH; }
       var tickStep = scale.ticks.length > 1 ? (scale.ticks[1] - scale.ticks[0]) : 1;
       scale.ticks.forEach(function (t) {
@@ -1413,12 +1535,10 @@
           label.textContent = t.toFixed(1); svg.appendChild(label);
         }
       });
-      var labelCount = Math.min(5, n);
-      for (var k = 0; k < labelCount; k++) {
-        var idx = labelCount === 1 ? 0 : Math.round((k / (labelCount - 1)) * (n - 1));
+      pickLabelIndices(xs, Math.min(5, n)).forEach(function (idx) {
         var lbl = el("text", { x: xAt(idx), y: H - 6, "text-anchor": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
         lbl.textContent = points[idx].label; svg.appendChild(lbl);
-      }
+      });
       if (typeof ratedValue === "number" && ratedValue >= scale.min && ratedValue <= scale.max) {
         var ry = yAt(ratedValue);
         svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: ry, y2: ry, stroke: pal.rated, "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
@@ -1429,12 +1549,23 @@
         var rlabel = el("text", { x: rlabelX + 3, y: ry - 8, "text-anchor": "start", "dominant-baseline": "middle", fill: pal.rated, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
         rlabel.textContent = rtext; svg.appendChild(rlabel);
       }
-      var d = vals.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
-      svg.appendChild(el("path", { d: d, fill: "none", stroke: color, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
-      var lastIdx = n - 1;
+      var split = buildSplitPathData(points, xs, yAt);
+      // 実測と予測の境界(=現在時刻)に縦線を引き、どこから先が予測かを明示する。
+      if (split.boundaryIndex > 0) {
+        var nowX = xAt(split.boundaryIndex - 1);
+        svg.appendChild(el("line", { x1: nowX, x2: nowX, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1, "stroke-dasharray": "2 2", opacity: 0.7 }));
+      }
+      if (split.solid) {
+        svg.appendChild(el("path", { d: split.solid, fill: "none", stroke: color, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+      }
+      if (split.dashed) {
+        svg.appendChild(el("path", { d: split.dashed, fill: "none", stroke: color, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-dasharray": "5 4", opacity: 0.85 }));
+      }
+      // 端点ラベルは「最後の実測値」に付ける(予測値ではなく現在値を読み取れるようにするため)。
+      var lastIdx = split.boundaryIndex > 0 ? split.boundaryIndex - 1 : n - 1;
       var ex = xAt(lastIdx), ey = yAt(vals[lastIdx]);
       svg.appendChild(el("circle", { cx: ex, cy: ey, r: 4, fill: color, stroke: pal.surface, "stroke-width": 2 }));
-      drawSeriesEndLabel(svg, pal, ex, ey, vals[lastIdx].toFixed(1) + " V");
+      drawSeriesEndLabel(svg, pal, ex, ey, vals[lastIdx].toFixed(1) + " " + valueUnit);
       var hoverGroup = el("g", { opacity: 0 });
       var crosshair = el("line", { x1: 0, x2: 0, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1 });
       var hoverDot = el("circle", { r: 4, fill: color, stroke: pal.surface, "stroke-width": 2 });
@@ -1446,8 +1577,7 @@
         var rect = svg.getBoundingClientRect();
         var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
         var relX = (clientX - rect.left) / rect.width * W;
-        var idx2 = Math.round(((relX - marginLeft) / plotW) * (n - 1));
-        idx2 = Math.max(0, Math.min(n - 1, idx2));
+        var idx2 = nearestIndexForX(xs, relX);
         var px = xAt(idx2), py = yAt(vals[idx2]);
         crosshair.setAttribute("x1", px); crosshair.setAttribute("x2", px);
         hoverDot.setAttribute("cx", px); hoverDot.setAttribute("cy", py);
@@ -1458,7 +1588,7 @@
         tooltip.appendChild(line0);
         var line = document.createElement("div");
         line.style.cssText = "color:var(--text-primary);font-weight:600;";
-        line.textContent = vals[idx2].toFixed(1) + " V";
+        line.textContent = vals[idx2].toFixed(1) + " " + valueUnit + (points[idx2].predicted ? "（予測）" : "");
         tooltip.appendChild(line);
         var containerRect = container.getBoundingClientRect();
         var tipX = (px / W) * containerRect.width;
@@ -1530,7 +1660,8 @@
       var thVals = lastThresholds.map(function (th) { return th.value; });
       var allVals = vals.concat(typeof lastBaseline === "number" ? [lastBaseline] : []).concat(thVals);
       var scale = niceScale(Math.min.apply(null, allVals), Math.max.apply(null, allVals), lastBaseline);
-      function xAt(i) { return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW; }
+      var xs = computeXPositions(points, marginLeft, plotW);
+      function xAt(i) { return xs[i]; }
       function yAt(v) { return marginTop + plotH - ((v - scale.min) / (scale.max - scale.min)) * plotH; }
       // ---- 雨量オーバーレイ(国交省 雨量計、上部の帯に半透明の棒グラフとして重ねる) ----
       var rainVals = points.map(function (p) { return typeof p.rainMm === "number" ? p.rainMm : null; });
@@ -1556,12 +1687,10 @@
         var label = el("text", { x: marginLeft - 8, y: y, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
         label.textContent = t.toFixed(2); svg.appendChild(label);
       });
-      var labelCount = Math.min(6, n);
-      for (var k = 0; k < labelCount; k++) {
-        var idx = labelCount === 1 ? 0 : Math.round((k / (labelCount - 1)) * (n - 1));
+      pickLabelIndices(xs, Math.min(6, n)).forEach(function (idx) {
         var lbl = el("text", { x: xAt(idx), y: H - 6, "text-anchor": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
         lbl.textContent = points[idx].label; svg.appendChild(lbl);
-      }
+      });
       if (typeof lastBaseline === "number" && lastBaseline >= scale.min && lastBaseline <= scale.max) {
         var by = yAt(lastBaseline);
         svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: by, y2: by, stroke: pal.textMuted, "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
@@ -1578,17 +1707,30 @@
         svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: ty, y2: ty, stroke: th.color, "stroke-width": 1.5, "stroke-dasharray": "6 3", opacity: 0.9 }));
       });
       // ---- 凡例(雨量・公式基準水位) ----
+      var hasPredicted = points.some(function (p) { return p.predicted; });
       if (legendEl) {
         while (legendEl.firstChild) legendEl.removeChild(legendEl.firstChild);
         if (hasRain) legendEl.appendChild(buildLegendChipEl(pal.rain, "雨量(三島観測所、10分雨量)"));
+        if (hasPredicted) legendEl.appendChild(buildLegendChipEl(pal.water, "点線＝予測(気象予報による参考値・公式予報ではありません)"));
         lastThresholds.forEach(function (th) {
           legendEl.appendChild(buildLegendChipEl(th.color, th.label + " " + th.value.toFixed(2) + "m"));
         });
-        legendEl.style.display = (hasRain || lastThresholds.length) ? "" : "none";
+        legendEl.style.display = (hasRain || hasPredicted || lastThresholds.length) ? "" : "none";
       }
-      var d = vals.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
-      svg.appendChild(el("path", { d: d, fill: "none", stroke: pal.water, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
-      var lastIdx = n - 1;
+      var waterSplit = buildSplitPathData(points, xs, yAt);
+      if (waterSplit.boundaryIndex > 0) {
+        var nowX2 = xAt(waterSplit.boundaryIndex - 1);
+        svg.appendChild(el("line", { x1: nowX2, x2: nowX2, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1, "stroke-dasharray": "2 2", opacity: 0.7 }));
+        var nowLabel = el("text", { x: nowX2 + 3, y: marginTop + plotH - 4, "text-anchor": "start", fill: pal.textMuted, "font-size": 10, "font-family": "system-ui, -apple-system, sans-serif" });
+        nowLabel.textContent = "現在"; svg.appendChild(nowLabel);
+      }
+      if (waterSplit.solid) {
+        svg.appendChild(el("path", { d: waterSplit.solid, fill: "none", stroke: pal.water, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
+      }
+      if (waterSplit.dashed) {
+        svg.appendChild(el("path", { d: waterSplit.dashed, fill: "none", stroke: pal.water, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round", "stroke-dasharray": "5 4", opacity: 0.85 }));
+      }
+      var lastIdx = waterSplit.boundaryIndex > 0 ? waterSplit.boundaryIndex - 1 : n - 1;
       var ex = xAt(lastIdx), ey = yAt(vals[lastIdx]);
       svg.appendChild(el("circle", { cx: ex, cy: ey, r: 4, fill: pal.water, stroke: pal.surface, "stroke-width": 1.5 }));
       var labelText = vals[lastIdx].toFixed(2) + " m";
@@ -1608,8 +1750,7 @@
         var rect = svg.getBoundingClientRect();
         var clientX = evt.touches ? evt.touches[0].clientX : evt.clientX;
         var relX = (clientX - rect.left) / rect.width * W;
-        var idx2 = Math.round(((relX - marginLeft) / plotW) * (n - 1));
-        idx2 = Math.max(0, Math.min(n - 1, idx2));
+        var idx2 = nearestIndexForX(xs, relX);
         var px = xAt(idx2), py = yAt(vals[idx2]);
         crosshair.setAttribute("x1", px); crosshair.setAttribute("x2", px);
         hoverDot.setAttribute("cx", px); hoverDot.setAttribute("cy", py);
@@ -1620,7 +1761,7 @@
         tooltip.appendChild(line0);
         var line1 = document.createElement("div");
         line1.style.cssText = "color:var(--text-primary);font-weight:600;";
-        line1.textContent = "水位 " + vals[idx2].toFixed(2) + " m";
+        line1.textContent = "水位 " + vals[idx2].toFixed(2) + " m" + (points[idx2].predicted ? "（予測）" : "");
         tooltip.appendChild(line1);
         if (typeof points[idx2].rainMm === "number") {
           var line2 = document.createElement("div");
@@ -1910,7 +2051,7 @@
     if (html !== undefined) e.innerHTML = html;
     return e;
   }
-  document.getElementById("powerSubtitle").textContent = POWER_SITES.length + "拠点を1分ごとに自動取得・mV → V に換算（起動時は即時取得）";
+  document.getElementById("powerSubtitle").textContent = POWER_SITES.length + "拠点を10分ごとに自動取得（発電はmini.lhlab-vps.netの発電(PV)値・W表示）";
 
   // 電源監視ページのカード表示順を、ライブカメラ一覧・水位変化グラフ一覧と同じ順序
   // (河川別拠点一覧と同じ、河川ごとに上流→下流)に揃える。対象拠点(POWER_SITES)自体は変えない。
@@ -1932,7 +2073,7 @@
     card.appendChild(header);
 
     var mini = el2("div", { class: "mini-stats" });
-    var pvStat = el2("div", {}, '<div class="stat-label"><span class="swatch" style="background:var(--series-pv)"></span>PV</div><div class="stat-value pv-value">–<span class="unit">V</span></div><div class="stat-delta pv-delta">&nbsp;</div>');
+    var pvStat = el2("div", {}, '<div class="stat-label"><span class="swatch" style="background:var(--series-pv)"></span>発電</div><div class="stat-value pv-value">–<span class="unit">W</span></div><div class="stat-delta pv-delta">&nbsp;</div>');
     var batStat = el2("div", {}, '<div class="stat-label"><span class="swatch" style="background:var(--series-bat)"></span>BAT</div><div class="stat-value bat-value">–<span class="unit">V</span></div><div class="stat-delta bat-delta">&nbsp;</div>');
     mini.appendChild(pvStat); mini.appendChild(batStat);
     card.appendChild(mini);
@@ -1943,7 +2084,7 @@
     var chartRow = el2("div", { class: "power-chart-row" });
     var pvCol = el2("div", { class: "power-chart-col" });
     var pvLegend = el2("div", { class: "chart-legend" },
-      '<span class="legend-item"><span class="legend-line" style="background:var(--series-pv)"></span>PV（発電電圧）</span>');
+      '<span class="legend-item"><span class="legend-line" style="background:var(--series-pv)"></span>発電（PV・電力）</span>');
     var pvChartBox = el2("div", { class: "chart-box", id: "pchart-pv-" + site.id });
     pvCol.appendChild(pvLegend); pvCol.appendChild(pvChartBox);
 
@@ -1958,8 +2099,8 @@
     sitesGrid.appendChild(card);
 
     var s = siteStates[site.id];
-    s.pvChart = createPowerSeriesChart("pchart-pv-" + site.id, "pv");
-    s.batChart = createPowerSeriesChart("pchart-bat-" + site.id, "bat", RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(1) + "V");
+    s.pvChart = createPowerSeriesChart("pchart-pv-" + site.id, "pv", null, null, "W");
+    s.batChart = createPowerSeriesChart("pchart-bat-" + site.id, "bat", RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(1) + "V", "V");
     s.powerCardEl = card;
     s.powerStatusDotEl = statusEl.querySelector(".dot");
     s.powerStatusTextEl = statusEl.querySelector(".status-text");
@@ -2013,8 +2154,10 @@
   // 無い場合(サーバー側の取得間隔が実際には数時間おきになっている等)は、24時間という枠に
   // こだわらず保存されている直近のデータ(最大MAX_CHART_POINTS件)を使って意味のある推移を表示する。
   // 戻り値のexpandedがtrueの場合、呼び出し側で「24時間より広い範囲を表示中」である旨を示せる。
-  function selectRecentForChart(points, filterFn) {
-    var cutoff = Date.now() - CHART_WINDOW_MS;
+  // windowMs: 表示範囲(省略時はCHART_WINDOW_MS=24時間)。未来予測を併記する場合は、
+  // 現在時刻がグラフの中央に来るよう過去側も予測と同じ長さ(12時間)を指定する。
+  function selectRecentForChart(points, filterFn, windowMs) {
+    var cutoff = Date.now() - (typeof windowMs === "number" ? windowMs : CHART_WINDOW_MS);
     var windowed = points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && filterFn(p); });
     if (windowed.length >= MIN_MEANINGFUL_CHART_POINTS) {
       if (windowed.length > MAX_CHART_POINTS) windowed = windowed.slice(windowed.length - MAX_CHART_POINTS);
@@ -2025,25 +2168,67 @@
     return { points: all, expanded: all.length > windowed.length };
   }
 
+  // 系列(pv / bat)ごとに「最後に値を持つ点」を返す。発電(PV)は中継サーバー(mini.lhlab-vps.net)、
+  // 水位はmatsuhisa.infoと取得経路が別で、点によって片方しか値を持たないため。
+  function lastPointWith(points, key) {
+    for (var i = points.length - 1; i >= 0; i--) {
+      if (typeof points[i][key] === "number") return points[i];
+    }
+    return null;
+  }
+  function prevPointWith(points, key, exclude) {
+    var seen = false;
+    for (var i = points.length - 1; i >= 0; i--) {
+      if (typeof points[i][key] !== "number") continue;
+      if (!seen) { seen = true; continue; }
+      if (points[i] !== exclude) return points[i];
+    }
+    return null;
+  }
+  // 実測の系列に未来予測(点線用)を継ぎ足したチャート用データを作る。
+  function buildSeriesWithForecast(points, key, forecastSeries) {
+    var data = points.map(function (p) {
+      return { label: fmtClock(p.fetchedAt), value: p[key], t: p.fetchedAt.getTime() };
+    });
+    (forecastSeries || []).forEach(function (f) {
+      data.push({ label: fmtClock(new Date(f.t)), value: f.value, t: f.t, predicted: true });
+    });
+    return data;
+  }
+
   function refreshPowerCard(site) {
     var s = siteStates[site.id];
     if (!site.hasPower || !s.powerCardEl) return;
     if (!s.points.length) return;
-    var last = s.points[s.points.length - 1];
-    var prev = s.points.length > 1 ? s.points[s.points.length - 2] : null;
-    if (typeof last.pv !== "number" || typeof last.bat !== "number") return;
-    s.pvValueEl.innerHTML = last.pv.toFixed(1) + '<span class="unit">V</span>';
-    s.batValueEl.innerHTML = last.bat.toFixed(1) + '<span class="unit">V</span>';
-    if (prev && typeof prev.pv === "number" && typeof prev.bat === "number") {
-      var dPv = last.pv - prev.pv, dBat = last.bat - prev.bat;
-      s.pvDeltaEl.textContent = (dPv >= 0 ? "▲ " : "▼ ") + Math.abs(dPv).toFixed(1) + " V";
-      s.batDeltaEl.textContent = (dBat >= 0 ? "▲ " : "▼ ") + Math.abs(dBat).toFixed(1) + " V";
+    var lastPv = lastPointWith(s.points, "pv");
+    var lastBat = lastPointWith(s.points, "bat");
+    if (!lastPv && !lastBat) return;
+    if (lastPv) {
+      s.pvValueEl.innerHTML = lastPv.pv.toFixed(1) + '<span class="unit">W</span>';
+      var prevPv = prevPointWith(s.points, "pv", lastPv);
+      if (prevPv) {
+        var dPv = lastPv.pv - prevPv.pv;
+        s.pvDeltaEl.textContent = (dPv >= 0 ? "▲ " : "▼ ") + Math.abs(dPv).toFixed(1) + " W";
+      }
     }
-    updateBatAlertState(site, last.bat);
-    var sel = selectRecentForChart(s.points, function (p) { return typeof p.pv === "number" && typeof p.bat === "number"; });
-    var recent = sel.points;
-    s.pvChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.pv }; }));
-    s.batChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.bat }; }));
+    if (lastBat) {
+      s.batValueEl.innerHTML = lastBat.bat.toFixed(1) + '<span class="unit">V</span>';
+      var prevBat = prevPointWith(s.points, "bat", lastBat);
+      if (prevBat) {
+        var dBat = lastBat.bat - prevBat.bat;
+        s.batDeltaEl.textContent = (dBat >= 0 ? "▲ " : "▼ ") + Math.abs(dBat).toFixed(1) + " V";
+      }
+      updateBatAlertState(site, lastBat.bat);
+    }
+    var batForecast = cachedPrediction(site, "bat");
+    var pvForecast = cachedPrediction(site, "pv");
+    // 予測を表示する場合は、現在時刻がグラフ中央に来るよう過去側も12時間に揃える。
+    var pvWindow = pvForecast.length ? CHART_PAST_WINDOW_WITH_FORECAST_MS : undefined;
+    var batWindow = batForecast.length ? CHART_PAST_WINDOW_WITH_FORECAST_MS : undefined;
+    var pvSel = selectRecentForChart(s.points, function (p) { return typeof p.pv === "number"; }, pvWindow);
+    var batSel = selectRecentForChart(s.points, function (p) { return typeof p.bat === "number"; }, batWindow);
+    s.pvChart.setData(buildSeriesWithForecast(pvSel.points, "pv", pvForecast));
+    s.batChart.setData(buildSeriesWithForecast(batSel.points, "bat", batForecast));
   }
 
   /* =====================================================================
@@ -2603,12 +2788,21 @@
   var LIVE_PLAYBACK_FRAME_MS = 1000;
   var livePlaybackTimer = null, livePlaybackActive = false, livePlaybackSiteId = null;
   var livePlaybackIndex = 0; // シークバー・再生の両方で共有する現在のコマ位置
+  // タイムラプス再生の対象は「直近TIMELAPSE_WINDOW_MS(2日)以内に撮影された画像」に限定する。
+  // (サーバー側の保持期間も2日へ変更済みだが、サーバー側の削除が遅れている場合や、
+  //  将来保持期間を延ばした場合でも、再生対象は常に直近2日分になるようクライアント側でも絞り込む。)
   function getSortedPlaybackFiles(siteId) {
     if (!imageManifest) return null; // 未読込(呼び出し側でnullを区別してメッセージ出し分け)
     var entry = imageManifest.sites ? imageManifest.sites[siteId] : null;
     var files = entry && entry.files ? entry.files.slice() : [];
     files.sort(function (a, b) { return new Date(a.ts).getTime() - new Date(b.ts).getTime(); });
-    return files;
+    var cutoff = Date.now() - TIMELAPSE_WINDOW_MS;
+    var recent = files.filter(function (f) {
+      var t = new Date(f.ts).getTime();
+      return isFinite(t) && t >= cutoff;
+    });
+    // 2日以内の画像が1枚も無い場合(サーバー停止中など)は、従来通り保存されている分をそのまま返す。
+    return recent.length ? recent : files;
   }
   function renderPlaybackFrame(files, idx) {
     if (!files || !files.length) return;
@@ -2763,24 +2957,39 @@
   // 拠点詳細の水位グラフ・データ一覧は同じ選定結果(24時間 or 拡大表示)を共有する。
   // renderSiteDetail()内でupdateDetailChart→updateDetailDataListの順に呼ばれるたびに再計算する
   // (双方とも軽量なfilter/sliceのみのため、都度計算しても負荷は問題にならない)。
-  function selectDetailWaterPoints() {
+  // 未来予測を併記する場合は過去側も12時間に揃え、現在時刻がグラフ中央に来るようにする。
+  function selectDetailWaterPoints(hasForecast) {
     var s = siteStates[activeDetailSiteId];
-    return selectRecentForChart(s.points, waterLevelFilter);
+    return selectRecentForChart(s.points, waterLevelFilter,
+      hasForecast ? CHART_PAST_WINDOW_WITH_FORECAST_MS : undefined);
   }
-  function updateWaterChartTitles(sel) {
+  function updateWaterChartTitles(sel, hasForecast) {
     if (waterChartTitleEl) {
-      waterChartTitleEl.textContent = sel.expanded
-        ? "■ 水位変化グラフ（直近のデータ・取得間隔が広いため範囲を拡大表示中）"
-        : "■ 水位変化グラフ（直近24時間）";
+      var base = sel.expanded
+        ? (hasForecast
+          ? "■ 水位変化グラフ（取得間隔が広いため範囲を拡大表示中／右端の点線は12時間先までの予測）"
+          : "■ 水位変化グラフ（直近のデータ・取得間隔が広いため範囲を拡大表示中）")
+        : hasForecast
+          ? "■ 水位変化グラフ（左：直近12時間の実測／右：点線は12時間先までの予測）"
+          : "■ 水位変化グラフ（直近24時間）";
+      waterChartTitleEl.textContent = base;
     }
     if (dataListTitleEl) dataListTitleEl.textContent = "■ 取得データ一覧";
   }
   function updateDetailChart() {
     var s = siteStates[activeDetailSiteId];
-    var sel = selectDetailWaterPoints();
+    var forecast = cachedPrediction(s.site, "water");
+    var hasForecast = forecast.length > 0;
+    var sel = selectDetailWaterPoints(hasForecast);
     var recent = sel.points;
-    updateWaterChartTitles(sel);
-    detailChart.setData(recent.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.waterLevelM, rainMm: findNearestRainMm(p.fetchedAt) }; }), s.baselineLevelM, getThresholdsForSite(s.site));
+    updateWaterChartTitles(sel, hasForecast);
+    var data = recent.map(function (p) {
+      return { label: fmtClock(p.fetchedAt), value: p.waterLevelM, t: p.fetchedAt.getTime(), rainMm: findNearestRainMm(p.fetchedAt) };
+    });
+    forecast.forEach(function (f) {
+      data.push({ label: fmtClock(new Date(f.t)), value: f.value, t: f.t, predicted: true, rainMm: f.rainMm });
+    });
+    detailChart.setData(data, s.baselineLevelM, getThresholdsForSite(s.site));
   }
   function updateDetailDataList() {
     var sel = selectDetailWaterPoints();
@@ -2843,7 +3052,7 @@
   var CAMLIST_SITES = RIVER_ORDER_SITES.filter(function (site) {
     return (site.hasWater || CAMLIST_INCLUDE_EXTRA_IDS.indexOf(site.id) >= 0) && CAMLIST_EXCLUDE_IDS.indexOf(site.id) < 0;
   });
-  document.getElementById("camlistSubtitle").textContent = "全" + CAMLIST_SITES.length + "拠点のライブカメラ映像のみを一覧表示します（1分ごとに自動更新）。";
+  document.getElementById("camlistSubtitle").textContent = "全" + CAMLIST_SITES.length + "拠点のライブカメラ映像のみを一覧表示します（10分ごとに自動更新）。";
   CAMLIST_SITES.forEach(function (site) {
     var card = document.createElement("div"); card.className = "simple-card"; card.dataset.siteId = site.id;
     var header = document.createElement("div"); header.className = "site-card-header";
@@ -2879,7 +3088,7 @@
   var graphlistStatusText = document.getElementById("graphlistStatusText");
   // 表示順は「河川別拠点一覧」と同じ(河川の並び→上流→下流)にする。
   var GRAPHLIST_SITES = RIVER_ORDER_SITES.filter(function (site) { return site.hasWater; });
-  document.getElementById("graphlistSubtitle").textContent = "全" + GRAPHLIST_SITES.length + "拠点の水位変化グラフのみを一覧表示します（1分ごとに自動取得。破線は基準(最低)水位です）。";
+  document.getElementById("graphlistSubtitle").textContent = "全" + GRAPHLIST_SITES.length + "拠点の水位変化グラフのみを一覧表示します（10分ごとに自動取得。破線は基準(最低)水位です）。";
   GRAPHLIST_SITES.forEach(function (site) {
     var card = document.createElement("div"); card.className = "simple-card"; card.dataset.siteId = site.id;
     var header = document.createElement("div"); header.className = "site-card-header";
@@ -2986,9 +3195,14 @@
    * ===================================================================== */
   function addPoint(site, reading, via) {
     var s = siteStates[site.id];
+    // 発電(PV)はmini.lhlab-vps.netのCSV(電力W)を正とするため、matsuhisa.info側のPV値は
+    // 「発電電圧(V)」として別フィールド(pvVoltage)に保持するだけにし、pv(W)には入れない。
+    // 一方バッテリー電圧(bat)は両者とも同じ単位(V)なので、電源CSVが取得できない場合の
+    // フォールバックとしてそのまま採用する。
     var point = {
       fetchedAt: new Date(), measureTime: reading.measureTime,
-      pv: typeof reading.pv === "number" ? reading.pv : null,
+      pv: null,
+      pvVoltage: typeof reading.pv === "number" ? reading.pv : null,
       bat: typeof reading.bat === "number" ? reading.bat : null,
       waterLevelM: typeof reading.waterLevelM === "number" ? reading.waterLevelM : null,
       via: via
@@ -2998,7 +3212,7 @@
     if (site.hasWater && typeof point.waterLevelM === "number") { recomputeBaseline(site); refreshMarkerRisingState(site); }
 
     var d = siteData[site.id];
-    if (typeof reading.pv === "number") d.pv = reading.pv;
+    if (typeof reading.pv === "number") d.pvVoltage = reading.pv;
     if (typeof reading.bat === "number") d.bat = reading.bat;
     if (reading.measureTime) d.measureTime = reading.measureTime;
     if (reading.imageUrl) { d.imageUrl = reading.imageUrl; d.imageFetchFailed = false; }
@@ -3107,7 +3321,8 @@
   /* =====================================================================
    * 15. CSV / 履歴ファイル連携 (電源監視ビュー専用、POWER_SITESのみ対象)
    * ===================================================================== */
-  var CSV_HEADER = "拠点,取得時刻,機器の計測時刻,PV(V),BAT(V),水位(m),取得方法";
+  // 発電(PV)は中継サーバー(mini.lhlab-vps.net)の値に合わせて電力(W)を記録する(従来は発電電圧V)。
+  var CSV_HEADER = "拠点,取得時刻,機器の計測時刻,PV(W),BAT(V),水位(m),取得方法";
   function allPointsFlat() {
     var out = [];
     POWER_SITES.forEach(function (site) { siteStates[site.id].points.forEach(function (p) { out.push({ site: site, p: p }); }); });
@@ -3142,7 +3357,16 @@
         if (waterLevelM !== null && isNaN(waterLevelM)) waterLevelM = null;
         via = cols[6] || "履歴ファイル";
       } else { via = cols[5] || "履歴ファイル"; }
-      out.push({ siteId: siteId, fetchedAt: fetchedAt, measureTime: cols[2] || null, pv: isNaN(pv) ? null : pv, bat: isNaN(bat) ? null : bat, waterLevelM: waterLevelM, via: via });
+      // PV列の単位切り替え対策: 発電(PV)は中継サーバー(mini.lhlab-vps.net)由来の行のみ電力(W)で、
+      // それ以前に記録された行は発電電圧(V)のため、同じ系列に混ぜると桁も意味も食い違う。
+      // 取得方法(via)が中継サーバーの行だけをPV(W)として採用し、古い行のPV値は捨てる。
+      var isRelayPower = via.indexOf("mini.lhlab-vps.net") >= 0;
+      out.push({
+        siteId: siteId, fetchedAt: fetchedAt, measureTime: cols[2] || null,
+        pv: (!isNaN(pv) && isRelayPower) ? pv : null,
+        pvVoltage: (!isNaN(pv) && !isRelayPower) ? pv : null,
+        bat: isNaN(bat) ? null : bat, waterLevelM: waterLevelM, via: via
+      });
     }
     return out;
   }
@@ -3182,6 +3406,7 @@
       bySite[siteId].forEach(function (np) {
         byTime[np.fetchedAt.getTime()] = {
           fetchedAt: np.fetchedAt, measureTime: np.measureTime, pv: np.pv, bat: np.bat,
+          pvVoltage: typeof np.pvVoltage === "number" ? np.pvVoltage : null,
           waterLevelM: typeof np.waterLevelM === "number" ? np.waterLevelM : null, via: np.via
         };
       });
@@ -3227,6 +3452,394 @@
         return 0;
       });
   }
+  /* =====================================================================
+   * 13c. 電源データ(発電PV[W] / バッテリーBAT[V])の取得 — mini.lhlab-vps.net
+   * -----------------------------------------------------------------------
+   * 中継サーバーが公開している1日分のCSV(全拠点・約5分間隔)を取得して取り込む。
+   * 初回は全文を取得して当日分の履歴をまとめて反映し、以降の定期更新では
+   * Rangeリクエストで末尾のみを取得して帯域を抑える(Range非対応なら頻度を落とす)。
+   * ===================================================================== */
+  var POWER_CSV_HEADER_FIELDS = ["timestamp", "id", "name", "source", "status", "detail", "age_s",
+    "pv_mv", "pv_ma", "pv_w", "bat_mv", "bat_charge_ma", "bat_discharge_ma", "bat_net_ma",
+    "ld1_ma", "ld2_ma", "ld3_ma", "load_w", "gen_wh_today", "load_wh_today"];
+  var lastPowerCsvFullFetchAt = 0;
+  var powerSourceState = { lastOkAt: null, lastError: null, rangeSupported: null };
+
+  function powerCsvUrlFor(d) {
+    var p = toJstParts(d || new Date());
+    var p2 = function (n) { return String(n).padStart(2, "0"); };
+    return POWER_CSV_BASE_URL + "power-" + p.y + "-" + p2(p.mo + 1) + "-" + p2(p.day) + ".csv";
+  }
+  // CSV本文を{siteId, fetchedAt, pv(W), bat(V), ...}の配列へ変換する。
+  // partial=true(Rangeで末尾のみ取得した場合)はヘッダー行が無く、先頭行が途中で切れている
+  // 可能性があるため、列数が合わない行は黙って捨てる。
+  function parsePowerCsvRows(text, partial) {
+    if (!text) return [];
+    var lines = text.split(/\r?\n/).filter(function (l) { return l.trim() !== ""; });
+    if (!lines.length) return [];
+    var idx = {};
+    var startAt = 0;
+    var first = lines[0].split(",");
+    var looksLikeHeader = first[0] === "timestamp";
+    if (looksLikeHeader) {
+      first.forEach(function (nameCol, i) { idx[nameCol.trim()] = i; });
+      startAt = 1;
+    } else {
+      // ヘッダーが無い(末尾のみ取得した)場合は既知の列順を使う。
+      POWER_CSV_HEADER_FIELDS.forEach(function (nameCol, i) { idx[nameCol] = i; });
+      if (partial) startAt = 1; // 先頭行は途中で切れている可能性があるので捨てる
+    }
+    var out = [];
+    for (var i = startAt; i < lines.length; i++) {
+      var cols = lines[i].split(",");
+      if (cols.length < POWER_CSV_HEADER_FIELDS.length) continue;
+      var name = (cols[idx["name"]] || "").trim();
+      var siteId = POWER_SOURCE_NAME_TO_ID[name];
+      if (!siteId || !siteStates[siteId]) continue; // 中継サーバー側にしか無い拠点等
+      var ts = new Date((cols[idx["timestamp"]] || "").trim());
+      if (!isFinite(ts.getTime())) continue;
+      var pvW = parseFloat(cols[idx["pv_w"]]);
+      var batMv = parseFloat(cols[idx["bat_mv"]]);
+      var pvMv = parseFloat(cols[idx["pv_mv"]]);
+      var loadW = parseFloat(cols[idx["load_w"]]);
+      if (!isFinite(pvW) && !isFinite(batMv)) continue;
+      out.push({
+        siteId: siteId, fetchedAt: ts,
+        pv: isFinite(pvW) ? pvW : null,          // 発電(PV) = 電力[W](同サイトの表示に合わせる)
+        pvVoltage: isFinite(pvMv) ? pvMv / 1000 : null,
+        bat: isFinite(batMv) ? batMv / 1000 : null,
+        loadW: isFinite(loadW) ? loadW : null,
+        status: (cols[idx["status"]] || "").trim(),
+        via: "mini.lhlab-vps.net"
+      });
+    }
+    return out;
+  }
+  // 既存の点と同じ時刻の点があれば電源値のみを上書きし、無ければ新しい点として挿入する
+  // (水位は別経路で取得しているため、同時刻に水位がある場合でも消さない)。
+  function mergePowerHistory(rows) {
+    var bySite = {};
+    rows.forEach(function (r) {
+      if (!siteStates[r.siteId]) return;
+      (bySite[r.siteId] = bySite[r.siteId] || []).push(r);
+    });
+    var touched = [];
+    Object.keys(bySite).forEach(function (siteId) {
+      var s = siteStates[siteId];
+      var byTime = {};
+      s.points.forEach(function (p) { byTime[p.fetchedAt.getTime()] = p; });
+      bySite[siteId].forEach(function (r) {
+        var key = r.fetchedAt.getTime();
+        var existing = byTime[key];
+        if (existing) {
+          if (typeof r.pv === "number") existing.pv = r.pv;
+          if (typeof r.bat === "number") existing.bat = r.bat;
+          if (typeof r.pvVoltage === "number") existing.pvVoltage = r.pvVoltage;
+          if (typeof r.loadW === "number") existing.loadW = r.loadW;
+        } else {
+          byTime[key] = {
+            fetchedAt: r.fetchedAt, measureTime: null, pv: r.pv, bat: r.bat,
+            pvVoltage: r.pvVoltage, loadW: r.loadW, waterLevelM: null, via: r.via
+          };
+        }
+      });
+      var merged = Object.keys(byTime).map(function (k) { return byTime[k]; });
+      merged.sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+      if (merged.length > MAX_STORED_POINTS) merged = merged.slice(merged.length - MAX_STORED_POINTS);
+      s.points = merged;
+      var latest = null;
+      for (var i = merged.length - 1; i >= 0; i--) {
+        if (typeof merged[i].pv === "number" || typeof merged[i].bat === "number") { latest = merged[i]; break; }
+      }
+      if (latest) {
+        var d = siteData[siteId];
+        if (typeof latest.pv === "number") d.pv = latest.pv;
+        if (typeof latest.bat === "number") d.bat = latest.bat;
+      }
+      touched.push(s.site);
+    });
+    touched.forEach(function (site) { refreshPowerCard(site); refreshDetailIfActive(site); });
+    if (touched.length && tableSection.classList.contains("show")) rebuildTable();
+    return touched.length;
+  }
+  // tail=trueなら末尾のみ(Range)を、falseなら全文を取得する。
+  // Rangeヘッダーは "bytes=<開始>-" の形だけがCORSの単純リクエストとして許可されるため、
+  // 先にHEADでファイルサイズを調べてから開始位置を指定する("bytes=-N"の末尾指定は
+  // プリフライトが必要になり、多くのサーバーで失敗するため使わない)。
+  function fetchPowerCsvText(tail) {
+    var baseUrl = powerCsvUrlFor(new Date());
+    var url = baseUrl + "?_ts=" + Date.now();
+    var rangeStartPromise = tail
+      ? fetch(url, { method: "HEAD", cache: "no-store" }).then(function (res) {
+          var len = parseInt(res.headers.get("content-length") || "", 10);
+          if (!isFinite(len) || len <= POWER_CSV_TAIL_BYTES) return null;
+          return len - POWER_CSV_TAIL_BYTES;
+        }).catch(function () { return null; })
+      : Promise.resolve(null);
+
+    var direct = rangeStartPromise.then(function (start) {
+      var opts = { cache: "no-store" };
+      if (start !== null) opts.headers = { Range: "bytes=" + start + "-" };
+      return fetch(url, opts).then(function (res) {
+        if (!res.ok && res.status !== 206) throw new Error("HTTP " + res.status);
+        var partial = res.status === 206;
+        if (tail) powerSourceState.rangeSupported = partial;
+        return res.text().then(function (t) {
+          if (!t || !t.trim()) throw new Error("空の応答");
+          return { text: t, partial: partial };
+        });
+      });
+    });
+    // CORSで直接取得できない環境では、このコードベースで実績のあるr.jina.aiプロキシへ退避する
+    // (プロキシ経由ではRangeが効かないため全文扱い)。
+    return direct.catch(function (err) {
+      return fetch("https://r.jina.ai/" + powerCsvUrlFor(new Date()) + "?_ts=" + Date.now(), { cache: "no-store" })
+        .then(function (res) { if (!res.ok) throw new Error("プロキシ HTTP " + res.status); return res.text(); })
+        .then(function (t) {
+          var body = extractCsvFromJinaProxyText(t);
+          if (!body) throw new Error("プロキシ応答からCSVを抽出できませんでした (" + (err && err.message) + ")");
+          return { text: body, partial: false };
+        });
+    });
+  }
+  // r.jina.aiはMarkdown化したテキストを返すため、CSV本体("timestamp,"で始まる行以降)を取り出す。
+  function extractCsvFromJinaProxyText(text) {
+    if (!text) return null;
+    var at = text.indexOf("timestamp,id,name");
+    if (at < 0) return null;
+    return text.slice(at);
+  }
+  function pollPowerSource(opts) {
+    var wantTail = !!(opts && opts.tail);
+    if (wantTail && powerSourceState.rangeSupported === false &&
+        Date.now() - lastPowerCsvFullFetchAt < POWER_CSV_FULL_REFETCH_MS) {
+      return Promise.resolve(0); // Range非対応サーバー: 全文の取り直しは頻度を落とす
+    }
+    return fetchPowerCsvText(wantTail).then(function (r) {
+      if (!r.partial) lastPowerCsvFullFetchAt = Date.now();
+      var rows = parsePowerCsvRows(r.text, r.partial);
+      powerSourceState.lastOkAt = new Date();
+      powerSourceState.lastError = null;
+      return mergePowerHistory(rows);
+    }).catch(function (err) {
+      powerSourceState.lastError = err && err.message ? err.message : String(err);
+      console.warn("電源データ(mini.lhlab-vps.net)の取得に失敗しました:", powerSourceState.lastError);
+      return 0;
+    });
+  }
+
+  /* =====================================================================
+   * 13d. 未来予測(水位・バッテリー電圧・発電電力)
+   * -----------------------------------------------------------------------
+   * Open-Meteoの1時間ごとの気象データ(過去実績2日 + 予報2日)を取得し、
+   * 「過去の気象 → 実測値の変化」の関係を最小二乗法でその場で当てはめて、
+   * PREDICTION_HORIZON_MS(12時間)先までを1時間刻みで外挿する。
+   *
+   *   水位   : Δh = a×(直近1時間の雨量) − b×(現在水位 − 基準水位)
+   *            …降雨で上がり、降らなければ基準水位へ戻る(逓減)という素直なモデル。
+   *   バッテリ: Δbat = c×(日射量) − d
+   *            …日射で充電され、常時一定量を消費するというモデル。
+   *   発電   : pv_w = k×(日射量)   …日射量にほぼ比例するため原点を通る比例式。
+   *
+   * いずれもこの拠点自身の実測履歴から係数を推定する。十分な実測点が無い場合は
+   * 保守的な既定係数を使う。あくまで参考値であり、公式の予報ではない。
+   * ===================================================================== */
+  var FORECAST_API_URL = "https://api.open-meteo.com/v1/forecast?latitude=" + WEATHER_LAT +
+    "&longitude=" + WEATHER_LON +
+    "&hourly=temperature_2m,precipitation,shortwave_radiation,cloud_cover" +
+    "&timezone=Asia%2FTokyo&past_days=2&forecast_days=2";
+  var FORECAST_REFRESH_MS = 60 * 60 * 1000;
+  var PREDICTION_CACHE_MS = 5 * 60 * 1000;
+  var HOUR_MS = 60 * 60 * 1000;
+  // 実測から係数を推定できない場合の既定値(控えめな値だが、降雨時に水位が全く動かない
+  // 予測にならないよう、雨への反応は0にしない)。
+  var DEFAULT_RAIN_RESPONSE_M_PER_MM = 0.01;
+  var DEFAULT_WATER_RECESSION = 0.15;
+  var BAT_PREDICT_MIN = 10.5, BAT_PREDICT_MAX = 14.2;
+  var forecastState = { hours: [], fetchedAt: null, error: null };
+  var predictionCache = {};
+
+  function loadForecastHourly() {
+    return fetch(FORECAST_API_URL, { cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function (json) {
+        var h = json && json.hourly;
+        if (!h || !h.time || !h.time.length) throw new Error("hourlyデータがありません");
+        var hours = [];
+        for (var i = 0; i < h.time.length; i++) {
+          var t = parseLocalHour(h.time[i]);
+          if (!isFinite(t)) continue;
+          hours.push({
+            t: t,
+            rain: typeof (h.precipitation || [])[i] === "number" ? h.precipitation[i] : 0,
+            rad: typeof (h.shortwave_radiation || [])[i] === "number" ? h.shortwave_radiation[i] : 0,
+            temp: typeof (h.temperature_2m || [])[i] === "number" ? h.temperature_2m[i] : null
+          });
+        }
+        hours.sort(function (a, b) { return a.t - b.t; });
+        forecastState.hours = hours;
+        forecastState.fetchedAt = new Date();
+        forecastState.error = null;
+        predictionCache = {};
+        refreshAllPredictionCharts();
+        return hours.length;
+      })
+      .catch(function (err) {
+        forecastState.error = err && err.message ? err.message : String(err);
+        console.warn("予報データ(Open-Meteo)を取得できませんでした:", forecastState.error);
+        return 0;
+      });
+  }
+  // Open-Meteoはtimezone指定時 "2026-09-13T14:00" のようなローカル(JST)時刻文字列を返す。
+  // 末尾にZが無いためブラウザのローカル時刻として解釈されてしまうので、JSTとして解釈する。
+  function parseLocalHour(s) {
+    var m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(s || ""));
+    if (!m) return NaN;
+    return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 9, +m[5]);
+  }
+  function weatherHourAt(tMs) {
+    var hours = forecastState.hours;
+    if (!hours.length) return null;
+    var best = null, bestDist = Infinity;
+    for (var i = 0; i < hours.length; i++) {
+      var dist = Math.abs(hours[i].t - tMs);
+      if (dist < bestDist) { bestDist = dist; best = hours[i]; }
+    }
+    return bestDist <= 90 * 60 * 1000 ? best : null;
+  }
+  function futureWeatherHours(fromMs, horizonMs) {
+    return forecastState.hours.filter(function (h) { return h.t > fromMs && h.t <= fromMs + horizonMs; });
+  }
+  // 連立正規方程式 (2変数の最小二乗法) を解く。解けない場合はnull。
+  function solveLeastSquares2(samples) {
+    var s11 = 0, s12 = 0, s22 = 0, sy1 = 0, sy2 = 0;
+    samples.forEach(function (s) {
+      s11 += s.x1 * s.x1; s12 += s.x1 * s.x2; s22 += s.x2 * s.x2;
+      sy1 += s.x1 * s.y; sy2 += s.x2 * s.y;
+    });
+    var det = s11 * s22 - s12 * s12;
+    if (!isFinite(det) || Math.abs(det) < 1e-9) return null;
+    return { a: (sy1 * s22 - sy2 * s12) / det, b: (sy2 * s11 - sy1 * s12) / det };
+  }
+  // valueKeyの実測値について「t の値」と「t+stepMs の値」の組を作り、気象と突き合わせる。
+  function buildTransitionSamples(points, valueKey, stepMs) {
+    var series = points.filter(function (p) { return typeof p[valueKey] === "number"; })
+      .map(function (p) { return { t: p.fetchedAt.getTime(), v: p[valueKey] }; });
+    var out = [];
+    for (var i = 0; i < series.length; i++) {
+      var target = series[i].t + stepMs;
+      var nextIdx = -1, bestDist = Infinity;
+      for (var j = i + 1; j < series.length; j++) {
+        var dist = Math.abs(series[j].t - target);
+        if (dist < bestDist) { bestDist = dist; nextIdx = j; }
+        if (series[j].t > target + 20 * 60 * 1000) break;
+      }
+      if (nextIdx < 0 || bestDist > 20 * 60 * 1000) continue;
+      var w = weatherHourAt(series[i].t);
+      if (!w) continue;
+      out.push({ from: series[i], to: series[nextIdx], weather: w, dv: series[nextIdx].v - series[i].v });
+    }
+    return out;
+  }
+  function predictWaterSeries(site) {
+    var s = siteStates[site.id];
+    if (!s || !forecastState.hours.length) return [];
+    var pts = s.points.filter(function (p) { return typeof p.waterLevelM === "number"; });
+    if (!pts.length) return [];
+    var last = pts[pts.length - 1];
+    var baseline = typeof s.baseline === "number" ? s.baseline : last.waterLevelM;
+    var transitions = buildTransitionSamples(s.points, "waterLevelM", HOUR_MS);
+    var a = DEFAULT_RAIN_RESPONSE_M_PER_MM, b = DEFAULT_WATER_RECESSION, fitted = false;
+    if (transitions.length >= MIN_POINTS_FOR_REGRESSION) {
+      var sol = solveLeastSquares2(transitions.map(function (tr) {
+        return { x1: tr.weather.rain, x2: -(tr.from.v - baseline), y: tr.dv };
+      }));
+      if (sol && isFinite(sol.a) && isFinite(sol.b)) {
+        a = Math.min(Math.max(sol.a, 0), 0.2);
+        b = Math.min(Math.max(sol.b, 0), 0.8);
+        fitted = true;
+      }
+    }
+    var nowMs = last.fetchedAt.getTime();
+    var hours = futureWeatherHours(nowMs, PREDICTION_HORIZON_MS);
+    if (!hours.length) return [];
+    // 予測が実測の範囲から極端に外れないよう、直近の実測レンジ±1mでクリップする。
+    var recentVals = pts.slice(-200).map(function (p) { return p.waterLevelM; });
+    var lo = Math.min.apply(null, recentVals) - 1, hi = Math.max.apply(null, recentVals) + 1;
+    var v = last.waterLevelM;
+    return hours.map(function (h) {
+      v = v + a * h.rain - b * (v - baseline);
+      v = Math.min(Math.max(v, lo), hi);
+      return { t: h.t, value: Math.round(v * 1000) / 1000, predicted: true, fitted: fitted, rainMm: h.rain };
+    });
+  }
+  function predictBatterySeries(site) {
+    var s = siteStates[site.id];
+    if (!s || !forecastState.hours.length) return [];
+    var pts = s.points.filter(function (p) { return typeof p.bat === "number"; });
+    if (!pts.length) return [];
+    var last = pts[pts.length - 1];
+    var transitions = buildTransitionSamples(s.points, "bat", HOUR_MS);
+    var c = 0.0009, d = 0.06, fitted = false; // 既定: 日射1000W/m2で約+0.9V/h、消費で約-0.06V/h
+    if (transitions.length >= MIN_POINTS_FOR_REGRESSION) {
+      var sol = solveLeastSquares2(transitions.map(function (tr) {
+        return { x1: tr.weather.rad, x2: -1, y: tr.dv };
+      }));
+      if (sol && isFinite(sol.a) && isFinite(sol.b)) {
+        c = Math.min(Math.max(sol.a, 0), 0.01);
+        d = Math.min(Math.max(sol.b, 0), 1);
+        fitted = true;
+      }
+    }
+    var nowMs = last.fetchedAt.getTime();
+    var hours = futureWeatherHours(nowMs, PREDICTION_HORIZON_MS);
+    if (!hours.length) return [];
+    var v = last.bat;
+    return hours.map(function (h) {
+      v = v + c * h.rad - d;
+      v = Math.min(Math.max(v, BAT_PREDICT_MIN), BAT_PREDICT_MAX);
+      return { t: h.t, value: Math.round(v * 100) / 100, predicted: true, fitted: fitted };
+    });
+  }
+  function predictPvSeries(site) {
+    var s = siteStates[site.id];
+    if (!s || !forecastState.hours.length) return [];
+    var pts = s.points.filter(function (p) { return typeof p.pv === "number"; });
+    if (!pts.length) return [];
+    var last = pts[pts.length - 1];
+    // 発電電力[W]は日射量[W/m2]にほぼ比例するため、原点を通る比例係数を最小二乗で求める。
+    var sxy = 0, sxx = 0, n = 0;
+    pts.slice(-400).forEach(function (p) {
+      var w = weatherHourAt(p.fetchedAt.getTime());
+      if (!w || !isFinite(w.rad)) return;
+      sxy += w.rad * p.pv; sxx += w.rad * w.rad; n++;
+    });
+    if (n < MIN_POINTS_FOR_REGRESSION || sxx <= 0) return [];
+    var k = sxy / sxx;
+    if (!isFinite(k) || k <= 0) return [];
+    var hours = futureWeatherHours(last.fetchedAt.getTime(), PREDICTION_HORIZON_MS);
+    return hours.map(function (h) {
+      return { t: h.t, value: Math.max(0, Math.round(k * h.rad * 100) / 100), predicted: true, fitted: true };
+    });
+  }
+  // 予測は拠点ごとに一定時間キャッシュする(毎回の再描画で回帰計算をやり直さない)。
+  function cachedPrediction(site, kind) {
+    var key = site.id + ":" + kind;
+    var hit = predictionCache[key];
+    if (hit && Date.now() - hit.computedAt < PREDICTION_CACHE_MS) return hit.series;
+    var series = kind === "water" ? predictWaterSeries(site)
+      : kind === "bat" ? predictBatterySeries(site)
+      : predictPvSeries(site);
+    predictionCache[key] = { computedAt: Date.now(), series: series };
+    return series;
+  }
+  function refreshAllPredictionCharts() {
+    ALL_SITES.forEach(function (site) {
+      refreshPowerCard(site);
+      refreshDetailIfActive(site);
+    });
+  }
+
   function downloadCsv() {
     var blob = new Blob([buildCsvContent()], { type: "text/csv;charset=utf-8" });
     var url = URL.createObjectURL(blob);
@@ -3348,7 +3961,7 @@
    * その場でZIPにまとめてダウンロードする。ダッシュボードのタブを閉じていても、GitHub Actions側が
    * 動いている限り画像は蓄積され続ける(旧バージョンのブラウザメモリ限定アーカイブとは異なる)。
    * ===================================================================== */
-  var IMAGE_RETENTION_DAYS_FALLBACK = 5;
+  var IMAGE_RETENTION_DAYS_FALLBACK = 2;
   var imageManifest = null; // { generatedAt, retentionDays, sites: {id: {name, files: [{ts, file}]}} } または読み込み前はnull
 
   var imageDataSiteSelect = document.getElementById("imageDataSiteSelect");
@@ -3735,6 +4348,13 @@
   activeDetailSiteId = WATER_SITES[0].id;
   loadServerHistory(); // サーバー側(GitHub Actions)の過去データ読み込みはライブ取得と並行して行う(失敗しても無視)
   loadServerWaterHistory(); // 水位データの1か月分読み込み(同上、失敗しても無視)
+  // 電源データ(発電PV[W]・バッテリー[V])は中継サーバーのCSVから取得する。
+  // 初回は全文を取得して当日分の履歴をまとめて反映し、以降は末尾のみを取得する。
+  pollPowerSource({ tail: false });
+  setInterval(function () { pollPowerSource({ tail: true }); }, FETCH_INTERVAL_MS);
+  // 未来予測に使う1時間ごとの気象データ(実績+予報)を読み込む。
+  loadForecastHourly();
+  setInterval(loadForecastHourly, FORECAST_REFRESH_MS);
   pollAll();
   pollFastSites();
   setInterval(pollAll, FETCH_INTERVAL_MS);
@@ -3772,6 +4392,23 @@
 
   // テストハーネス/デバッグ専用のフック(本番動作には影響しない)。
   window.__dashboardDebug = {
+    // --- Request L (2026-09-13): 取得間隔10分/2分・タイムラプス2日・発電(W)・未来予測 ---
+    TIMELAPSE_WINDOW_MS: TIMELAPSE_WINDOW_MS, getSortedPlaybackFiles: getSortedPlaybackFiles,
+    POWER_CSV_BASE_URL: POWER_CSV_BASE_URL, POWER_SOURCE_NAME_TO_ID: POWER_SOURCE_NAME_TO_ID,
+    powerCsvUrlFor: powerCsvUrlFor, parsePowerCsvRows: parsePowerCsvRows,
+    mergePowerHistory: mergePowerHistory, pollPowerSource: pollPowerSource,
+    extractCsvFromJinaProxyText: extractCsvFromJinaProxyText,
+    getPowerSourceState: function () { return powerSourceState; },
+    PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS,
+    CHART_PAST_WINDOW_WITH_FORECAST_MS: CHART_PAST_WINDOW_WITH_FORECAST_MS,
+    loadForecastHourly: loadForecastHourly, parseLocalHour: parseLocalHour,
+    getForecastState: function () { return forecastState; },
+    predictWaterSeries: predictWaterSeries, predictBatterySeries: predictBatterySeries,
+    predictPvSeries: predictPvSeries, cachedPrediction: cachedPrediction,
+    clearPredictionCache: function () { predictionCache = {}; },
+    computeXPositions: computeXPositions, buildSplitPathData: buildSplitPathData,
+    solveLeastSquares2: solveLeastSquares2, buildTransitionSamples: buildTransitionSamples,
+    lastPointWith: lastPointWith,
     siteStates: siteStates, siteData: siteData,
     pollAll: pollAll, computeForecast: computeForecast, amedasState: amedasState,
     updateRainfallSignal: updateRainfallSignal, refreshAllForecasts: refreshAllForecasts,
