@@ -24,6 +24,7 @@
     --warn-bg:        #fff6e0;
     --critical-border:#d03b3b;
     --critical-bg:    #fbe9e7;
+    --ok-border:      #2e9e63;
     /* 参考サイト(mishima-waterdx.com)の実際のCSSから抽出した水色系アクセント(#29b6f6/#008ac0系統)を
        ベースにした配色。ヘッダーの帯や選択状態のハイライトなど「配色・背景のイメージ」にのみ用いる。 */
     --accent:         #1394bd;
@@ -49,6 +50,7 @@
       --warn-border:    #eda100;
       --warn-bg:        #3a2f0f;
       --critical-border:#e05c5c;
+      --ok-border:      #46b87d;
       --critical-bg:    #3a1f1a;
       --accent:         #3fb8dd;
       --accent-strong:  #0c5c78;
@@ -78,6 +80,7 @@
     --warn-bg:        #3a2f0f;
     --critical-border:#e05c5c;
     --critical-bg:    #3a1f1a;
+    --ok-border:      #46b87d;
   }
 
   * { box-sizing: border-box; }
@@ -387,6 +390,14 @@
   .mini-stats .stat-value { font-size: 16px; font-weight: 600; margin-top: 1px; font-variant-numeric: proportional-nums; }
   .mini-stats .stat-value .unit { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
   .mini-stats .stat-delta { font-size: 10px; color: var(--text-secondary); }
+  /* バッテリー残量ゲージ(スマートフォンの電池表示のイメージ)。
+     数値(パーセンテージ)は必ず文字として表示するため、色だけに意味を持たせていない。 */
+  .battery-gauge { display: flex; flex-direction: column; gap: 2px; }
+  .battery-gauge svg { display: block; }
+  .battery-gauge .battery-pct-text { font-weight: 700; fill: var(--text-primary); }
+  .battery-gauge .battery-body { fill: none; stroke: var(--text-secondary); stroke-width: 2; }
+  .battery-gauge .battery-cap { fill: var(--text-secondary); }
+  .battery-gauge .battery-fill { opacity: 0.55; }
 
   .table-section { display: none; }
   .table-section.show { display: block; }
@@ -400,6 +411,16 @@
   .panel-title { font-size: 20px; font-weight: 600; margin: 0 0 8px; color: var(--text-primary); }
   .panel-sub { font-size: 12px; color: var(--text-secondary); margin: -4px 0 10px; }
   .map-box { position: relative; width: 100%; height: 320px; border-radius: 8px; overflow: hidden; }
+  /* 地図を動かしたあと、初期表示(全拠点が収まる範囲)へ戻すためのボタン。
+     Leafletのズームコントロールは左上にあるため、こちらは右上に置く。 */
+  .map-reset-btn {
+    position: absolute; top: 10px; right: 10px; z-index: 1100;
+    font-size: 12px; font-weight: 600; line-height: 1;
+    padding: 7px 10px; border-radius: 6px; cursor: pointer;
+    color: var(--text-primary); background: var(--surface-1);
+    border: 1px solid var(--border); box-shadow: 0 1px 4px rgba(0,0,0,0.22);
+  }
+  .map-reset-btn:hover { border-color: var(--accent); color: var(--accent); }
   .map-box.all-sites-map { height: 70vh; min-height: 480px; }
   .nowcast-toggle {
     display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-secondary);
@@ -1068,6 +1089,60 @@
   var WARN_BAT_VOLTAGE = 12.0;
   var CRITICAL_BAT_VOLTAGE = 11.5;
 
+  /* ---------------------------------------------------------------------
+   * バッテリー残量(%)の換算
+   * -----------------------------------------------------------------------
+   * 13.5Vを100%、11.5Vを0%として線形に換算する。ただし下限(0%とみなす電圧)が
+   * 異なる拠点があるため、拠点ごとの上書き表を持つ。
+   *   北沢アンダーパス(cam03) 9.5V / 多呂樋管(cam14) 10.5V /
+   *   梅名樋管2号(cam09) 10.5V / 芝橋(cam43) 10.5V
+   * --------------------------------------------------------------------- */
+  var BATTERY_FULL_VOLTAGE = 13.5;
+  var BATTERY_EMPTY_VOLTAGE_DEFAULT = 11.5;
+  var BATTERY_EMPTY_VOLTAGE_OVERRIDE = {
+    cam03: 9.5,   // 北沢アンダーパス
+    cam14: 10.5,  // 多呂樋管
+    cam09: 10.5,  // 梅名樋管2号(梅名第二)
+    cam43: 10.5   // 芝橋
+  };
+  function batteryEmptyVoltageFor(siteId) {
+    var v = BATTERY_EMPTY_VOLTAGE_OVERRIDE[siteId];
+    return typeof v === "number" ? v : BATTERY_EMPTY_VOLTAGE_DEFAULT;
+  }
+  // 残量(%)。0〜100にクリップし、整数へ丸める。値が無い場合はnull。
+  function batteryPercentFor(siteId, voltage) {
+    if (typeof voltage !== "number" || !isFinite(voltage)) return null;
+    var empty = batteryEmptyVoltageFor(siteId);
+    var span = BATTERY_FULL_VOLTAGE - empty;
+    if (!(span > 0)) return null;
+    var pct = ((voltage - empty) / span) * 100;
+    return Math.round(Math.min(100, Math.max(0, pct)));
+  }
+  // 残量に応じたステータス色(良好/注意/危険)。数値も併記するため色だけに依存しない。
+  // スマートフォンの電池表示のような横向きの電池マーク。中央に残量(%)を大きく表示する。
+  // pctがnullの場合は「–」を表示する(データ未取得)。
+  function batteryGaugeSvg(pct) {
+    var W = 104, H = 40;
+    var bodyX = 2, bodyY = 4, bodyW = 88, bodyH = 32, r = 7;
+    var padding = 4;
+    var innerW = bodyW - padding * 2;
+    var fillW = pct === null ? 0 : Math.max(pct > 0 ? 3 : 0, (innerW * pct) / 100);
+    var color = batteryLevelColorVar(pct);
+    var label = pct === null ? "–" : pct + "%";
+    return '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="バッテリー残量 ' + label + '">' +
+      '<rect class="battery-fill" x="' + (bodyX + padding) + '" y="' + (bodyY + padding) + '" width="' + fillW.toFixed(1) + '" height="' + (bodyH - padding * 2) + '" rx="4" fill="' + color + '"></rect>' +
+      '<rect class="battery-body" x="' + bodyX + '" y="' + bodyY + '" width="' + bodyW + '" height="' + bodyH + '" rx="' + r + '"></rect>' +
+      '<rect class="battery-cap" x="' + (bodyX + bodyW + 2) + '" y="' + (bodyY + 9) + '" width="6" height="14" rx="2"></rect>' +
+      '<text class="battery-pct-text" x="' + (bodyX + bodyW / 2) + '" y="' + (bodyY + bodyH / 2 + 1) + '" text-anchor="middle" dominant-baseline="middle" font-size="18" font-family="system-ui, -apple-system, sans-serif">' + label + '</text>' +
+      '</svg>';
+  }
+  function batteryLevelColorVar(pct) {
+    if (pct === null) return "var(--text-muted)";
+    if (pct < 20) return "var(--critical-border)";
+    if (pct < 50) return "var(--warn-border)";
+    return "var(--ok-border)";
+  }
+
   // ブラウザ側のライブ取得間隔。ご要望により、カメラ・水位計ともに10分間隔へ変更(従来1分)。
   // (サーバー側(GitHub Actions)の自動保存も同じく10分間隔に揃えている。ただし後述の通り
   //  GitHub側の無料枠cronはベストエフォートのため、実際の実行間隔はこれより広がることがある。)
@@ -1274,6 +1349,11 @@
   function fmtClock(d) {
     var p = function (n) { return String(n).padStart(2, "0"); };
     return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
+  // グラフのX軸ラベル・ツールチップ用(秒は表示しない)。
+  function fmtClockHm(d) {
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return p(d.getHours()) + ":" + p(d.getMinutes());
   }
   function fmtTime(d) {
     var p = function (n) { return String(n).padStart(2, "0"); };
@@ -2076,6 +2156,12 @@
     var pvStat = el2("div", {}, '<div class="stat-label"><span class="swatch" style="background:var(--series-pv)"></span>発電</div><div class="stat-value pv-value">–<span class="unit">W</span></div><div class="stat-delta pv-delta">&nbsp;</div>');
     var batStat = el2("div", {}, '<div class="stat-label"><span class="swatch" style="background:var(--series-bat)"></span>BAT</div><div class="stat-value bat-value">–<span class="unit">V</span></div><div class="stat-delta bat-delta">&nbsp;</div>');
     mini.appendChild(pvStat); mini.appendChild(batStat);
+    // バッテリー残量ゲージ(電池マークの中にパーセンテージ)。
+    // .mini-stats は横並びで、拠点サムネイルが margin-left:auto で右端へ寄るため、
+    // ここへ差し込むと「バッテリーの数値」と「拠点の画像」の間に配置される。
+    var batteryStat = el2("div", { class: "battery-gauge" },
+      '<div class="stat-label">バッテリー残量</div>' + batteryGaugeSvg(null));
+    mini.appendChild(batteryStat);
     card.appendChild(mini);
 
     var batAlertLine = el2("div", { class: "bat-alert-line" });
@@ -2106,6 +2192,7 @@
     s.powerStatusTextEl = statusEl.querySelector(".status-text");
     s.pvValueEl = pvStat.querySelector(".pv-value");
     s.batValueEl = batStat.querySelector(".bat-value");
+    s.batteryGaugeEl = batteryStat;
     s.pvDeltaEl = pvStat.querySelector(".pv-delta");
     s.batDeltaEl = batStat.querySelector(".bat-delta");
     s.batAlertLineEl = batAlertLine;
@@ -2188,12 +2275,27 @@
   // 実測の系列に未来予測(点線用)を継ぎ足したチャート用データを作る。
   function buildSeriesWithForecast(points, key, forecastSeries) {
     var data = points.map(function (p) {
-      return { label: fmtClock(p.fetchedAt), value: p[key], t: p.fetchedAt.getTime() };
+      return { label: fmtClockHm(p.fetchedAt), value: p[key], t: p.fetchedAt.getTime() };
     });
     (forecastSeries || []).forEach(function (f) {
-      data.push({ label: fmtClock(new Date(f.t)), value: f.value, t: f.t, predicted: true });
+      data.push({ label: fmtClockHm(new Date(f.t)), value: f.value, t: f.t, predicted: true });
     });
     return data;
+  }
+
+  // 電池マーク(残量%)を最新のバッテリー電圧で描き直す。
+  function updateBatteryGauge(site, batVoltage) {
+    var s = siteStates[site.id];
+    if (!s || !s.batteryGaugeEl) return;
+    var pct = batteryPercentFor(site.id, batVoltage);
+    var svgHolder = s.batteryGaugeEl;
+    var old = svgHolder.querySelector("svg");
+    if (old) svgHolder.removeChild(old);
+    svgHolder.insertAdjacentHTML("beforeend", batteryGaugeSvg(pct));
+    var empty = batteryEmptyVoltageFor(site.id);
+    svgHolder.title = pct === null
+      ? "バッテリー残量: データ未取得"
+      : "バッテリー残量 " + pct + "%（" + BATTERY_FULL_VOLTAGE.toFixed(1) + "V=100% / " + empty.toFixed(1) + "V=0%）";
   }
 
   function refreshPowerCard(site) {
@@ -2220,6 +2322,7 @@
       }
       updateBatAlertState(site, lastBat.bat);
     }
+    updateBatteryGauge(site, lastBat ? lastBat.bat : null);
     var batForecast = cachedPrediction(site, "bat");
     var pvForecast = cachedPrediction(site, "pv");
     // 予測を表示する場合は、現在時刻がグラフ中央に来るよう過去側も12時間に揃える。
@@ -2384,6 +2487,34 @@
     box.textContent = "地図を読み込めませんでした（ネットワーク環境をご確認ください）。";
     console.warn(label + "の初期化に失敗しました");
   }
+  /* ---------------------------------------------------------------------
+   * 地図共通: 「初期表示に戻す」ボタン
+   * -----------------------------------------------------------------------
+   * 地図をドラッグ・ズームしたあと、最初に表示していた範囲へワンタッチで戻せるようにする。
+   * Leafletのコンテナ要素の中へ通常のボタンとして重ねる(地図側へクリックが伝わらないよう
+   * 各種イベントの伝播を止める)。
+   * --------------------------------------------------------------------- */
+  function addMapResetButton(containerId, onReset) {
+    var container = document.getElementById(containerId);
+    if (!container) return null;
+    var existing = container.querySelector(".map-reset-btn");
+    if (existing) return existing;
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "map-reset-btn";
+    btn.textContent = "⟲ 初期表示に戻す";
+    btn.title = "地図の位置・拡大率を最初の状態に戻します";
+    ["mousedown", "pointerdown", "touchstart", "dblclick", "wheel"].forEach(function (evt) {
+      btn.addEventListener(evt, function (e) { e.stopPropagation(); });
+    });
+    btn.addEventListener("click", function (e) {
+      e.preventDefault(); e.stopPropagation();
+      try { onReset(); } catch (err) { console.warn("地図の初期表示への復帰に失敗しました:", err); }
+    });
+    container.appendChild(btn);
+    return btn;
+  }
+
   function ensureRiverMap() {
     if (riverMapReady) return;
     try {
@@ -2393,9 +2524,17 @@
         maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       }).addTo(riverMap);
       riverMapReady = true;
+      addMapResetButton("riverMap", resetRiverMapView);
       renderRiverMap(riverGroups[activeRiver] || []);
     } catch (mapErr) { showMapLoadError("riverMap", "河川マップ"); }
   }
+  var riverMapDefaultView = null;
+  function applyRiverMapDefaultView() {
+    if (!riverMapReady || !riverMapDefaultView) return;
+    if (riverMapDefaultView.type === "center") riverMap.setView(riverMapDefaultView.center, riverMapDefaultView.zoom);
+    else riverMap.fitBounds(riverMapDefaultView.bounds, { padding: [30, 30] });
+  }
+  function resetRiverMapView() { applyRiverMapDefaultView(); }
   function renderRiverMap(sites) {
     if (!riverMapReady) return;
     if (riverMapLayer) { riverMap.removeLayer(riverMapLayer); riverMapLayer = null; }
@@ -2415,8 +2554,11 @@
     });
     group.addTo(riverMap);
     riverMapLayer = group;
-    if (latlngs.length === 1) riverMap.setView(latlngs[0], 16);
-    else riverMap.fitBounds(L.latLngBounds(latlngs), { padding: [30, 30] });
+    // 「初期表示に戻す」で復帰できるよう、河川を切り替えるたびに既定の表示範囲を覚えておく。
+    if (latlngs.length === 1) riverMapDefaultView = { type: "center", center: latlngs[0], zoom: 16 };
+    else if (latlngs.length) riverMapDefaultView = { type: "bounds", bounds: L.latLngBounds(latlngs) };
+    else riverMapDefaultView = null;
+    applyRiverMapDefaultView();
     setTimeout(function () { riverMap.invalidateSize(); }, 50);
   }
   function refreshMarkerRisingState(site) {
@@ -2620,10 +2762,21 @@
   var nowcastPlayStatus = document.getElementById("nowcastPlayStatus");
   var NOWCAST_PLAYBACK_FRAME_MS = 1000;
   var nowcastPlaybackTimer = null, nowcastPlaybackActive = false;
+  // 気象庁のbasetime/validtimeは "YYYYMMDDHHMMSS" のUTC表記。
+  // 以前はこの文字列の時分をそのまま表示していたため、日本時間では9時間前の時刻が表示され、
+  // 「現在時刻からの未来予測になっていない」ように見えていた。UTCとして解釈してから表示する。
+  function parseJmaTimeMs(t) {
+    if (typeof t !== "string" || t.length < 12) return NaN;
+    return Date.UTC(+t.slice(0, 4), +t.slice(4, 6) - 1, +t.slice(6, 8),
+      +t.slice(8, 10), +t.slice(10, 12), t.length >= 14 ? +t.slice(12, 14) : 0);
+  }
   function fmtNowcastValidTime(vt) {
-    // "20260827235000" -> "23:50"
-    if (typeof vt !== "string" || vt.length < 12) return vt;
-    return vt.slice(8, 10) + ":" + vt.slice(10, 12);
+    // "20260913123500"(UTC) -> ブラウザのローカル時刻で "21:35"
+    var ms = parseJmaTimeMs(vt);
+    if (!isFinite(ms)) return vt;
+    var d = new Date(ms);
+    var p = function (n) { return String(n).padStart(2, "0"); };
+    return p(d.getHours()) + ":" + p(d.getMinutes());
   }
   function stopNowcastPlayback(restoreLive) {
     if (nowcastPlaybackTimer) { clearInterval(nowcastPlaybackTimer); nowcastPlaybackTimer = null; }
@@ -2638,7 +2791,12 @@
       .then(function (r) { if (!r.ok) throw new Error("nowcast N2 targetTimes fetch failed: " + r.status); return r.json(); })
       .then(function (list) {
         if (!Array.isArray(list) || !list.length) throw new Error("nowcast N2 targetTimes empty");
-        var frames = list.slice().sort(function (a, b) { return a.validtime < b.validtime ? -1 : a.validtime > b.validtime ? 1 : 0; });
+        var sorted = list.slice().sort(function (a, b) { return a.validtime < b.validtime ? -1 : a.validtime > b.validtime ? 1 : 0; });
+        // 「この先1時間」の再生なので、現在時刻より前のコマは対象から外す
+        // (配信の切り替わり直後などに過去のコマが混ざることがあるため)。
+        var nowMs = Date.now();
+        var future = sorted.filter(function (f) { return parseJmaTimeMs(f.validtime) >= nowMs - 5 * 60 * 1000; });
+        var frames = future.length ? future : sorted;
         nowcastPlaybackActive = true;
         if (nowcastPlayBtn) nowcastPlayBtn.textContent = "■ 停止";
         var i = 0;
@@ -2732,6 +2890,12 @@
   }
 
   var allSitesNowcastOverlay = null;
+  var allSitesDefaultBounds = null;
+  function resetAllSitesMapView() {
+    if (!allSitesMapReady || !allSitesDefaultBounds) return;
+    allSitesMap.fitBounds(allSitesDefaultBounds, { padding: [24, 24] });
+    updateAllSitesLabelVisibility();
+  }
   function ensureAllSitesMap() {
     if (allSitesMapReady) { setTimeout(function () { allSitesMap.invalidateSize(); }, 50); return; }
     try {
@@ -2756,7 +2920,9 @@
         allSitesMarkers[site.id] = { marker: marker, idx: idx, site: site };
       });
       var allBounds = L.latLngBounds(MAP_SITES.map(function (s) { return [s.lat, s.lon]; }));
+      allSitesDefaultBounds = allBounds;
       allSitesMap.fitBounds(allBounds, { padding: [24, 24] });
+      addMapResetButton("allSitesMap", resetAllSitesMapView);
       if (typeof allSitesMap.on === "function") allSitesMap.on("zoomend", updateAllSitesLabelVisibility);
       allSitesMapReady = true;
       setTimeout(function () { allSitesMap.invalidateSize(); updateAllSitesLabelVisibility(); }, 200);
@@ -2905,6 +3071,11 @@
   }
   var siteMapReady = false, siteMap, siteMapMarkers = {};
   var siteMapNowcastOverlay = null;
+  var siteMapDefaultBounds = null;
+  function resetSiteDetailMapView() {
+    if (!siteMapReady || !siteMapDefaultBounds) return;
+    siteMap.fitBounds(siteMapDefaultBounds, { padding: [20, 20] });
+  }
   function ensureSiteDetailMap() {
     if (siteMapReady) return;
     try {
@@ -2923,7 +3094,9 @@
         siteMapMarkers[site.id] = cm;
       });
       var bounds = L.latLngBounds(MAP_SITES.map(function (s) { return [s.lat, s.lon]; }));
+      siteMapDefaultBounds = bounds;
       siteMap.fitBounds(bounds, { padding: [20, 20] });
+      addMapResetButton("siteMap", resetSiteDetailMapView);
       siteMapReady = true;
       setTimeout(function () { siteMap.invalidateSize(); }, 200);
       updateSiteDetailMapHighlight();
@@ -2984,10 +3157,10 @@
     var recent = sel.points;
     updateWaterChartTitles(sel, hasForecast);
     var data = recent.map(function (p) {
-      return { label: fmtClock(p.fetchedAt), value: p.waterLevelM, t: p.fetchedAt.getTime(), rainMm: findNearestRainMm(p.fetchedAt) };
+      return { label: fmtClockHm(p.fetchedAt), value: p.waterLevelM, t: p.fetchedAt.getTime(), rainMm: findNearestRainMm(p.fetchedAt) };
     });
     forecast.forEach(function (f) {
-      data.push({ label: fmtClock(new Date(f.t)), value: f.value, t: f.t, predicted: true, rainMm: f.rainMm });
+      data.push({ label: fmtClockHm(new Date(f.t)), value: f.value, t: f.t, predicted: true, rainMm: f.rainMm });
     });
     detailChart.setData(data, s.baselineLevelM, getThresholdsForSite(s.site));
   }
@@ -3133,7 +3306,7 @@
       var last = waterPoints[waterPoints.length - 1];
       s.graphNowValueEl.innerHTML = last.waterLevelM.toFixed(2) + '<span class="unit">m</span>';
       s.graphLabelEl.textContent = "最終取得 " + fmtClock(new Date());
-      s.graphChart.setData(waterPoints.map(function (p) { return { label: fmtClock(p.fetchedAt), value: p.waterLevelM, rainMm: findNearestRainMm(p.fetchedAt) }; }), s.baselineLevelM, getThresholdsForSite(site));
+      s.graphChart.setData(waterPoints.map(function (p) { return { label: fmtClockHm(p.fetchedAt), value: p.waterLevelM, t: p.fetchedAt.getTime(), rainMm: findNearestRainMm(p.fetchedAt) }; }), s.baselineLevelM, getThresholdsForSite(site));
     }
     updateForecastReadouts(site);
   }
@@ -4392,6 +4565,21 @@
 
   // テストハーネス/デバッグ専用のフック(本番動作には影響しない)。
   window.__dashboardDebug = {
+    // --- Request M (2026-09-13): バッテリー残量%・ナウキャスト時刻修正・地図リセット・秒非表示 ---
+    batteryPercentFor: batteryPercentFor, batteryEmptyVoltageFor: batteryEmptyVoltageFor,
+    batteryGaugeSvg: batteryGaugeSvg, updateBatteryGauge: updateBatteryGauge,
+    BATTERY_FULL_VOLTAGE: BATTERY_FULL_VOLTAGE,
+    BATTERY_EMPTY_VOLTAGE_DEFAULT: BATTERY_EMPTY_VOLTAGE_DEFAULT,
+    BATTERY_EMPTY_VOLTAGE_OVERRIDE: BATTERY_EMPTY_VOLTAGE_OVERRIDE,
+    parseJmaTimeMs: parseJmaTimeMs, fmtNowcastValidTime: fmtNowcastValidTime,
+    startNowcastPlayback: startNowcastPlayback, stopNowcastPlayback: stopNowcastPlayback,
+    resetAllSitesMapView: resetAllSitesMapView, resetRiverMapView: resetRiverMapView,
+    resetSiteDetailMapView: resetSiteDetailMapView, addMapResetButton: addMapResetButton,
+    fmtClockHm: fmtClockHm, fmtClock: fmtClock,
+    ensureAllSitesMap: ensureAllSitesMap, ensureRiverMap: ensureRiverMap, ensureSiteDetailMap: ensureSiteDetailMap,
+    getAllSitesMap: function () { return allSitesMap; },
+    getRiverMap: function () { return riverMap; },
+    getSiteMap: function () { return siteMap; },
     // --- Request L (2026-09-13): 取得間隔10分/2分・タイムラプス2日・発電(W)・未来予測 ---
     TIMELAPSE_WINDOW_MS: TIMELAPSE_WINDOW_MS, getSortedPlaybackFiles: getSortedPlaybackFiles,
     POWER_CSV_BASE_URL: POWER_CSV_BASE_URL, POWER_SOURCE_NAME_TO_ID: POWER_SOURCE_NAME_TO_ID,
