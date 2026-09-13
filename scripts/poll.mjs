@@ -27,22 +27,24 @@ const WATER_RECENT_CSV_PATH = path.join(DATA_DIR, "recent_water.csv");
 const LATEST_JSON_PATH = path.join(DATA_DIR, "latest.json");
 const IMAGES_DIR = path.join(DATA_DIR, "images");
 const IMAGE_MANIFEST_PATH = path.join(IMAGES_DIR, "manifest.json");
-// 画像は1週間ではなく直近5日分のみ保持する(リポジトリの肥大化を抑えるための運用上の判断。
-// 日々の増分は5分間隔・全46拠点で1日あたり数百MB規模になり得るため、保持期間はなるべく短くしている。
+// 画像は直近2日分のみ保持する(ご要望によりタイムラプス再生の対象を直近2日間へ変更したため、
+// サーバー側の保持期間も2日に合わせた。リポジトリの肥大化を抑える意味でも有効。
 // なお git の性質上、削除しても過去コミットの履歴には画像バイトが残り続けるため、リポジトリの
 // 「.git」自体のサイズは長期的には増加し続ける。厳密にサイズを一定に保つには、履歴を持たない
 // 専用ブランチをforce-pushで定期的に作り直す等の追加対応が必要(今回はスコープ外)。
-const IMAGE_RETENTION_DAYS = 5;
+const IMAGE_RETENTION_DAYS = 2;
 const IMAGE_RETENTION_MS = IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024; // 3MB(異常な応答を保存しないための安全上限)
 const IMAGE_CONCURRENCY = 5;
 
-// 拠点,取得時刻,機器の計測時刻,PV(V),BAT(V),水位(m),取得方法 の7列
+// 拠点,取得時刻,機器の計測時刻,PV(W),BAT(V),水位(m),取得方法 の7列
 // (旧バージョンは水位(m)列が無い6列だったため、recent.csv再構築時に旧形式の行は破棄する)
-const CSV_HEADER = "拠点,取得時刻,機器の計測時刻,PV(V),BAT(V),水位(m),取得方法";
+// PV列は発電電圧(V)から発電電力(W)へ変更した(中継サーバー mini.lhlab-vps.net の「発電(PV)」に合わせる)。
+const CSV_HEADER = "拠点,取得時刻,機器の計測時刻,PV(W),BAT(V),水位(m),取得方法";
 const CSV_COLUMNS = 7;
 const VIA_LABEL_MATSUHISA = "サーバー(直接取得)";
 const VIA_LABEL_KAWABOU = "サーバー(国交省 川の防災情報)";
+const VIA_LABEL_POWER_RELAY = "サーバー(mini.lhlab-vps.net 電源CSV)";
 const FETCH_TIMEOUT_MS = 15000;
 const RECENT_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // 水位グラフに十分な直近3日分を保持
 const WATER_RECENT_WINDOW_MS = 30 * 24 * 60 * 60 * 1000; // 水位データのみ直近1か月分を別途保持
@@ -186,7 +188,10 @@ function parseMatsuhisaReading(rawText, site) {
     throw new Error("ページ内にPV=/BAT=/水位の数値が見つかりませんでした");
   }
   return {
-    pv: pvMatch ? parseFloat(pvMatch[1]) / 1000 : null,
+    // 発電(PV)は中継サーバー(mini.lhlab-vps.net)の電力(W)を正とするため、
+    // matsuhisa.info側のPV値(電圧V)はpvには入れず、pvVoltageとして別に保持する。
+    pv: null,
+    pvVoltage: pvMatch ? parseFloat(pvMatch[1]) / 1000 : null,
     bat: batMatch ? parseFloat(batMatch[1]) / 1000 : null,
     measureTime: timeMatch ? timeMatch[1] : null,
     waterLevelM: waterLevelM,
@@ -227,6 +232,72 @@ function fmtKawabouIsoTime(iso) {
 }
 
 // ---- 取得(サーバー実行のためCORSプロキシは不要、直接取得のみ) ----
+// ---- 電源データ(発電PV[W]/バッテリ[V])の取得元: 中継サーバー mini.lhlab-vps.net ----
+// 全拠点分の電源データが1日1本のCSV(約5分間隔・1行=1拠点×1チェック)で公開されているため、
+// 1回のリクエストで当日分の全拠点・全時刻をまとめて取得できる。GitHub Actionsのスケジュール実行が
+// 遅延しても、実行できた回に当日分の履歴をまとめて取り込めるのでグラフが疎にならない。
+const POWER_CSV_BASE_URL = "https://mini.lhlab-vps.net/power/logs/";
+const POWER_CSV_FIELDS = ["timestamp", "id", "name", "source", "status", "detail", "age_s",
+  "pv_mv", "pv_ma", "pv_w", "bat_mv", "bat_charge_ma", "bat_discharge_ma", "bat_net_ma",
+  "ld1_ma", "ld2_ma", "ld3_ma", "load_w", "gen_wh_today", "load_wh_today"];
+// 中継サーバーの拠点名 → このダッシュボードの拠点ID(中継側にしか無い拠点は対象外)。
+const POWER_SOURCE_NAME_TO_ID = {
+  "うるおい広場": "cam01", "中郷第１樋管": "cam02", "中郷第1樋管": "cam02",
+  "北沢アンダー": "cam03", "中郷第２樋管": "cam04", "中郷第2樋管": "cam04",
+  "宮川橋": "cam08", "梅名樋管２号": "cam09", "梅名樋管2号": "cam09",
+  "祇園大橋": "cam11", "安間樋管": "cam12", "上町樋管": "cam13", "多呂樋管": "cam14",
+  "梅名樋管１号": "cam36", "梅名樋管1号": "cam36", "大場ポンプ場": "cam39",
+  "藤代橋": "cam40", "こも池": "cam41", "芝橋": "cam43", "ほたるの里": "cam44",
+  "竹倉用水路": "cam45", "清住緑地": "cam46", "中郷温水地": "cam47", "中郷温水池": "cam47",
+  "島田浄水場": "cam48", "徳倉下水路": "cam50", "神川下水路": "cam51", "中村橋": "cam52",
+  "中島樋管第１": "cam53", "中島樋管第1": "cam53", "幸原山橋": "cam55", "中島樋管３号": "cam54",
+  "中島樋管3号": "cam54"
+};
+function powerCsvUrlFor(d) {
+  const p = toJstParts(d);
+  const p2 = function (n) { return String(n).padStart(2, "0"); };
+  return POWER_CSV_BASE_URL + "power-" + p.y + "-" + p2(p.mo + 1) + "-" + p2(p.day) + ".csv";
+}
+function parsePowerCsv(text) {
+  if (!text) return [];
+  const lines = String(text).split(/\r?\n/).filter(function (l) { return l.trim() !== ""; });
+  if (!lines.length) return [];
+  const idx = {};
+  let startAt = 0;
+  const first = lines[0].split(",");
+  if (first[0] === "timestamp") {
+    first.forEach(function (c, i) { idx[c.trim()] = i; });
+    startAt = 1;
+  } else {
+    POWER_CSV_FIELDS.forEach(function (c, i) { idx[c] = i; });
+  }
+  const out = [];
+  for (let i = startAt; i < lines.length; i++) {
+    const cols = lines[i].split(",");
+    if (cols.length < POWER_CSV_FIELDS.length) continue;
+    const siteId = POWER_SOURCE_NAME_TO_ID[(cols[idx["name"]] || "").trim()];
+    if (!siteId) continue;
+    const ts = new Date((cols[idx["timestamp"]] || "").trim());
+    if (!isFinite(ts.getTime())) continue;
+    const pvW = parseFloat(cols[idx["pv_w"]]);
+    const batMv = parseFloat(cols[idx["bat_mv"]]);
+    if (!isFinite(pvW) && !isFinite(batMv)) continue;
+    out.push({
+      siteId: siteId,
+      fetchedAt: ts,
+      pv: isFinite(pvW) ? pvW : null,
+      bat: isFinite(batMv) ? batMv / 1000 : null
+    });
+  }
+  out.sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+  return out;
+}
+async function fetchPowerRelayRows() {
+  const res = await fetchWithTimeout(powerCsvUrlFor(new Date()));
+  const text = await res.text();
+  return parsePowerCsv(text);
+}
+
 async function fetchWithTimeout(targetUrl, extraHeaders) {
   const controller = new AbortController();
   const timer = setTimeout(function () { controller.abort(); }, FETCH_TIMEOUT_MS);
@@ -521,8 +592,10 @@ async function main() {
       readingsBySiteId[site.id] = reading;
       newCsvRows.push({ order: site.id, row: toCsvRow(site, fetchedAt, reading) });
       latest.sites[site.id] = {
-        pv: reading.pv,
-        bat: reading.bat,
+        // 発電(PV)は中継サーバーのCSVからのみ入る(この後の取り込み処理で上書きされる)。
+        // 新しい行が無かった回でも値が消えないよう、前回値を引き継いでおく。
+        pv: typeof prev.pv === "number" ? prev.pv : null,
+        bat: typeof reading.bat === "number" ? reading.bat : (typeof prev.bat === "number" ? prev.bat : null),
         measureTime: reading.measureTime,
         waterLevelM: reading.waterLevelM,
         via: reading.via,
@@ -551,10 +624,44 @@ async function main() {
     }
   });
 
+  // ---- 電源データ(発電PV[W]/バッテリ[V])を中継サーバーのCSVからまとめて取り込む ----
+  // 当日分の全時刻が毎回返ってくるため、前回取り込み済みの最終時刻より新しい行だけを追記する。
+  const prevPowerTs = previousLatest.powerRelay && previousLatest.powerRelay.lastTs
+    ? new Date(previousLatest.powerRelay.lastTs).getTime() : 0;
+  let newestPowerTs = prevPowerTs;
+  try {
+    const powerRows = await fetchPowerRelayRows();
+    const freshRows = powerRows.filter(function (r) { return r.fetchedAt.getTime() > prevPowerTs; });
+    freshRows.forEach(function (r) {
+      if (r.fetchedAt.getTime() > newestPowerTs) newestPowerTs = r.fetchedAt.getTime();
+      newCsvRows.push({
+        order: r.siteId,
+        orderTs: r.fetchedAt.getTime(),
+        row: [r.siteId, r.fetchedAt.toISOString(), "",
+          typeof r.pv === "number" ? r.pv.toFixed(3) : "",
+          typeof r.bat === "number" ? r.bat.toFixed(3) : "",
+          "", VIA_LABEL_POWER_RELAY].map(csvEscape).join(",")
+      });
+      const entry = latest.sites[r.siteId];
+      if (entry) {
+        if (typeof r.pv === "number") entry.pv = r.pv;
+        if (typeof r.bat === "number") entry.bat = r.bat;
+      }
+    });
+    console.log("[OK] 電源CSV(mini.lhlab-vps.net): " + powerRows.length + "行中 " + freshRows.length + "行を新規取り込み");
+  } catch (err) {
+    console.warn("[NG] 電源CSV(mini.lhlab-vps.net)の取得に失敗しました: " + (err && err.message ? err.message : String(err)));
+  }
+  latest.powerRelay = { lastTs: newestPowerTs ? new Date(newestPowerTs).toISOString() : null };
+
   // SITES本来の順番で書き込む(並行実行のため完了順はバラつくため)
   const orderIndex = {};
   SITES.forEach(function (s, i) { orderIndex[s.id] = i; });
-  newCsvRows.sort(function (a, b) { return orderIndex[a.order] - orderIndex[b.order]; });
+  newCsvRows.sort(function (a, b) {
+    const ta = a.orderTs || 0, tb = b.orderTs || 0;
+    if (ta !== tb) return ta - tb;
+    return (orderIndex[a.order] || 0) - (orderIndex[b.order] || 0);
+  });
   const rowStrings = newCsvRows.map(function (r) { return r.row; });
 
   if (rowStrings.length) {
@@ -586,5 +693,6 @@ runPromise.catch(function (err) {
 export {
   runPromise, SITES, main, KAWABOU_CAMERA_SITES, KAWABOU_WATER_SITES, IMAGE_RETENTION_DAYS, IMAGES_DIR, IMAGE_MANIFEST_PATH,
   fetchKawabouWaterReading, kawabouWaterJsonUrl, kawabouSwstgJsonUrl,
-  WATER_RECENT_CSV_PATH, WATER_RECENT_WINDOW_MS
+  WATER_RECENT_CSV_PATH, WATER_RECENT_WINDOW_MS,
+  parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID, POWER_CSV_BASE_URL
 };
