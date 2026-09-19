@@ -1,0 +1,21 @@
+{
+  "name": "mishima-dashboard-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "三島市 河川カメラ・水位ダッシュボードのテスト一式(本番の index.html / scripts/poll.mjs をそのまま検証する)",
+  "type": "module",
+  "scripts": {
+    "test": "node run_all.mjs",
+    "test:core": "node test_core.mjs",
+    "test:power": "node test_power.mjs",
+    "test:forecast": "node test_forecast.mjs",
+    "test:views": "node test_views.mjs",
+    "test:playback": "node test_playback.mjs",
+    "test:history": "node test_history.mjs",
+    "test:poll": "node test_poll.mjs",
+    "postinstall": "playwright install chromium"
+  },
+  "devDependencies": {
+    "playwright": "^1.47.0"
+  }
+}
