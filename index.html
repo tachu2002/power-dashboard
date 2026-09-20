@@ -866,7 +866,7 @@
           </div>
         </div>
         <div class="notice-banner" id="imageDataDisclaimer">
-          GitHub Actionsが全拠点のカメラ画像をサーバー(このリポジトリのdata/images/配下)へ自動保存しており、保持期間内のものをいつでもここからダウンロードできます。ダッシュボードのタブを閉じていた間の画像もサーバー側に保存されているため失われません。保持期間と実際の保存間隔は下に表示します。
+          GitHub Actionsが全拠点のカメラ画像をサーバー(このリポジトリの画像専用ブランチ)へ自動保存しており、保持期間内のものをいつでもここからダウンロードできます。ダッシュボードのタブを閉じていた間の画像もサーバー側に保存されているため失われません。保持期間と実際の保存間隔は下に表示します。
         </div>
         <div class="toolbar">
           <label for="imageDataSiteSelect" style="font-size:13px;color:var(--text-secondary);">拠点:</label>
@@ -4569,9 +4569,10 @@
   function updateImageDataDisclaimer() {
     var el = document.getElementById("imageDataDisclaimer");
     if (!el) return;
-    var base = "GitHub Actionsが全拠点のカメラ画像をサーバー(このリポジトリのdata/images/配下)へ自動保存しており、" +
+    var base = "GitHub Actionsが全拠点のカメラ画像をサーバー(このリポジトリの画像専用ブランチ)へ自動保存しており、" +
       "保持期間内のものをいつでもここからダウンロードできます。ダッシュボードのタブを閉じていた間の画像も" +
-      "サーバー側に保存されているため失われません。";
+      "サーバー側に保存されているため失われません。保存される画像は表示用に長辺640pxへ縮小しています" +
+      "（画面に出ている現在のライブ映像は取得元から直接読み込むため、この縮小の影響を受けません）。";
     var sum = imageArchiveSummary();
     if (!sum) { el.textContent = base; return; }
     var extra = "保持期間は直近" + (sum.retentionDays || "?") + "日分で、これより古いものはサーバー側で自動的に削除されます。";
