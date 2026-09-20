@@ -111,6 +111,8 @@
   .dot.ok { background: #0ca30c; }
   .dot.err { background: #d03b3b; }
   .dot.pending { background: #eda100; }
+  /* 配信停止中(国交省側でカメラが止まっている): こちらの取得失敗(赤)とは区別する */
+  .dot.unavailable { background: #8a8a8a; }
 
   .error-banner {
     display: none;
@@ -658,7 +660,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">⚡ 電源監視</h1>
-            <p class="subtitle" id="powerSubtitle">拠点を10分ごとに自動取得（発電はmini.lhlab-vps.netの発電(PV)値）</p>
+            <p class="subtitle" id="powerSubtitle">拠点を10分ごとに自動取得（発電はmini.lhlab-vps.netの発電(PV)値・W表示）</p>
           </div>
           <div class="header-toolbars">
             <div class="toolbar">
@@ -777,7 +779,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">📷 ライブカメラ一覧</h1>
-            <p class="subtitle" id="camlistSubtitle">全拠点のライブカメラ映像のみを一覧表示します（10分ごとに自動更新）。</p>
+            <p class="subtitle" id="camlistSubtitle">全拠点のライブカメラ映像のみを一覧表示します（10分ごとに自動更新。各カードの「▶ 再生」で保存済み画像のタイムラプスを再生できます）。</p>
           </div>
           <div class="toolbar">
             <span id="camlistStatusText">読み込み中…</span>
@@ -792,7 +794,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">📈 水位変化グラフ一覧</h1>
-            <p class="subtitle" id="graphlistSubtitle">全拠点の水位変化グラフのみを一覧表示します（10分ごとに自動取得。破線は基準(最低)水位です）。</p>
+            <p class="subtitle" id="graphlistSubtitle">全拠点の水位変化グラフのみを一覧表示します（10分ごとに自動取得。左は直近12時間の実測、右の点線は6時間先までの予測、横の破線は基準(最低)水位です）。</p>
           </div>
           <div class="toolbar">
             <span id="graphlistStatusText">読み込み中…</span>
@@ -835,7 +837,7 @@
         <div class="header-row">
           <div class="header-title">
             <h1 class="view-title">💧 水位データ</h1>
-            <p class="subtitle" id="waterDataSubtitle">全拠点の水位測定値を蓄積した履歴です（ページ表示中は10分ごと、サーバー側でも10分ごとに自動収集）。CSVでダウンロードできます。</p>
+            <p class="subtitle" id="waterDataSubtitle">全拠点の水位測定値を蓄積した履歴です（このページを開いている間は10分ごとに取得。サーバー側の自動保存はGitHubの都合で数時間空くことがあります）。CSVでダウンロードできます。</p>
           </div>
           <div class="toolbar">
             <div class="status" id="waterDataStatusText">件数: 0件</div>
@@ -851,7 +853,7 @@
           </table>
         </div>
         <footer>
-          このデータは水位監視37拠点(電源専用のうるおい広場（大場川 / 東町）は対象外)を対象に、5分間隔の共有ポーリングで取得したものです。うち11拠点(下神川橋・中村橋・下御殿橋・青木橋・境川・島田橋・夏梅木橋・大場・大場川左岸2.3k+44・間宮・徳倉)は国土交通省「川の防災情報」から取得しており、水位は計算式による補正を行わない生値(危機管理型水位計は堤防天端からの高さ)です。
+          このデータは水位監視37拠点(電源専用のうるおい広場（大場川 / 東町）は対象外)を対象に、10分間隔(大場ポンプ場流入水路・神川都市下水路・徳倉都市下水路の3拠点のみ2分間隔)の共有ポーリングで取得したものです。うち11拠点(下神川橋・中村橋・下御殿橋・青木橋・境川・島田橋・夏梅木橋・大場・大場川左岸2.3k+44・間宮・徳倉)は国土交通省「川の防災情報」から取得しており、水位は計算式による補正を行わない生値(危機管理型水位計は堤防天端からの高さのため、平常時はマイナス値になります)です。
         </footer>
       </div>
 
@@ -864,7 +866,7 @@
           </div>
         </div>
         <div class="notice-banner" id="imageDataDisclaimer">
-          GitHub Actionsが5分おきに全拠点のカメラ画像をサーバー(このリポジトリのdata/images/配下)へ自動保存しており、直近5日分をいつでもここからダウンロードできます（5日より古いものはサーバー側で自動的に削除されます）。ダッシュボードのタブを閉じていた間の画像もサーバー側に保存されているため失われません。
+          GitHub Actionsが全拠点のカメラ画像をサーバー(このリポジトリのdata/images/配下)へ自動保存しており、保持期間内のものをいつでもここからダウンロードできます。ダッシュボードのタブを閉じていた間の画像もサーバー側に保存されているため失われません。保持期間と実際の保存間隔は下に表示します。
         </div>
         <div class="toolbar">
           <label for="imageDataSiteSelect" style="font-size:13px;color:var(--text-secondary);">拠点:</label>
@@ -976,9 +978,10 @@
    * 従来のmatsuhisa.info拠点とは取得パターンが異なるため、専用のsourceTypeで区別する。
    *   - kawabou-water  : 水位観測拠点。水位状況→水位の数値を計算式(補正)を入れずそのまま採用。
    *                       https://www.river.go.jp/kawabou/file/files/tmlist/stg/{yyyymmdd}/{hhmm(5分刻み)}/{obsCd13}.json
-   *                       の obsValue.stg (m) / obsValue.obsTime をそのまま使用(CORS開放を確認済み)。
+   *                       の obsValue.stg (m) / obsValue.obsTime をそのまま使用(通常の水位計 /tmlist/stg/ はCORS開放済み。
+   *                       危機管理型水位計 /tmlist/swstg/ はCORS非対応のため、r.jina.aiプロキシへ退避する)。
    *   - kawabou-camera : 河川カメラ拠点。ライブ映像(現在)と正常時映像の2タブを持つ。
-   *                       https://cam.river.go.jp/cam/{now|normal}/{camCode}.jpg を5分間隔で再取得。
+   *                       https://cam.river.go.jp/cam/{now|normal}/{camCode}.jpg を10分間隔で再取得。
    *                       同名.jsonに撮影時刻(get_time)が入っている(CORS開放を確認済み)。
    * obsCd13 = ofcCd(5桁0埋め) + itmkndCd(3桁0埋め) + obsCd(5桁0埋め) (例: 5633/4/16 → "0563300400016")
    * 出典: 川の防災情報 - 国土交通省 (https://www.river.go.jp/kawabou/)
@@ -1164,19 +1167,20 @@
   }
 
   // ブラウザ側のライブ取得間隔。ご要望により、カメラ・水位計ともに10分間隔へ変更(従来1分)。
-  // (サーバー側(GitHub Actions)の自動保存も同じく10分間隔に揃えている。ただし後述の通り
-  //  GitHub側の無料枠cronはベストエフォートのため、実際の実行間隔はこれより広がることがある。)
+  // (サーバー側(GitHub Actions)も設定上は10分間隔だが、無料枠のcronはベストエフォートのため
+  //  実測では約2〜5時間に1回しか動いていない。2026-09-20実測: 実行間隔114〜324分。
+  //  このため「サーバーに保存された履歴」は10分刻みにはならない前提で作ってある。)
   var FETCH_INTERVAL_MS = 10 * 60 * 1000;
   var MAX_CHART_POINTS = 288;
   var CHART_WINDOW_MS = 24 * 60 * 60 * 1000;
   // GitHub Actions(サーバー側の定期取得)は無料枠の「ベストエフォート」スケジュールのため、
-  // 実際の実行間隔が設定上の5分間隔よりはるかに広く(実測で数時間〜半日程度)なることがある。
+  // 実際の実行間隔が設定上の10分間隔よりはるかに広く(2026-09-20実測で114〜324分)なる。
   // このため直近24時間の枠内に点が数えるほどしか無く、電源監視・拠点詳細の水位グラフが
   // 「過去データを参照していないように見える」問題が起きていた。この最小点数を下回る場合は、
   // 24時間という窓に固執せず、保存されている直近のデータ(MAX_CHART_POINTS件まで)を使って
   // 意味のある推移グラフを表示するようにする(selectRecentForChart参照)。
   var MIN_MEANINGFUL_CHART_POINTS = 6;
-  // 30日分(5分間隔)を保持できるだけの余裕を持たせる(従来は7日分=2016)。
+  // 30日分(10分間隔)を保持できるだけの余裕を持たせる(従来は7日分=2016)。
   // 水位データを1か月分読み込めるようにするための拡張。表示グラフの範囲(CHART_WINDOW_MS=1日)は変更しない。
   var MAX_STORED_POINTS = 8640;
   var POLL_CONCURRENCY = 3;
@@ -1401,9 +1405,13 @@
   //  安定して200を得るために切り捨てておく。)
   // ブラウザのローカルタイムゾーンに関わらず、常にJST(UTC+9)の壁時計時刻でパスを構築する
   // (このダッシュボードは海外のブラウザから開かれる可能性もあるため、d.getHours()等のローカル時刻に依存しない)。
+  // ある瞬間の日本時間(JST=UTC+9)の年月日時分を返す。
+  // 以前は getTimezoneOffset() で補正してから+9時間していたが、これは
+  // 「日本時間のブラウザでは -9時間 して +9時間」となって相殺され、結果がUTCになっていた。
+  // (UTCで動くGitHub Actionsでは offset=0 のため正しく、ブラウザ側だけ9時間ずれていた。)
+  // 影響: 川の防災情報のURL(5分区切り)が9時間前を指し、電源CSVも日本時間の0〜9時は前日分を取得していた。
   function toJstParts(d) {
-    var utcMs = d.getTime() + d.getTimezoneOffset() * 60000;
-    var jst = new Date(utcMs + 9 * 3600000);
+    var jst = new Date(d.getTime() + 9 * 3600000);
     return { y: jst.getUTCFullYear(), mo: jst.getUTCMonth(), day: jst.getUTCDate(), h: jst.getUTCHours(), mi: jst.getUTCMinutes() };
   }
   function kawabouWaterJsonUrl(obsCd13, d) {
@@ -1431,21 +1439,73 @@
     if (!m) return iso;
     return m[1] + "/" + m[2] + "/" + m[3] + " " + m[4] + ":" + m[5] + ":" + m[6];
   }
+  /* ---------------------------------------------------------------------
+   * 川の防災情報のJSON取得(CORS非対応の系統はプロキシへ退避)
+   * -----------------------------------------------------------------------
+   * 通常の水位計(/tmlist/stg/)はCORSが開放されているのでブラウザから直接読めるが、
+   * 危機管理型水位計(/tmlist/swstg/)には Access-Control-Allow-Origin が付いておらず、
+   * 直接fetchすると必ず失敗する(2026-09-20に確認。サーバー側のpoll.mjsは直接取得できる)。
+   * そのため、直接取得に失敗した場合は雨量計と同じr.jina.aiプロキシへ退避する。
+   * --------------------------------------------------------------------- */
+  function fetchKawabouJson(url) {
+    return fetch(url, { cache: "no-store" })
+      .then(function (res) {
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return res.json();
+      })
+      .catch(function (err) {
+        return fetch("https://r.jina.ai/" + url + "?_ts=" + Date.now(), { cache: "no-store" })
+          .then(function (res) { if (!res.ok) throw new Error("プロキシ HTTP " + res.status); return res.text(); })
+          .then(function (text) { return extractJsonFromJinaProxyText(text); })
+          .catch(function () { throw err; });
+      });
+  }
+  // 川の防災情報のURLは「5分区切りの時刻」を含むが、その区切りのファイルは区切り時刻ちょうどには
+  // まだ公開されていない(実測で約2分の遅れ)。現在の区切りで取れなければ1つ前・2つ前を試す。
+  // (この対策が無いと、区切り直後に実行した回は全拠点が404になる。)
+  var KAWABOU_BUCKET_FALLBACK_MIN = [0, 5, 10];
+  function parseKawabouWaterJson(json, isSwstg) {
+    var v = json && json.obsValue;
+    if (isSwstg) {
+      // 危機管理型水位計は堤防天端からの高さ(stgHght, m)を「水位」として採用する(サイト表示の主要数値と同じ)。
+      if (!v || typeof v.stgHght !== "number") return null;
+      return { waterLevelM: v.stgHght, measureTime: v.obsTime || v.tmObsTime || null, pv: null, bat: null, imageUrl: null };
+    }
+    if (!v || typeof v.stg !== "number") return null;
+    return { waterLevelM: v.stg, measureTime: v.obsTime || null, pv: null, bat: null, imageUrl: null };
+  }
   function fetchKawabouWaterReading(site) {
     var isSwstg = site.kind === "swstg";
-    var url = isSwstg ? kawabouSwstgJsonUrl(site.obsCd, new Date()) : kawabouWaterJsonUrl(site.obsCd13, new Date());
-    return fetch(url, { cache: "no-store" }).then(function (res) {
-      if (!res.ok) throw new Error("国交省API: HTTP " + res.status);
-      return res.json();
-    }).then(function (json) {
-      var v = json && json.obsValue;
-      if (isSwstg) {
-        // 危機管理型水位計は堤防天端からの高さ(stgHght, m)を「水位」として採用する(サイト表示の主要数値と同じ)。
-        if (!v || typeof v.stgHght !== "number") throw new Error("国交省API: 水位データなし");
-        return { waterLevelM: v.stgHght, measureTime: v.obsTime || v.tmObsTime || null, pv: null, bat: null, imageUrl: null };
-      }
-      if (!v || typeof v.stg !== "number") throw new Error("国交省API: 水位データなし");
-      return { waterLevelM: v.stg, measureTime: v.obsTime || null, pv: null, bat: null, imageUrl: null };
+    var nowMs = Date.now();
+    var attempt = Promise.reject(new Error("国交省API: 取得できませんでした"));
+    KAWABOU_BUCKET_FALLBACK_MIN.forEach(function (backMin) {
+      attempt = attempt.catch(function (prevErr) {
+        var at = new Date(nowMs - backMin * 60000);
+        var url = isSwstg ? kawabouSwstgJsonUrl(site.obsCd, at) : kawabouWaterJsonUrl(site.obsCd13, at);
+        return fetchKawabouJson(url).then(function (json) {
+          var reading = parseKawabouWaterJson(json, isSwstg);
+          if (!reading) throw new Error("国交省API: 水位データなし");
+          return reading;
+        }).catch(function (err) {
+          throw new Error(backMin === 0 ? (err && err.message ? err.message : String(err)) : (prevErr && prevErr.message ? prevErr.message : String(prevErr)));
+        });
+      });
+    });
+    return attempt;
+  }
+  // 国交省カメラ。撮影時刻のJSONが取得できない場合でも、画像そのものは表示できることがあるため
+  // 「JSONが読めない=拠点全体が失敗」とはしない。国交省側でカメラが停止していると、.json のURLが
+  // JSONではなく「カメラ画像が取得できませんでした。」の案内画像を返す(2026-09-20に確認)ので、
+  // その場合は配信停止中として扱い、案内画像をそのまま表示する。
+  function looksLikeImage(url) {
+    return new Promise(function (resolve) {
+      var img = new Image();
+      var done = false;
+      var finish = function (v) { if (!done) { done = true; resolve(v); } };
+      var timer = setTimeout(function () { finish(false); }, 8000);
+      img.onload = function () { clearTimeout(timer); finish(true); };
+      img.onerror = function () { clearTimeout(timer); finish(false); };
+      img.src = url + (url.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
     });
   }
   function fetchKawabouCameraReading(site) {
@@ -1454,6 +1514,11 @@
       return res.json();
     }).then(function (json) {
       return { imageUrl: site.liveImageUrl, measureTime: fmtKawabouIsoTime(json && json.get_time), pv: null, bat: null, waterLevelM: null };
+    }).catch(function (err) {
+      return looksLikeImage(site.camJsonUrl).then(function (isImage) {
+        if (!isImage) throw err;
+        return { imageUrl: site.liveImageUrl, measureTime: null, pv: null, bat: null, waterLevelM: null, cameraUnavailable: true };
+      });
     });
   }
   // 静岡県「川の防災情報」河川監視カメラ(cam.shizuoka4.jp)からライブ画像を取得する。
@@ -3606,9 +3671,13 @@
   // シームレスループのため表示テキストを2つ複製し、実測幅から一定速度になるようアニメーション時間を都度算出する。
   function updateErrorTicker() {
     if (!errorTicker || !errorTickerTrack) return;
+    // 取得に失敗している拠点に加え、国交省側でカメラが停止している拠点も流す
+    // (原因が違うので「(配信停止中)」と明示して区別する)。
     var failingNames = ALL_SITES.filter(function (s) {
-      return siteData[s.id] && siteData[s.id].lastState === "err";
-    }).map(function (s) { return s.name; });
+      return siteData[s.id] && (siteData[s.id].lastState === "err" || siteData[s.id].lastState === "unavailable");
+    }).map(function (s) {
+      return siteData[s.id].lastState === "unavailable" ? (s.name + "（配信停止中）") : s.name;
+    });
     if (!failingNames.length) {
       errorTicker.style.display = "none";
       errorTickerTrack.innerHTML = "";
@@ -3636,7 +3705,16 @@
       if (s.camLabelEl) s.camLabelEl.textContent = "取得失敗";
       if (s.graphLabelEl) s.graphLabelEl.textContent = "取得失敗";
     }
-    setSiteStatus(site, state, state === "ok" ? ("最終更新 " + fmtClock(new Date())) : (state === "err" ? ("取得失敗 " + fmtClock(new Date())) : "取得中…"));
+    // "unavailable" は「国交省側でカメラが停止中」。こちらの取得は成功しているため赤枠にはしない。
+    if (state === "unavailable") {
+      if (s.camLabelEl) s.camLabelEl.textContent = "配信停止中（国交省側）";
+      if (s.graphLabelEl) s.graphLabelEl.textContent = "配信停止中（国交省側）";
+    }
+    setSiteStatus(site, state,
+      state === "ok" ? ("最終更新 " + fmtClock(new Date()))
+        : state === "err" ? ("取得失敗 " + fmtClock(new Date()))
+        : state === "unavailable" ? ("配信停止中（国交省側） " + fmtClock(new Date()))
+        : "取得中…");
     updateFetchAlertFrame(site, state === "err");
     updateErrorTicker();
   }
@@ -3669,6 +3747,8 @@
     if (reading.imageUrl) { d.imageUrl = reading.imageUrl; d.imageFetchFailed = false; }
     else { d.imageUrl = null; d.imageFetchFailed = true; }
     if (typeof reading.waterLevelM === "number") d.waterLevelM = reading.waterLevelM;
+    // 国交省側でカメラが停止している場合(案内画像が返ってくる)は、こちらの取得失敗と区別して記録する。
+    d.cameraUnavailable = !!reading.cameraUnavailable;
     d.lastState = "ok"; d.lastFetchedAt = point.fetchedAt; d.via = via;
 
     refreshPowerCard(site);
@@ -3702,7 +3782,7 @@
       .then(function (reading) {
         hideError();
         addPoint(site, reading, viaLabel);
-        setSiteDots(site, "ok");
+        setSiteDots(site, reading.cameraUnavailable ? "unavailable" : "ok");
       })
       .catch(function (err) {
         if (!isRetry) {
@@ -3721,7 +3801,7 @@
       });
   }
   // sitesを対象にポーリングする共通処理。updateStatus!==falseの場合のみ一覧画面の取得状況テキストを更新する
-  // (2分間隔の高頻度グループは、5分間隔グループの表示中の「取得中…」テキストを不必要に上書きしないよう既定でfalse)。
+  // (2分間隔の高頻度グループは、10分間隔グループの表示中の「取得中…」テキストを不必要に上書きしないよう既定でfalse)。
   function pollSites(sites, opts) {
     opts = opts || {};
     var showStatus = opts.updateStatus !== false;
@@ -4391,7 +4471,7 @@
     if (showing) rebuildTable();
   });
   /* =====================================================================
-   * 15b. データダウンロード: 水位データ (WATER_SITESのみ対象、5分間隔で蓄積)
+   * 15b. データダウンロード: 水位データ (WATER_SITESのみ対象、10分間隔で蓄積)
    * ===================================================================== */
   var waterTableBody = document.getElementById("waterTableBody");
   var waterDataStatusText = document.getElementById("waterDataStatusText");
@@ -4459,7 +4539,50 @@
 
   var imageManifestFailed = false; // trueの間は、後続のupdateImageDataStatus()呼び出し(showView等)でも「0枚」ではなく読み込み失敗の案内を維持する
 
+  // 画像アーカイブの「実際の」保存間隔(中央値)を算出する。GitHub Actionsの無料枠cronは
+  // ベストエフォートで設定どおりには動かないため、説明文を固定値で書かず実データから作る。
+  function imageArchiveSummary() {
+    if (!imageManifest || !imageManifest.sites) return null;
+    var best = null;
+    Object.keys(imageManifest.sites).forEach(function (id) {
+      var f = imageManifest.sites[id].files || [];
+      if (!best || f.length > best.length) best = f;
+    });
+    if (!best || best.length < 2) return { retentionDays: imageManifest.retentionDays || null, frames: best ? best.length : 0, medianMin: null };
+    var gaps = [];
+    for (var i = 1; i < best.length; i++) {
+      gaps.push((new Date(best[i].ts).getTime() - new Date(best[i - 1].ts).getTime()) / 60000);
+    }
+    gaps.sort(function (a, b) { return a - b; });
+    return {
+      retentionDays: imageManifest.retentionDays || null,
+      frames: best.length,
+      medianMin: Math.round(gaps[Math.floor(gaps.length / 2)])
+    };
+  }
+  function fmtIntervalMin(min) {
+    if (!(min > 0)) return "不明";
+    if (min < 60) return "約" + min + "分ごと";
+    var h = Math.round(min / 60);
+    return "約" + h + "時間ごと";
+  }
+  function updateImageDataDisclaimer() {
+    var el = document.getElementById("imageDataDisclaimer");
+    if (!el) return;
+    var base = "GitHub Actionsが全拠点のカメラ画像をサーバー(このリポジトリのdata/images/配下)へ自動保存しており、" +
+      "保持期間内のものをいつでもここからダウンロードできます。ダッシュボードのタブを閉じていた間の画像も" +
+      "サーバー側に保存されているため失われません。";
+    var sum = imageArchiveSummary();
+    if (!sum) { el.textContent = base; return; }
+    var extra = "保持期間は直近" + (sum.retentionDays || "?") + "日分で、これより古いものはサーバー側で自動的に削除されます。";
+    if (sum.medianMin) {
+      extra += "実際の保存間隔は" + fmtIntervalMin(sum.medianMin) + "です（GitHubの無料枠では定期実行が設定どおりに動かないため、" +
+        "1拠点あたりの保存枚数は現在" + sum.frames + "枚程度です）。";
+    }
+    el.textContent = base + extra;
+  }
   function updateImageDataStatus() {
+    updateImageDataDisclaimer();
     if (imageManifestFailed) {
       imageDataStatusText.textContent = "サーバーの画像アーカイブ情報を読み込めませんでした(GitHub Actionsが未設定・未実行、または初回実行前の可能性があります)。";
       return;
@@ -4933,6 +5056,11 @@
     SERVER_WATER_HISTORY_URL: SERVER_WATER_HISTORY_URL, MAX_STORED_POINTS: MAX_STORED_POINTS,
     SERVER_HISTORY_URL: SERVER_HISTORY_URL, recomputeBaseline: recomputeBaseline,
     loadImageManifest: loadImageManifest, IMAGE_MANIFEST_URL: IMAGE_MANIFEST_URL,
+    imageArchiveSummary: imageArchiveSummary, updateImageDataDisclaimer: updateImageDataDisclaimer,
+    fmtIntervalMin: fmtIntervalMin,
+    fetchKawabouJson: fetchKawabouJson, parseKawabouWaterJson: parseKawabouWaterJson,
+    KAWABOU_BUCKET_FALLBACK_MIN: KAWABOU_BUCKET_FALLBACK_MIN,
+    fetchKawabouCameraReading: fetchKawabouCameraReading, toJstParts: toJstParts,
     getImageManifest: function () { return imageManifest; },
     fetchKawabouWaterReading: fetchKawabouWaterReading,
     kawabouWaterJsonUrl: kawabouWaterJsonUrl, kawabouSwstgJsonUrl: kawabouSwstgJsonUrl,
