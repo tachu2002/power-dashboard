@@ -16,7 +16,7 @@
 // ダッシュボードのタイムラプス再生と「データダウンロード」画面はこのマニフェストを使う。
 "use strict";
 
-import { readFile, writeFile, appendFile, mkdir, unlink } from "node:fs/promises";
+import { readFile, writeFile, appendFile, mkdir, unlink, stat } from "node:fs/promises";
 import { execFile } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -427,6 +427,9 @@ async function fetchImageBuffer(url) {
   return buffer;
 }
 
+async function fileExists(p) {
+  try { await stat(p); return true; } catch (e) { return false; }
+}
 async function readManifest() {
   const fallback = { generatedAt: null, retentionDays: IMAGE_RETENTION_DAYS, sites: {} };
   try {
@@ -539,10 +542,17 @@ async function archiveImages(readingsBySiteId) {
   for (const siteId of Object.keys(manifest.sites)) {
     const entry = manifest.sites[siteId];
     const kept = [], removed = [];
-    (entry.files || []).forEach(function (f) {
+    for (const f of (entry.files || [])) {
       const t = Date.parse(f.ts);
-      if (!isNaN(t) && t >= cutoff) kept.push(f); else removed.push(f);
-    });
+      if (isNaN(t) || t < cutoff) { removed.push(f); continue; }
+      // 画像を専用ブランチへ移す前の古いエントリ(fileが相対パス)は、main側に実体が無くなっているため
+      // ダッシュボードから読み込めない。実体が残っていないものはここで一覧から外す
+      // (専用ブランチのURL形式のエントリは、この実行で取得していなくても有効なので必ず残す)。
+      if (!/^https?:/i.test(String(f.file || "")) && !(await fileExists(path.join(ROOT, f.path || f.file || "")))) {
+        continue;
+      }
+      kept.push(f);
+    }
     kept.sort(function (a, b) { return Date.parse(a.ts) - Date.parse(b.ts); });
     entry.files = kept;
     for (const f of removed) {
