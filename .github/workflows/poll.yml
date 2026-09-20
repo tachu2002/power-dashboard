@@ -2,16 +2,16 @@ name: 三島 水位・電源データ取得
 
 on:
   schedule:
-    # 10分間隔(ご要望により5分→10分へ変更)。
-    # なおGitHub無料枠のスケジュール実行は「ベストエフォート」のため、実際の実行間隔は
-    # これより大幅に広がる(実測で数時間規模になることもある)。このため電源データは
-    # 中継サーバー(mini.lhlab-vps.net)の当日分CSVをまとめて取り込む方式にしており、
-    # 実行が遅れた回でも、その間の履歴をまとめて回収できるようにしてある。
-    - cron: "*/10 * * * *"
+    # GitHubの無料枠のスケジュール実行は「ベストエフォート」で、`*/10` と書いても実際には
+    # 2〜5時間に1回しか起動しない(2026-09-20実測: 起動間隔114〜324分)。このため従来は
+    # データも画像も約3時間に1回しか保存されず、タイムラプスが成立していなかった。
+    # 対策として「1回の実行の中で10分ごとに取得し続ける長時間ジョブ」に変更し、
+    # 起動そのものは2時間おきに予約しておく(前の実行が終わる頃に次が始まるように重ねる)。
+    - cron: "7 */2 * * *"
   workflow_dispatch: {}
 
-# 前回の実行が終わる前に次の実行が始まらないようにし、
-# git push が競合しないようにする
+# 前の実行が終わる前に次の実行が始まらないようにし、git push が競合しないようにする
+# (長時間ジョブのため、次の予約はpendingで待機し、終わり次第すぐ動き出す)
 concurrency:
   group: poll-data
   cancel-in-progress: false
@@ -22,7 +22,14 @@ permissions:
 jobs:
   poll:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 355
+    env:
+      LOOP_MINUTES: "330"      # ループを続ける時間(分)。タイムアウトより少し短くする
+      DATA_INTERVAL_SEC: "600" # データ取得の間隔(10分)
+      IMAGE_EVERY_N: "2"       # 画像は何回に1回保存するか(2=20分ごと)
+      HISTORY_EVERY_N: "6"     # history.csv(全期間・6MB超)をコミットする頻度(6=1時間ごと)
+      # 画像は履歴を持たない専用ブランチ(images)へ置き、ダッシュボードはそのraw URLを読む
+      IMAGE_BASE_URL: "https://raw.githubusercontent.com/${{ github.repository }}/images/"
     steps:
       - name: リポジトリを取得
         uses: actions/checkout@v4
@@ -32,26 +39,70 @@ jobs:
         with:
           node-version: "20"
 
-      - name: 全拠点のデータを取得してdata/配下を更新
-        run: node scripts/poll.mjs
-
-      - name: 変更があればコミット・push
+      - name: mainから画像の実体を外す(初回のみ・以後はimagesブランチが持つ)
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add data/history.csv data/recent.csv data/recent_water.csv data/latest.json data/images
-          if git diff --cached --quiet; then
-            echo "変更なし。コミットをスキップします。"
-            exit 0
+          TRACKED="$(git ls-files data/images | grep -v 'manifest.json' || true)"
+          if [ -n "$TRACKED" ]; then
+            echo "$TRACKED" | xargs -r git rm --cached --quiet
+            git commit -q -m "画像はimagesブランチへ移動（mainからは実体を外す）"
+            git push -q
+          else
+            echo "mainに画像の実体はありません"
           fi
-          git commit -m "データ自動更新: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          for i in 1 2 3; do
-            if git push; then
-              exit 0
+
+      - name: 10分ごとに取得し続ける（画像は20分ごと）
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -u
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          REMOTE="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          END=$(( $(date +%s) + LOOP_MINUTES * 60 ))
+          i=0
+          while :; do
+            i=$((i + 1))
+            if [ $(( (i - 1) % IMAGE_EVERY_N )) -eq 0 ]; then
+              export SKIP_IMAGES=0
+            else
+              export SKIP_IMAGES=1
             fi
-            echo "push失敗。再試行します ($i/3)..."
-            git pull --rebase
-            sleep 5
+            echo "===== ${i}回目 $(date -u +'%Y-%m-%dT%H:%M:%SZ') (画像: $([ "$SKIP_IMAGES" = "0" ] && echo あり || echo なし)) ====="
+            node scripts/poll.mjs || echo "データ取得でエラーが出ましたが続行します"
+
+            if [ "$SKIP_IMAGES" = "0" ]; then
+              bash scripts/publish-images.sh "$REMOTE" || echo "imagesブランチへの反映に失敗しましたが続行します"
+            fi
+
+            # history.csv は全期間分(6MB超)のため毎回はコミットしない(既定1時間ごと)
+            git add data/recent.csv data/recent_water.csv data/latest.json data/images/manifest.json || true
+            if [ $(( (i - 1) % HISTORY_EVERY_N )) -eq 0 ]; then
+              git add data/history.csv || true
+            fi
+            if git diff --cached --quiet; then
+              echo "データに変更はありません"
+            else
+              git commit -q -m "データ自動更新: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+              pushed=0
+              for t in 1 2 3; do
+                if git push -q; then pushed=1; break; fi
+                echo "pushに失敗しました。再試行します ($t/3)..."
+                git pull --rebase -q || true
+                sleep 5
+              done
+              [ "$pushed" = "1" ] || echo "pushできませんでした(次の回で再試行します)"
+            fi
+
+            NOW=$(date +%s)
+            if [ "$NOW" -ge "$END" ]; then
+              echo "ループ終了(次の予約実行が引き継ぎます)"
+              break
+            fi
+            # 次の区切り(10分刻み)まで待つ
+            SLEEP=$(( DATA_INTERVAL_SEC - (NOW % DATA_INTERVAL_SEC) ))
+            [ "$SLEEP" -lt 30 ] && SLEEP=$(( SLEEP + DATA_INTERVAL_SEC ))
+            echo "次の取得まで ${SLEEP}秒待機します"
+            sleep "$SLEEP"
           done
-          echo "pushに失敗しました" >&2
-          exit 1
