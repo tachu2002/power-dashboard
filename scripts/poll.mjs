@@ -200,9 +200,12 @@ function parseMatsuhisaReading(rawText, site) {
 }
 
 // ---- 国交省「川の防災情報」水位JSON(5分値、CORS開放済み・サーバー側は直接取得可) ----
+// ある瞬間の日本時間(JST=UTC+9)の年月日時分を返す。
+// 以前は getTimezoneOffset() で補正してから+9時間していたが、これはUTC以外のタイムゾーンで
+// 動かすと相殺されてずれる(日本時間で動かすと結果がUTCになる)。GitHub ActionsはUTCのため
+// 従来も結果は正しかったが、ローカル実行やタイムゾーン設定の変更で壊れないようにしておく。
 function toJstParts(d) {
-  const utcMs = d.getTime() + d.getTimezoneOffset() * 60000;
-  const jst = new Date(utcMs + 9 * 3600000);
+  const jst = new Date(d.getTime() + 9 * 3600000);
   return { y: jst.getUTCFullYear(), mo: jst.getUTCMonth(), day: jst.getUTCDate(), h: jst.getUTCHours(), mi: jst.getUTCMinutes() };
 }
 function kawabouWaterJsonUrl(obsCd13, d) {
@@ -330,19 +333,38 @@ async function fetchMatsuhisaReading(site) {
   return Object.assign({ via: VIA_LABEL_MATSUHISA }, reading);
 }
 
-async function fetchKawabouWaterReading(site) {
-  const isSwstg = site.kind === "swstg";
-  const url = isSwstg ? kawabouSwstgJsonUrl(site.obsCd, new Date()) : kawabouWaterJsonUrl(site.obsCd13, new Date());
-  const res = await fetchWithTimeout(url, { "Accept": "application/json" });
-  const json = await res.json();
+// 川の防災情報のURLは「5分区切りの時刻」を含むが、その区切りのファイルは区切り時刻ちょうどには
+// まだ公開されていない(実測で約2分の遅れ)。この対策が無いと、区切り直後に実行した回は
+// 11拠点すべてがHTTP 404になる(実測: 直近21回のうち11回が全滅)。
+// 現在の区切りで取れなければ1つ前・2つ前の区切りを順に試す。
+const KAWABOU_BUCKET_FALLBACK_MIN = [0, 5, 10];
+function parseKawabouWaterJson(json, isSwstg) {
   const v = json && json.obsValue;
   if (isSwstg) {
     // 危機管理型水位計は堤防天端からの高さ(stgHght, m)を「水位」として採用する(ダッシュボード表示の主要数値と同じ)。
-    if (!v || typeof v.stgHght !== "number") throw new Error("水位データなし");
+    if (!v || typeof v.stgHght !== "number") return null;
     return { pv: null, bat: null, measureTime: fmtKawabouIsoTime(v.obsTime || v.tmObsTime), waterLevelM: v.stgHght, via: VIA_LABEL_KAWABOU };
   }
-  if (!v || typeof v.stg !== "number") throw new Error("水位データなし");
+  if (!v || typeof v.stg !== "number") return null;
   return { pv: null, bat: null, measureTime: fmtKawabouIsoTime(v.obsTime), waterLevelM: v.stg, via: VIA_LABEL_KAWABOU };
+}
+async function fetchKawabouWaterReading(site) {
+  const isSwstg = site.kind === "swstg";
+  const nowMs = Date.now();
+  let firstError = null;
+  for (const backMin of KAWABOU_BUCKET_FALLBACK_MIN) {
+    const at = new Date(nowMs - backMin * 60000);
+    const url = isSwstg ? kawabouSwstgJsonUrl(site.obsCd, at) : kawabouWaterJsonUrl(site.obsCd13, at);
+    try {
+      const res = await fetchWithTimeout(url, { "Accept": "application/json" });
+      const reading = parseKawabouWaterJson(await res.json(), isSwstg);
+      if (reading) return reading;
+      if (!firstError) firstError = new Error("水位データなし");
+    } catch (err) {
+      if (!firstError) firstError = err;
+    }
+  }
+  throw firstError || new Error("水位データなし");
 }
 
 function fetchReading(site) {
