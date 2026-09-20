@@ -48,6 +48,9 @@ const IMAGE_QUALITY = Number(process.env.IMAGE_QUALITY || 72);
 const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "";
 // データ(CSV)だけ更新して画像アーカイブは行わない回に使う(データ10分・画像20分などの使い分け)。
 const SKIP_IMAGES = process.env.SKIP_IMAGES === "1";
+// matsuhisa.info系27拠点だけを今回は取得しない(この取得元への負荷を抑えるため、
+// 国交省の拠点より低い頻度で回す回に使う)。前回値はlatest.jsonへそのまま引き継ぐ。
+const SKIP_MATSUHISA = process.env.SKIP_MATSUHISA === "1";
 
 // 拠点,取得時刻,機器の計測時刻,PV(W),BAT(V),水位(m),取得方法 の7列
 // (旧バージョンは水位(m)列が無い6列だったため、recent.csv再構築時に旧形式の行は破棄する)
@@ -503,12 +506,14 @@ async function archiveImages(readingsBySiteId) {
   const fetchedAt = new Date();
 
   const tasks = [];
-  MATSUHISA_SITES.forEach(function (site) {
-    const reading = readingsBySiteId[site.id];
-    if (reading && reading.imageUrl) {
-      tasks.push({ site: site, resolveUrl: async function () { return reading.imageUrl; } });
-    }
-  });
+  if (!SKIP_MATSUHISA) {
+    MATSUHISA_SITES.forEach(function (site) {
+      const reading = readingsBySiteId[site.id];
+      if (reading && reading.imageUrl) {
+        tasks.push({ site: site, resolveUrl: async function () { return reading.imageUrl; } });
+      }
+    });
+  }
   KAWABOU_WATER_SITES.forEach(function (site) {
     if (site.shizuokaCamtype) {
       tasks.push({ site: site, resolveUrl: function () { return fetchShizuokaLiveImageUrl(site.shizuokaCamtype); } });
@@ -682,7 +687,17 @@ async function main() {
   const newCsvRows = [];
   const readingsBySiteId = {}; // 画像アーカイブでmatsuhisa拠点のimageUrlを再利用するため保持
 
-  await mapWithConcurrency(SITES, CONCURRENCY, async function (site) {
+  // matsuhisaをスキップする回は、その拠点の前回状態をそのまま引き継ぐ(一覧から消えないようにする)
+  const targetSites = SKIP_MATSUHISA ? SITES.filter(function (s) { return s.sourceType !== "matsuhisa"; }) : SITES;
+  if (SKIP_MATSUHISA) {
+    SITES.forEach(function (site) {
+      if (site.sourceType !== "matsuhisa") return;
+      const prev = (previousLatest.sites && previousLatest.sites[site.id]) || {};
+      latest.sites[site.id] = Object.assign({}, prev);
+    });
+    console.log("matsuhisa.info系" + (SITES.length - targetSites.length) + "拠点は今回スキップしました(SKIP_MATSUHISA=1)。");
+  }
+  await mapWithConcurrency(targetSites, CONCURRENCY, async function (site) {
     const prev = (previousLatest.sites && previousLatest.sites[site.id]) || {};
     const fetchedAt = new Date();
     try {
@@ -770,7 +785,7 @@ async function main() {
   await writeFile(LATEST_JSON_PATH, JSON.stringify(latest, null, 2) + "\n", "utf8");
 
   const okCount = Object.values(latest.sites).filter(function (s) { return s.lastFetchOk; }).length;
-  console.log(okCount + "/" + SITES.length + " 拠点の取得に成功しました。");
+  console.log(okCount + "/" + targetSites.length + " 拠点の取得に成功しました。");
 
   // 画像アーカイブはデータ取得(上記)とは独立したベストエフォート処理とし、
   // ここで失敗してもデータ取得自体の成功/終了コードには影響させない。
