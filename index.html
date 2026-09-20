@@ -385,6 +385,16 @@
     box-shadow: 0 2px 6px rgba(0,0,0,0.18); cursor: pointer; opacity: 0.96;
   }
   .mini-stats .site-thumb:hover { opacity: 1; }
+  /* 水位変化グラフ一覧: 各カードの右上に拠点のカメラ映像を置く(電源監視のサムネイルと同じ見せ方)。
+     タイトル・現在水位は左側の列に積み、画像は右側で上端を揃える。 */
+  .graphlist-head { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+  .graphlist-head-main { flex: 1 1 auto; min-width: 0; }
+  .graphlist-head .site-thumb {
+    flex: 0 0 auto; max-width: min(88px, 32%); max-height: 74px; width: auto; height: auto;
+    object-fit: contain; border-radius: 6px; border: 1px solid var(--border);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.18); cursor: pointer; opacity: 0.96;
+  }
+  .graphlist-head .site-thumb:hover { opacity: 1; }
   .mini-stats .stat-label { font-size: 10px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; }
   .mini-stats .swatch { width: 8px; height: 8px; border-radius: 2px; display: inline-block; }
   .mini-stats .stat-value { font-size: 16px; font-weight: 600; margin-top: 1px; font-variant-numeric: proportional-nums; }
@@ -1238,6 +1248,10 @@
   var CHART_PAST_WINDOW_WITH_FORECAST_MS = PREDICTION_HORIZON_MS;
   // 回帰に必要な最低限の実測点数(これを下回る場合は同時刻帯の平均値による簡易予測にフォールバック)。
   var MIN_POINTS_FOR_REGRESSION = 12;
+  // 「水位変化グラフ一覧」だけは表示範囲を別に持つ(ご要望により、過去は現在時刻の12時間前まで、
+  //  予測は6時間先までとする)。拠点詳細・電源監視のグラフは従来どおり(過去12時間+予測12時間)。
+  var GRAPHLIST_PAST_WINDOW_MS = 12 * 60 * 60 * 1000;
+  var GRAPHLIST_FORECAST_HORIZON_MS = 6 * 60 * 60 * 1000;
 
   function isDark() { return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches; }
   function palette() {
@@ -2406,20 +2420,30 @@
     return !d.imageUrl && !!d.imageFetchFailed;
   }
 
+  // 拠点のカメラ映像のサムネイルを作る(電源監視カードと水位変化グラフ一覧カードで共通)。
+  function ensureSiteThumb(site, slot, existing, onGone, imageUrl) {
+    if (existing) return existing;
+    var img = document.createElement("img");
+    img.className = "site-thumb"; img.referrerPolicy = "no-referrer";
+    img.alt = site.name + " 読取画像"; img.title = "クリックで拡大表示";
+    img.addEventListener("click", function () { window.open(imageUrl, "_blank", "noopener"); });
+    img.addEventListener("error", function () { if (img.parentNode) img.parentNode.removeChild(img); onGone(); });
+    slot.appendChild(img);
+    return img;
+  }
   function updateSiteImage(site, imageUrl) {
     var s = siteStates[site.id];
-    if (!site.hasPower || !s.powerCardEl || !imageUrl) return;
+    if (!imageUrl) return;
     var src = imageUrl + (imageUrl.indexOf("?") >= 0 ? "&" : "?") + "_ts=" + Date.now();
-    if (!s.thumbEl) {
-      var img = document.createElement("img");
-      img.className = "site-thumb"; img.referrerPolicy = "no-referrer";
-      img.alt = site.name + " 読取画像"; img.title = "クリックで拡大表示";
-      img.addEventListener("click", function () { window.open(imageUrl, "_blank", "noopener"); });
-      img.addEventListener("error", function () { if (img.parentNode) img.parentNode.removeChild(img); s.thumbEl = null; });
-      s.thumbSlot.appendChild(img);
-      s.thumbEl = img;
+    if (site.hasPower && s.powerCardEl && s.thumbSlot) {
+      s.thumbEl = ensureSiteThumb(site, s.thumbSlot, s.thumbEl, function () { s.thumbEl = null; }, imageUrl);
+      s.thumbEl.src = src;
     }
-    s.thumbEl.src = src;
+    // 水位変化グラフ一覧のカード右上にも同じ映像を出す。
+    if (s.graphThumbSlot) {
+      s.graphThumbEl = ensureSiteThumb(site, s.graphThumbSlot, s.graphThumbEl, function () { s.graphThumbEl = null; }, imageUrl);
+      s.graphThumbEl.src = src;
+    }
   }
 
   function setSiteStatus(site, state, text) {
@@ -3411,7 +3435,7 @@
   var graphlistStatusText = document.getElementById("graphlistStatusText");
   // 表示順は「河川別拠点一覧」と同じ(河川の並び→上流→下流)にする。
   var GRAPHLIST_SITES = RIVER_ORDER_SITES.filter(function (site) { return site.hasWater; });
-  document.getElementById("graphlistSubtitle").textContent = "全" + GRAPHLIST_SITES.length + "拠点の水位変化グラフのみを一覧表示します（10分ごとに自動取得。破線は基準(最低)水位です）。";
+  document.getElementById("graphlistSubtitle").textContent = "全" + GRAPHLIST_SITES.length + "拠点の水位変化グラフのみを一覧表示します（10分ごとに自動取得。左は直近12時間の実測、右の点線は6時間先までの予測、横の破線は基準(最低)水位です）。";
   GRAPHLIST_SITES.forEach(function (site) {
     var card = document.createElement("div"); card.className = "simple-card"; card.dataset.siteId = site.id;
     var header = document.createElement("div"); header.className = "site-card-header";
@@ -3439,24 +3463,52 @@
     var caption = document.createElement("button"); caption.type = "button"; caption.className = "card-caption"; caption.textContent = "詳細を見る →";
     caption.addEventListener("click", function () { showView("site"); openSiteDetail(site.id); });
 
-    card.appendChild(header); card.appendChild(nowRow); card.appendChild(graphBox); card.appendChild(graphLegend); card.appendChild(forecastRow); card.appendChild(caption);
+    // カード右上に拠点のカメラ映像を置くため、見出し・現在水位を左の列にまとめる
+    // (画像は取得できた時点で updateSiteImage が headRow の右端へ差し込む)。
+    var headRow = document.createElement("div"); headRow.className = "graphlist-head";
+    var headMain = document.createElement("div"); headMain.className = "graphlist-head-main";
+    headMain.appendChild(header); headMain.appendChild(nowRow);
+    headRow.appendChild(headMain);
+
+    card.appendChild(headRow); card.appendChild(graphBox); card.appendChild(graphLegend); card.appendChild(forecastRow); card.appendChild(caption);
     graphGrid.appendChild(card);
 
     var s = siteStates[site.id];
     s.graphChart = createLevelChart("gchart-" + site.id);
+    s.graphThumbSlot = headRow; s.graphThumbEl = null;
     s.graphDotEl = dot; s.graphLabelEl = statusLabel; s.graphNowValueEl = nowValue;
     s.forecast6El = f6; s.forecast12El = f12;
     s.graphCardEl = card;
   });
+  // グラフ一覧の水位グラフは「現在時刻の12時間前まで(実線)＋6時間先までの予測(点線)」を描く。
+  // 予測系列自体は拠点詳細・電源監視と共通(12時間先まで)のため、ここで6時間先までに切り出す。
+  function graphlistForecastFor(site) {
+    var limit = Date.now() + GRAPHLIST_FORECAST_HORIZON_MS;
+    return cachedPrediction(site, "water").filter(function (f) { return f.t <= limit; });
+  }
+  // 直近12時間ぶんの実測 + 6時間先までの予測を1本の系列にまとめる。
+  // 実測が少ない場合(サーバー側の取得間隔が広い場合)は selectRecentForChart が自動で範囲を広げるため、
+  // グラフが1〜2点だけになってしまうことはない。
+  function buildGraphlistChartData(site) {
+    var s = siteStates[site.id];
+    var sel = selectRecentForChart(s.points, waterLevelFilter, GRAPHLIST_PAST_WINDOW_MS);
+    var data = sel.points.map(function (p) {
+      return { label: fmtClockHm(p.fetchedAt), value: p.waterLevelM, t: p.fetchedAt.getTime(), rainMm: findNearestRainMm(p.fetchedAt) };
+    });
+    graphlistForecastFor(site).forEach(function (f) {
+      data.push({ label: fmtClockHm(new Date(f.t)), value: f.value, t: f.t, predicted: true, rainMm: f.rainMm });
+    });
+    return data;
+  }
   function refreshGraphlistCard(site) {
     var s = siteStates[site.id];
     if (!s.graphChart) return;
-    var waterPoints = s.points.filter(function (p) { return typeof p.waterLevelM === "number"; });
+    var waterPoints = s.points.filter(waterLevelFilter);
     if (waterPoints.length) {
       var last = waterPoints[waterPoints.length - 1];
       s.graphNowValueEl.innerHTML = last.waterLevelM.toFixed(2) + '<span class="unit">m</span>';
       s.graphLabelEl.textContent = "最終取得 " + fmtClock(new Date());
-      s.graphChart.setData(waterPoints.map(function (p) { return { label: fmtClockHm(p.fetchedAt), value: p.waterLevelM, t: p.fetchedAt.getTime(), rainMm: findNearestRainMm(p.fetchedAt) }; }), s.baselineLevelM, getThresholdsForSite(site));
+      s.graphChart.setData(buildGraphlistChartData(site), s.baselineLevelM, getThresholdsForSite(site));
     }
     updateForecastReadouts(site);
   }
@@ -4187,6 +4239,8 @@
     ALL_SITES.forEach(function (site) {
       refreshPowerCard(site);
       refreshDetailIfActive(site);
+      // 予測(気象データ)が後から届いた場合でも、グラフ一覧の点線が表示されるようにする。
+      if (siteStates[site.id].graphChart) refreshGraphlistCard(site);
     });
   }
 
@@ -4774,6 +4828,10 @@
     getPowerSourceState: function () { return powerSourceState; },
     PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS,
     CHART_PAST_WINDOW_WITH_FORECAST_MS: CHART_PAST_WINDOW_WITH_FORECAST_MS,
+    GRAPHLIST_PAST_WINDOW_MS: GRAPHLIST_PAST_WINDOW_MS,
+    GRAPHLIST_FORECAST_HORIZON_MS: GRAPHLIST_FORECAST_HORIZON_MS,
+    GRAPHLIST_SITES: GRAPHLIST_SITES, graphlistForecastFor: graphlistForecastFor,
+    buildGraphlistChartData: buildGraphlistChartData, refreshGraphlistCard: refreshGraphlistCard,
     loadForecastHourly: loadForecastHourly, parseLocalHour: parseLocalHour,
     getForecastState: function () { return forecastState; },
     predictWaterSeries: predictWaterSeries, predictBatterySeries: predictBatterySeries,
