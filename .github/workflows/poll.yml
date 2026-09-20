@@ -27,6 +27,9 @@ jobs:
       LOOP_MINUTES: "330"      # ループを続ける時間(分)。タイムアウトより少し短くする
       DATA_INTERVAL_SEC: "600" # データ取得の間隔(10分)
       IMAGE_EVERY_N: "2"       # 画像は何回に1回保存するか(2=20分ごと)
+      # matsuhisa.info(27拠点)は個人運用のCGIのため、取得頻度を国交省の拠点より落とす。
+      # 3=30分ごと(1日約1,296回)。ここを1にすると10分ごと(1日約3,888回)になる。
+      MATSUHISA_EVERY_N: "3"
       HISTORY_EVERY_N: "6"     # history.csv(全期間・6MB超)をコミットする頻度(6=1時間ごと)
       # 画像は履歴を持たない専用ブランチ(images)へ置き、ダッシュボードはそのraw URLを読む
       IMAGE_BASE_URL: "https://raw.githubusercontent.com/${{ github.repository }}/images/"
@@ -77,7 +80,12 @@ jobs:
             else
               export SKIP_IMAGES=1
             fi
-            echo "===== ${i}回目 $(date -u +'%Y-%m-%dT%H:%M:%SZ') (画像: $([ "$SKIP_IMAGES" = "0" ] && echo あり || echo なし)) ====="
+            if [ $(( (i - 1) % MATSUHISA_EVERY_N )) -eq 0 ]; then
+              export SKIP_MATSUHISA=0
+            else
+              export SKIP_MATSUHISA=1
+            fi
+            echo "===== ${i}回目 $(date -u +'%Y-%m-%dT%H:%M:%SZ') (画像: $([ "$SKIP_IMAGES" = "0" ] && echo あり || echo なし) / matsuhisa: $([ "$SKIP_MATSUHISA" = "0" ] && echo あり || echo なし)) ====="
             node scripts/poll.mjs || echo "データ取得でエラーが出ましたが続行します"
 
             if [ "$SKIP_IMAGES" = "0" ]; then
