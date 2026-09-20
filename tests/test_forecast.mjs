@@ -286,6 +286,58 @@ export async function run() {
   r.check("g4-e クリックで拡大できる旨の説明が付く", (thumbs.clickable || "").includes("拡大"), thumbs.clickable);
   r.check("g4-f 画像を取得できた拠点すべてに表示される", thumbs.total > 1 && thumbs.total <= thumbs.cards, thumbs);
 
+  // 「現在水位」の隣に、直前に取得した水位との差を出す
+  const delta = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const s = d.siteStates.cam02;
+    const keep = s.points.slice();
+    const now = Date.now();
+    const mk = (agoMin, v) => ({ fetchedAt: new Date(now - agoMin * 60000), measureTime: null,
+      pv: null, bat: null, pvVoltage: null, waterLevelM: v, via: "t" });
+    const render = (pts) => { s.points = pts; d.updateGraphlistDelta(d.SITE_CATALOG.cam02);
+      return { delta: s.graphDeltaEl.textContent, color: s.graphDeltaEl.style.color,
+        strong: s.graphDeltaEl.classList.contains("water-delta-strong"), prev: s.graphPrevLineEl.textContent }; };
+    const out = {
+      rise: render([mk(34, 0.68), mk(0, 0.70)]),
+      fall: render([mk(90, 0.80), mk(0, 0.53)]),
+      flat: render([mk(20, 0.61), mk(0, 0.61)]),
+      surge: render([mk(45, 0.50), mk(0, 0.95)]),
+      hours: render([mk(3 * 60 + 12, 0.40), mk(0, 0.42)]),
+      single: render([mk(0, 0.55)]),
+      info: (() => { s.points = [mk(34, 0.68), mk(0, 0.70)];
+        const i = d.waterDeltaInfo(d.SITE_CATALOG.cam02);
+        return { diff: +i.diff.toFixed(3), prevValue: i.prevValue, elapsedMin: Math.round(i.elapsedMs / 60000) }; })(),
+      none: (() => { s.points = [mk(0, 0.55)]; return d.waterDeltaInfo(d.SITE_CATALOG.cam02); })()
+    };
+    s.points = keep;
+    d.updateGraphlistDelta(d.SITE_CATALOG.cam02);
+    return out;
+  });
+  r.check("g5-a 上昇時は「直前比 ▲0.02 m」と表示", delta.rise.delta === "直前比 ▲0.02 m", delta.rise);
+  r.check("g5-b 比較元の値と時刻・経過時間を併記", /^直前 0\.68 m（\d{2}:\d{2}・34分前）$/.test(delta.rise.prev), delta.rise.prev);
+  r.check("g5-c 下降時は▼で絶対値を表示", delta.fall.delta === "直前比 ▼0.27 m", delta.fall);
+  r.check("g5-d 変化なしは±0.00 m", delta.flat.delta === "直前比 ±0.00 m", delta.flat);
+  r.check("g5-e 急上昇(0.2m以上)は強調表示", delta.surge.strong === true && delta.rise.strong === false, delta);
+  r.check("g5-f 上昇と下降で色を変える", delta.rise.color !== delta.fall.color && !!delta.rise.color, delta);
+  r.check("g5-g 1時間以上空いた場合は「N時間M分前」", /3時間12分前/.test(delta.hours.prev), delta.hours.prev);
+  r.check("g5-h 実測が1点のみなら比較できない旨を出す",
+    delta.single.prev.includes("直前の取得値がまだありません") && delta.single.delta.trim() === "", delta.single);
+  r.check("g5-i 差・比較元・経過時間を数値で取得できる",
+    delta.info.diff === 0.02 && delta.info.prevValue === 0.68 && delta.info.elapsedMin === 34, delta.info);
+  r.check("g5-j 比較できない場合はnullを返す", delta.none === null, delta.none);
+
+  const deltaDom = await page.evaluate(() => {
+    const card = document.querySelector('#graphGrid .simple-card[data-site-id="cam02"]');
+    const row = card.querySelector(".water-now");
+    const kids = Array.from(row.children).map((c) => c.className || c.tagName);
+    const val = row.querySelector(".water-now-value").getBoundingClientRect();
+    const dl = row.querySelector(".water-now-delta").getBoundingClientRect();
+    return { kids, sameLine: Math.abs(val.top - dl.top) < 24, deltaRightOfValue: dl.left > val.left,
+      prevBelow: row.querySelector(".water-prev-line").getBoundingClientRect().top > val.top };
+  });
+  r.check("g5-k 差は「現在水位」の値と同じ行に並ぶ", deltaDom.sameLine && deltaDom.deltaRightOfValue, deltaDom);
+  r.check("g5-l 比較元の値は同じ枠の下段に置く", deltaDom.prevBelow, deltaDom);
+
   const glSubtitle = await page.textContent("#graphlistSubtitle");
   r.check("g3-e 説明文が12時間・6時間に言及", glSubtitle.includes("12時間") && glSubtitle.includes("6時間"), glSubtitle);
 
