@@ -284,6 +284,62 @@ export async function run() {
   r.check("c9-d タイムラプスの対象は直近2日", intervals.timelapse === 2 * 24 * 60 * 60 * 1000, intervals.timelapse);
   r.check("c9-e 予測は12時間先まで", intervals.horizon === 12 * 60 * 60 * 1000, intervals.horizon);
 
+  /* ---- 10. 日本時間(JST)への変換(2026-09-20修正) ---- */
+  const jst = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    // 2026-09-20T12:25:00Z は日本時間で 2026-09-20 21:25
+    const t = new Date("2026-09-20T12:25:00Z");
+    const p = d.toJstParts(t);
+    // 日付をまたぐ場合: 2026-09-20T15:30:00Z → 日本時間 2026-09-21 00:30
+    const p2 = d.toJstParts(new Date("2026-09-20T15:30:00Z"));
+    return {
+      y: p.y, mo: p.mo, day: p.day, h: p.h, mi: p.mi,
+      cross: { y: p2.y, mo: p2.mo, day: p2.day, h: p2.h },
+      tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      offsetMin: t.getTimezoneOffset(),
+      stgUrl: d.kawabouWaterJsonUrl("0563300400020", t),
+      swstgUrl: d.kawabouSwstgJsonUrl("2200000022", t),
+      powerCsv: d.powerCsvUrlFor(new Date("2026-09-20T18:30:00Z")) // JST 9/21 03:30
+    };
+  });
+  r.check("c10-a 日本時間の時分に変換される(21:25)", jst.h === 21 && jst.mi === 25, jst);
+  r.check("c10-b 日付も日本時間(9/20)", jst.y === 2026 && jst.mo === 8 && jst.day === 20, jst);
+  r.check("c10-c UTCで日付をまたぐ時刻も日本時間の翌日になる",
+    jst.cross.day === 21 && jst.cross.h === 0, jst.cross);
+  r.check("c10-d 水位URLの時分が日本時間の5分区切り(2125)",
+    jst.stgUrl.indexOf("/20260920/2125/") >= 0, jst.stgUrl);
+  r.check("c10-e 危機管理型水位計のURLも同じ区切り",
+    jst.swstgUrl.indexOf("/20260920/2125/") >= 0, jst.swstgUrl);
+  r.check("c10-f 電源CSVは日本時間の日付で決まる(深夜も当日分)",
+    jst.powerCsv.endsWith("power-2026-09-21.csv"), jst.powerCsv);
+
+  /* ---- 11. 川の防災情報の5分区切りフォールバック(2026-09-20追加) ---- */
+  const bucket = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const t = new Date("2026-09-20T12:25:00Z"); // JST 21:25
+    return {
+      list: d.KAWABOU_BUCKET_FALLBACK_MIN,
+      urls: d.KAWABOU_BUCKET_FALLBACK_MIN.map((m) =>
+        d.kawabouWaterJsonUrl("0563300400020", new Date(t.getTime() - m * 60000))),
+      parsedStg: d.parseKawabouWaterJson({ obsValue: { stg: 0.75, obsTime: "2026/09/20 21:10" } }, false),
+      parsedSw: d.parseKawabouWaterJson({ obsValue: { stgHght: -1.24, tmObsTime: "2026/09/20 09:00" } }, true),
+      emptyStg: d.parseKawabouWaterJson({ obsValue: {} }, false),
+      emptySw: d.parseKawabouWaterJson({ obsValue: { stg: 26.3 } }, true),
+      nullJson: d.parseKawabouWaterJson(null, false)
+    };
+  });
+  r.check("c11-a 現在・5分前・10分前の3つを試す",
+    bucket.list.length === 3 && bucket.list[0] === 0 && bucket.list[1] === 5 && bucket.list[2] === 10, bucket.list);
+  r.check("c11-b フォールバック先のURLが1つ前の区切りになる",
+    bucket.urls[1].indexOf("/2120/") >= 0 && bucket.urls[2].indexOf("/2115/") >= 0, bucket.urls);
+  r.check("c11-c 通常の水位計はstgを採用", bucket.parsedStg.waterLevelM === 0.75, bucket.parsedStg);
+  r.check("c11-d 危機管理型は堤防天端からの高さ(stgHght)を採用",
+    bucket.parsedSw.waterLevelM === -1.24, bucket.parsedSw);
+  r.check("c11-e 危機管理型はtmObsTimeも計測時刻として使える",
+    !!bucket.parsedSw.measureTime, bucket.parsedSw);
+  r.check("c11-f 値が無い応答はnull(次の区切りへ進む)",
+    bucket.emptyStg === null && bucket.emptySw === null && bucket.nullJson === null, bucket);
+
   /* ---- 10. ページ例外が無いこと ---- */
   r.check("c10-a 読み込み時にページ例外が発生しない", page.errMsgs().length === 0, page.errMsgs());
 

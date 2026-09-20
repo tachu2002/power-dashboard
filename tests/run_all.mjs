@@ -6,6 +6,7 @@ import { teardown } from "./harness.mjs";
 const SUITES = [
   ["core", "./test_core.mjs"],
   ["power", "./test_power.mjs"],
+  ["sources", "./test_sources.mjs"],
   ["forecast", "./test_forecast.mjs"],
   ["views", "./test_views.mjs"],
   ["playback", "./test_playback.mjs"],
