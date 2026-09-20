@@ -51,6 +51,11 @@ if [ -d "$SRC_DIR" ]; then
   done
 fi
 
+# コミット者の設定は複製先のリポジトリにも必要(mainリポジトリのローカル設定は引き継がれないため、
+# これが無いと "fatal: empty ident name" でコミットに失敗する)
+git -C "$WORK_DIR" config user.name "${GIT_USER_NAME:-github-actions[bot]}"
+git -C "$WORK_DIR" config user.email "${GIT_USER_EMAIL:-github-actions[bot]@users.noreply.github.com}"
+
 cd "$WORK_DIR"
 git add -A
 if git diff --cached --quiet; then
