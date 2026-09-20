@@ -167,10 +167,99 @@ export async function run() {
   r.check("f4-e 時刻ラベルが存在する", timeLabels.length > 0, labels);
   r.check("f4-f 時刻ラベルに秒が含まれない", timeLabels.every((t) => !/^\d{2}:\d{2}:\d{2}/.test(t)), timeLabels);
 
+  /* ---- 5. 水位変化グラフ一覧(直近12時間 + 6時間先の予測) ---- */
+  await page.evaluate(() => window.__dashboardDebug.showView("graphlist"));
+  await page.waitForTimeout(400);
+
+  const glConst = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    return { past: d.GRAPHLIST_PAST_WINDOW_MS, horizon: d.GRAPHLIST_FORECAST_HORIZON_MS, detailPast: d.CHART_PAST_WINDOW_WITH_FORECAST_MS };
+  });
+  r.check("g1-a グラフ一覧の過去側の表示範囲は12時間", glConst.past === 12 * 3600000, glConst);
+  r.check("g1-b グラフ一覧の予測は6時間先まで", glConst.horizon === 6 * 3600000, glConst);
+  r.check("g1-c 拠点詳細側の設定(12時間)は変えていない", glConst.detailPast === 12 * 3600000, glConst);
+
+  const gl = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const site = d.SITE_CATALOG.cam02;
+    const data = d.buildGraphlistChartData(site);
+    const now = Date.now();
+    const measured = data.filter((p) => !p.predicted);
+    const predicted = data.filter((p) => p.predicted);
+    return {
+      total: data.length,
+      measured: measured.length,
+      predicted: predicted.length,
+      oldestAgoH: (now - measured[0].t) / 3600000,
+      newestMeasuredAgoH: (now - measured[measured.length - 1].t) / 3600000,
+      lastPredictedAheadH: predicted.length ? (predicted[predicted.length - 1].t - now) / 3600000 : null,
+      firstPredictedAfterLastMeasured: predicted.length ? predicted[0].t > measured[measured.length - 1].t : null,
+      sorted: data.every((p, i) => i === 0 || p.t >= data[i - 1].t),
+      full: d.cachedPrediction(site, "water").length,
+      labelsHaveNoSeconds: data.every((p) => /^\d{2}:\d{2}$/.test(p.label))
+    };
+  });
+  r.check("g2-a 実測の最も古い点が12時間以内", gl.oldestAgoH <= 12.01, gl);
+  r.check("g2-b 12時間ぶんの実測が使われている(古すぎる点を切っている)", gl.oldestAgoH > 11, gl);
+  r.check("g2-c 予測が付く", gl.predicted > 0, gl);
+  r.check("g2-d 予測は6時間先までに収まる", gl.lastPredictedAheadH !== null && gl.lastPredictedAheadH <= 6.01, gl);
+  r.check("g2-e 予測は12時間分の系列から切り出している", gl.predicted < gl.full, gl);
+  r.check("g2-f 予測は最後の実測より後から始まる", gl.firstPredictedAfterLastMeasured === true, gl);
+  r.check("g2-g 系列全体が時刻の昇順", gl.sorted, gl);
+  r.check("g2-h 時刻ラベルに秒が入らない", gl.labelsHaveNoSeconds, gl);
+
+  const glSvg = await page.evaluate(() => {
+    const box = document.getElementById("gchart-cam02");
+    const el = box ? box.querySelector("svg") : null;
+    if (!el) return null;
+    const paths = Array.from(el.querySelectorAll("path"));
+    const texts = Array.from(el.querySelectorAll("text")).map((t) => t.textContent);
+    return {
+      dashed: paths.filter((p) => p.getAttribute("stroke-dasharray")).length,
+      solid: paths.filter((p) => !p.getAttribute("stroke-dasharray") && p.getAttribute("d")).length,
+      hasNowMarker: texts.includes("現在"),
+      legend: (document.getElementById("gchart-cam02-legend") || {}).textContent || ""
+    };
+  });
+  r.check("g3-a グラフ一覧の水位グラフが描画される", glSvg && glSvg.solid >= 1, glSvg);
+  r.check("g3-b 予測部分が点線で描かれる", glSvg && glSvg.dashed >= 1, glSvg);
+  r.check("g3-c 実測と予測の境界に「現在」の目印が出る", glSvg && glSvg.hasNowMarker, glSvg);
+  r.check("g3-d 凡例に点線=予測の説明が出る", glSvg && glSvg.legend.includes("点線"), glSvg.legend);
+
+  // 各カードの右上に拠点のカメラ映像が入ること(電源監視のサムネイルと同じ扱い)
+  const thumbs = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const card = document.querySelector('#graphGrid .simple-card[data-site-id="cam02"]');
+    const head = card ? card.querySelector(".graphlist-head") : null;
+    const img = head ? head.querySelector("img.site-thumb") : null;
+    const kids = head ? Array.from(head.children).map((c) => c.className) : [];
+    const powerThumb = d.siteStates.cam02.thumbEl;
+    return {
+      hasHead: !!head,
+      hasImg: !!img,
+      src: img ? img.getAttribute("src") : null,
+      isLast: kids.length ? kids[kids.length - 1].indexOf("site-thumb") >= 0 : false,
+      kids,
+      sameClassAsPower: !!powerThumb && powerThumb.className === (img && img.className),
+      clickable: img ? img.title : null,
+      total: document.querySelectorAll("#graphGrid img.site-thumb").length,
+      cards: document.querySelectorAll("#graphGrid .simple-card").length
+    };
+  });
+  r.check("g4-a カードの先頭に見出し＋画像の行がある", thumbs.hasHead, thumbs);
+  r.check("g4-b 拠点のカメラ映像が入る", thumbs.hasImg, thumbs);
+  r.check("g4-c 画像は行の右端(=カードの右上)に置かれる", thumbs.isLast, thumbs.kids);
+  r.check("g4-d 電源監視と同じサムネイルの体裁", thumbs.sameClassAsPower, thumbs);
+  r.check("g4-e クリックで拡大できる旨の説明が付く", (thumbs.clickable || "").includes("拡大"), thumbs.clickable);
+  r.check("g4-f 画像を取得できた拠点すべてに表示される", thumbs.total > 1 && thumbs.total <= thumbs.cards, thumbs);
+
+  const glSubtitle = await page.textContent("#graphlistSubtitle");
+  r.check("g3-e 説明文が12時間・6時間に言及", glSubtitle.includes("12時間") && glSubtitle.includes("6時間"), glSubtitle);
+
   r.check("f4-g ページ例外が発生しない", page.errMsgs().length === 0, page.errMsgs());
   await page.close();
 
-  /* ---- 5. 気象データが取れない場合 ---- */
+  /* ---- 6. 気象データが取れない場合 ---- */
   const page2 = await newPage(null, { nowMs: NOW, openMeteoStatus: 500, recentCsv: recent, recentWaterCsv: recent });
   await openDashboard(page2);
   await page2.waitForTimeout(1500);
