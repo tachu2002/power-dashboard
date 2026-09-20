@@ -189,6 +189,45 @@ export async function run() {
   r.check("b7-a 一連の再生操作でページ例外が発生しない", page.errMsgs().length === 0, page.errMsgs());
   await page.close();
 
+  /* ---- 3b. 画像が専用ブランチ(絶対URL)にある場合 ---- */
+  const pageUrl = await newPage(null, {
+    nowMs: NOW,
+    manifest: {
+      generatedAt: new Date(NOW).toISOString(), retentionDays: 2,
+      sites: { cam02: { name: "cam02", files: [1, 2, 3].map((i) => ({
+        ts: new Date(NOW - i * HOUR).toISOString(),
+        file: "https://raw.githubusercontent.com/tachu2002/power-dashboard/images/cam02/f" + i + ".jpg",
+        path: "data/images/cam02/f" + i + ".jpg"
+      })) } }
+    }
+  });
+  await pageUrl.route("**/raw.githubusercontent.com/**/images/**", (route) =>
+    route.fulfill({ contentType: "image/jpeg", body: Buffer.from(
+      "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==",
+      "base64") }));
+  await openDashboard(pageUrl, () => !!window.__dashboardDebug.getImageManifest());
+  const absUrl = await pageUrl.evaluate(() => {
+    const d = window.__dashboardDebug;
+    d.showView("camlist");
+    const files = d.getSortedPlaybackFiles("cam02");
+    d.startCamlistPlayback("cam02");
+    const s = d.siteStates.cam02;
+    return {
+      count: files.length,
+      allAbsolute: files.every((f) => /^https:\/\/raw\.githubusercontent\.com\//.test(f.file)),
+      sorted: files.every((f, i) => i === 0 || new Date(f.ts) >= new Date(files[i - 1].ts)),
+      src: s.camImgEl.getAttribute("src"),
+      active: d.getCamlistPlaybackState().active
+    };
+  });
+  r.check("b7b-a 絶対URLの画像一覧も扱える", absUrl.count === 3 && absUrl.allAbsolute, absUrl);
+  r.check("b7b-b 時刻の昇順に並ぶ", absUrl.sorted, absUrl);
+  r.check("b7b-c 再生時に絶対URLをそのまま読み込む",
+    /^https:\/\/raw\.githubusercontent\.com\/.*\/images\/cam02\//.test(absUrl.src || ""), absUrl.src);
+  r.check("b7b-d 再生が開始される", absUrl.active === true, absUrl);
+  r.check("b7b-e ページ例外にはならない", pageUrl.errMsgs().length === 0, pageUrl.errMsgs());
+  await pageUrl.close();
+
   /* ---- 4. マニフェストをまだ読み込めていない場合 ---- */
   const page2 = await newPage(null, { nowMs: NOW });
   // 応答を返さないことで「読み込み中」の状態を再現する(後から登録したルートが優先される)

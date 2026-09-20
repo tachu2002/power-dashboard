@@ -244,6 +244,66 @@ export async function run() {
     m3.sites.cam02.files.map((f) => f.ts));
   r.check("s11-g 生成時刻が更新される", Date.parse(m3.generatedAt) > now - 60000, m3.generatedAt);
 
+  /* ============ 画像の保存先・縮小・スキップ(2026-09-20の見直し) ============ */
+  // マニフェストには「ダッシュボードが読むURL(file)」と「リポジトリ内の実体(path)」の両方が入る
+  const m1 = JSON.parse(fs.readFileSync(path.join(sandbox, "data", "images", "manifest.json"), "utf8"));
+  const anyEntry = Object.values(m1.sites).find((v) => v.files && v.files.length).files[0];
+  r.check("s12-a 既定では従来どおり相対パス", anyEntry.file.startsWith("data/images/"), anyEntry);
+  r.check("s12-b 実体の位置(path)も持つ", anyEntry.path && anyEntry.path.startsWith("data/images/"), anyEntry);
+
+  // IMAGE_BASE_URL を指定すると、fileが専用ブランチのURLになる
+  const sandbox4 = makeSandbox("imgbranch");
+  const prevBase = process.env.IMAGE_BASE_URL;
+  process.env.IMAGE_BASE_URL = "https://raw.githubusercontent.com/tachu2002/power-dashboard/images/";
+  await runPoll(sandbox4, handler, "7");
+  delete process.env.IMAGE_BASE_URL;
+  if (prevBase) process.env.IMAGE_BASE_URL = prevBase;
+  const m2 = JSON.parse(fs.readFileSync(path.join(sandbox4, "data", "images", "manifest.json"), "utf8"));
+  const e2 = Object.values(m2.sites).find((v) => v.files && v.files.length).files[0];
+  r.check("s12-c 指定するとimagesブランチのURLになる",
+    e2.file.indexOf("raw.githubusercontent.com") >= 0 && e2.file.indexOf("/images/") >= 0, e2);
+  r.check("s12-d URLの末尾が拠点ID/ファイル名", /\/images\/(cam|kw|kc)\w+\/\d{8}T\d{6}Z\.jpg$/.test(e2.file), e2.file);
+  r.check("s12-e 実体の位置はリポジトリ内の相対パスのまま", e2.path.startsWith("data/images/"), e2);
+  r.check("s12-f 実体が保存されている", fs.existsSync(path.join(sandbox4, e2.path)), e2.path);
+
+  // SKIP_IMAGES=1 のときは画像を保存しない(データだけ更新する回)
+  const sandbox5 = makeSandbox("skipimg");
+  process.env.SKIP_IMAGES = "1";
+  await runPoll(sandbox5, handler, "8");
+  delete process.env.SKIP_IMAGES;
+  r.check("s13-a SKIP_IMAGES=1では画像ディレクトリを作らない",
+    !fs.existsSync(path.join(sandbox5, "data", "images", "cam02")), "cam02");
+  r.check("s13-b データ(CSV)は通常どおり書かれる",
+    (readCsv(sandbox5, "recent.csv") || []).length > 30, (readCsv(sandbox5, "recent.csv") || []).length);
+  const latest5 = JSON.parse(fs.readFileSync(path.join(sandbox5, "data", "latest.json"), "utf8"));
+  r.check("s13-c latest.jsonも通常どおり", Object.keys(latest5.sites).length === 38, Object.keys(latest5.sites).length);
+
+  // 保持期間を過ぎた画像の削除は path を見て行う(fileがURLでも消せる)
+  const sandbox6 = makeSandbox("urlretention");
+  const dir6 = path.join(sandbox6, "data", "images", "cam02");
+  fs.mkdirSync(dir6, { recursive: true });
+  fs.writeFileSync(path.join(sandbox6, "data/images/cam02/old.jpg"), TINY_JPEG);
+  fs.writeFileSync(path.join(sandbox6, "data", "images", "manifest.json"), JSON.stringify({
+    generatedAt: new Date(now - 5 * 24 * 3600000).toISOString(), retentionDays: 2,
+    sites: { cam02: { name: "中郷第１樋管", files: [
+      { ts: new Date(now - 5 * 24 * 3600000).toISOString(),
+        file: "https://raw.githubusercontent.com/tachu2002/power-dashboard/images/cam02/old.jpg",
+        path: "data/images/cam02/old.jpg" }
+    ] } }
+  }, null, 2) + "\n");
+  process.env.IMAGE_BASE_URL = "https://raw.githubusercontent.com/tachu2002/power-dashboard/images/";
+  await runPoll(sandbox6, handler, "9");
+  delete process.env.IMAGE_BASE_URL;
+  const m6 = JSON.parse(fs.readFileSync(path.join(sandbox6, "data", "images", "manifest.json"), "utf8"));
+  r.check("s14-a URL形式でも古い画像をマニフェストから外す",
+    !m6.sites.cam02.files.some((f) => (f.path || "").indexOf("old.jpg") >= 0), m6.sites.cam02.files.map((f) => f.path));
+  r.check("s14-b URL形式でも実体を削除する",
+    !fs.existsSync(path.join(sandbox6, "data/images/cam02/old.jpg")), "old.jpg");
+
+  fs.rmSync(sandbox4, { recursive: true, force: true });
+  fs.rmSync(sandbox5, { recursive: true, force: true });
+  fs.rmSync(sandbox6, { recursive: true, force: true });
+
   /* ============ 純粋関数 ============ */
   const { parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID } = first.mod;
   const parsed = parsePowerCsv(powerCsv(relayRows));
