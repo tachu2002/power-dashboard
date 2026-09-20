@@ -105,10 +105,25 @@ jobs:
               for t in 1 2 3; do
                 if git push -q; then pushed=1; break; fi
                 echo "pushに失敗しました。再試行します ($t/3)..."
-                git pull --rebase -q || true
+                # 注意: history.csv は既定で6回に1回しかステージしないため、作業ツリーには常に
+                # 未ステージの変更が残る。素の `git pull --rebase` はこれを理由に
+                # "cannot pull with rebase: You have unstaged changes." で必ず失敗し、
+                # 一度リモートが先に進むと以後ずっとpushできない状態になる(2026-09-20に発生)。
+                # --autostash を付けて、未ステージの変更を自動で退避・復元させる。
+                git fetch -q origin main || true
+                if ! git rebase -q --autostash origin/main; then
+                  git rebase --abort >/dev/null 2>&1 || true
+                fi
                 sleep 5
               done
-              [ "$pushed" = "1" ] || echo "pushできませんでした(次の回で再試行します)"
+              if [ "$pushed" != "1" ]; then
+                # 3回試しても押し込めない場合は、リモートに合わせ直してから次の回でやり直す。
+                # (そのままだとローカルだけ先に進み、以後ずっとpushできなくなるため)
+                echo "pushできませんでした。リモートに合わせ直して次の回で取り直します"
+                git rebase --abort >/dev/null 2>&1 || true
+                git fetch -q origin main || true
+                git reset -q --hard origin/main || true
+              fi
             fi
 
             NOW=$(date +%s)
