@@ -574,6 +574,10 @@
   .water-now-value { font-size: 26px; font-weight: 700; font-variant-numeric: proportional-nums; }
   .water-now-value .unit { font-size: 13px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
   .water-now-delta { font-size: 12px; color: var(--text-secondary); margin-left: auto; }
+  /* 水位変化グラフ一覧: 現在水位と「直前に取得した水位」との差。
+     差の大きさは色だけでなく必ず数値で示す(色覚に依存しないようにするため)。 */
+  .water-now-delta.water-delta-strong { font-weight: 700; }
+  .water-prev-line { flex: 0 0 100%; font-size: 10px; color: var(--text-muted); margin-top: 2px; }
 
   .data-list-scroll { height: 220px; overflow-y: auto; border: 1px solid var(--gridline); border-radius: 8px; }
   table.data-list-table { width: 100%; border-collapse: collapse; font-size: 12px; }
@@ -3447,9 +3451,13 @@
     header.appendChild(h2); header.appendChild(status);
 
     var nowRow = document.createElement("div"); nowRow.className = "water-now"; nowRow.style.marginBottom = "6px";
+    nowRow.style.flexWrap = "wrap";
     var nowLabel = document.createElement("span"); nowLabel.style.fontSize = "11px"; nowLabel.style.color = "var(--text-secondary)"; nowLabel.textContent = "現在水位";
     var nowValue = document.createElement("span"); nowValue.className = "water-now-value"; nowValue.style.fontSize = "20px"; nowValue.innerHTML = '–<span class="unit">m</span>';
-    nowRow.appendChild(nowLabel); nowRow.appendChild(nowValue);
+    // 現在水位の隣に「直前に取得した水位との差」を出す(下段に比較元の値と時刻)。
+    var nowDelta = document.createElement("span"); nowDelta.className = "water-now-delta"; nowDelta.innerHTML = "&nbsp;";
+    var prevLine = document.createElement("div"); prevLine.className = "water-prev-line";
+    nowRow.appendChild(nowLabel); nowRow.appendChild(nowValue); nowRow.appendChild(nowDelta); nowRow.appendChild(prevLine);
 
     var graphBox = document.createElement("div"); graphBox.className = "graph-box"; graphBox.id = "gchart-" + site.id;
     var graphLegend = document.createElement("div"); graphLegend.className = "chart-legend"; graphLegend.id = "gchart-" + site.id + "-legend";
@@ -3477,6 +3485,7 @@
     s.graphChart = createLevelChart("gchart-" + site.id);
     s.graphThumbSlot = headRow; s.graphThumbEl = null;
     s.graphDotEl = dot; s.graphLabelEl = statusLabel; s.graphNowValueEl = nowValue;
+    s.graphDeltaEl = nowDelta; s.graphPrevLineEl = prevLine;
     s.forecast6El = f6; s.forecast12El = f12;
     s.graphCardEl = card;
   });
@@ -3485,6 +3494,59 @@
   function graphlistForecastFor(site) {
     var limit = Date.now() + GRAPHLIST_FORECAST_HORIZON_MS;
     return cachedPrediction(site, "water").filter(function (f) { return f.t <= limit; });
+  }
+  /* ---------------------------------------------------------------------
+   * 現在水位と「直前に取得した水位」との差
+   * -----------------------------------------------------------------------
+   * 水位は取得間隔が一定でない(サーバー側の定期取得が数時間空くことがある)ため、
+   * 差だけでなく「いつの値と比べているか」も併記する。
+   * --------------------------------------------------------------------- */
+  var WATER_DELTA_EPSILON_M = 0.005; // 表示は小数2桁のため、これ未満は「変化なし」として扱う
+  function waterDeltaInfo(site) {
+    var s = siteStates[site.id];
+    if (!s) return null;
+    var pts = s.points.filter(waterLevelFilter);
+    if (pts.length < 2) return null;
+    var last = pts[pts.length - 1], prev = pts[pts.length - 2];
+    return {
+      diff: last.waterLevelM - prev.waterLevelM,
+      value: last.waterLevelM, prevValue: prev.waterLevelM,
+      prevAt: prev.fetchedAt, lastAt: last.fetchedAt,
+      elapsedMs: last.fetchedAt.getTime() - prev.fetchedAt.getTime()
+    };
+  }
+  function fmtWaterDelta(diff) {
+    var mark = diff > WATER_DELTA_EPSILON_M ? "▲" : diff < -WATER_DELTA_EPSILON_M ? "▼" : "±";
+    return "直前比 " + mark + Math.abs(diff).toFixed(2) + " m";
+  }
+  function waterDeltaColorVar(diff) {
+    if (diff >= RISE_ALERT_THRESHOLD_M) return "var(--critical-border)";  // 急上昇(0.2m以上)
+    if (diff > WATER_DELTA_EPSILON_M) return "var(--warn-border)";        // 上昇
+    if (diff < -WATER_DELTA_EPSILON_M) return "var(--ok-border)";         // 下降
+    return "var(--text-muted)";                                           // 変化なし
+  }
+  function fmtElapsedShort(ms) {
+    var min = Math.max(0, Math.round(ms / 60000));
+    if (min < 60) return min + "分前";
+    var h = Math.floor(min / 60), m = min % 60;
+    return h + "時間" + (m ? m + "分" : "") + "前";
+  }
+  function updateGraphlistDelta(site) {
+    var s = siteStates[site.id];
+    if (!s.graphDeltaEl) return;
+    var info = waterDeltaInfo(site);
+    if (!info) {
+      s.graphDeltaEl.innerHTML = "&nbsp;";
+      s.graphDeltaEl.style.color = "";
+      s.graphDeltaEl.classList.remove("water-delta-strong");
+      s.graphPrevLineEl.textContent = "直前の取得値がまだありません";
+      return;
+    }
+    s.graphDeltaEl.textContent = fmtWaterDelta(info.diff);
+    s.graphDeltaEl.style.color = waterDeltaColorVar(info.diff);
+    s.graphDeltaEl.classList.toggle("water-delta-strong", info.diff >= RISE_ALERT_THRESHOLD_M);
+    s.graphPrevLineEl.textContent = "直前 " + info.prevValue.toFixed(2) + " m（" +
+      fmtClockHm(info.prevAt) + "・" + fmtElapsedShort(info.elapsedMs) + "）";
   }
   // グラフ一覧で使う実測点(直近12時間ぶん)。
   // 拠点詳細の selectRecentForChart は「枠内の点が少なければ過去へ範囲を広げる」動作をするが、
@@ -3523,6 +3585,7 @@
       s.graphLabelEl.textContent = "最終取得 " + fmtClock(new Date());
       s.graphChart.setData(buildGraphlistChartData(site), s.baselineLevelM, getThresholdsForSite(site));
     }
+    updateGraphlistDelta(site);
     updateForecastReadouts(site);
   }
   document.getElementById("graphlistRefreshBtn").addEventListener("click", function () { pollEverythingNow(); });
@@ -4846,6 +4909,9 @@
     GRAPHLIST_SITES: GRAPHLIST_SITES, graphlistForecastFor: graphlistForecastFor,
     GRAPHLIST_MIN_POINTS_IN_WINDOW: GRAPHLIST_MIN_POINTS_IN_WINDOW,
     selectGraphlistWaterPoints: selectGraphlistWaterPoints,
+    waterDeltaInfo: waterDeltaInfo, fmtWaterDelta: fmtWaterDelta,
+    waterDeltaColorVar: waterDeltaColorVar, fmtElapsedShort: fmtElapsedShort,
+    updateGraphlistDelta: updateGraphlistDelta, WATER_DELTA_EPSILON_M: WATER_DELTA_EPSILON_M,
     buildGraphlistChartData: buildGraphlistChartData, refreshGraphlistCard: refreshGraphlistCard,
     loadForecastHourly: loadForecastHourly, parseLocalHour: parseLocalHour,
     getForecastState: function () { return forecastState; },
