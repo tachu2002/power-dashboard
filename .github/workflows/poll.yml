@@ -39,6 +39,14 @@ jobs:
         with:
           node-version: "20"
 
+      - name: 画像縮小用のImageMagickを用意する
+        run: |
+          if command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1; then
+            echo "ImageMagickは既に使えます"
+          else
+            sudo apt-get update -qq && sudo apt-get install -y -qq imagemagick || echo "導入に失敗しました(縮小せずに保存します)"
+          fi
+
       - name: mainから画像の実体を外す(初回のみ・以後はimagesブランチが持つ)
         run: |
           git config user.name "github-actions[bot]"
