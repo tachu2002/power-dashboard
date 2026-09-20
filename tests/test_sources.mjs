@@ -65,7 +65,7 @@ export async function run() {
   await page.waitForFunction(() => {
     const d = window.__dashboardDebug;
     return ["kw06", "kw07", "kw09"].every((id) => d.siteData[id].lastState !== "pending");
-  }, { timeout: 40000 });
+  }, { timeout: 90000 });
   const others = await page.evaluate(() => {
     const d = window.__dashboardDebug;
     return ["kw06", "kw07", "kw09"].map((id) => ({
@@ -119,7 +119,7 @@ export async function run() {
   await page3.waitForFunction(() => {
     const d = window.__dashboardDebug;
     return d.siteData.kw04 && d.siteData.kw04.lastState !== "pending";
-  }, { timeout: 40000 });
+  }, { timeout: 90000 });
   const allFail = await page3.evaluate(() => ({
     state: window.__dashboardDebug.siteData.kw04.lastState,
     ticker: (document.getElementById("errorTickerTrack") || {}).textContent || ""

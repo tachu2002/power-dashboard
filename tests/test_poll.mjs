@@ -304,6 +304,51 @@ export async function run() {
   fs.rmSync(sandbox5, { recursive: true, force: true });
   fs.rmSync(sandbox6, { recursive: true, force: true });
 
+  // 専用ブランチへ移す前の古いエントリ(相対パスで実体が無い)は一覧から外す。
+  // ただし専用ブランチのURL形式のエントリは、その実行で取得していなくても残す。
+  const sandbox7 = makeSandbox("legacyentries");
+  fs.mkdirSync(path.join(sandbox7, "data", "images", "cam02"), { recursive: true });
+  fs.writeFileSync(path.join(sandbox7, "data", "images", "manifest.json"), JSON.stringify({
+    generatedAt: new Date(now - 3600000).toISOString(), retentionDays: 2,
+    sites: { cam02: { name: "中郷第１樋管", files: [
+      // 実体が無い古い形式 → 外れる
+      { ts: new Date(now - 3600000).toISOString(), file: "data/images/cam02/gone.jpg" },
+      // 専用ブランチのURL形式 → 今回取得していなくても残る
+      { ts: new Date(now - 1800000).toISOString(),
+        file: "https://raw.githubusercontent.com/tachu2002/power-dashboard/images/cam02/kept.jpg",
+        path: "data/images/cam02/kept.jpg" }
+    ] } }
+  }, null, 2) + "\n");
+  process.env.IMAGE_BASE_URL = "https://raw.githubusercontent.com/tachu2002/power-dashboard/images/";
+  await runPoll(sandbox7, handler, "10");
+  delete process.env.IMAGE_BASE_URL;
+  const m7 = JSON.parse(fs.readFileSync(path.join(sandbox7, "data", "images", "manifest.json"), "utf8"));
+  const f7 = m7.sites.cam02.files;
+  r.check("s15-a 実体の無い古い相対パスのエントリは外す",
+    !f7.some((f) => String(f.file).indexOf("gone.jpg") >= 0), f7.map((f) => f.file).slice(0, 4));
+  r.check("s15-b 専用ブランチのURLのエントリは今回取得していなくても残る",
+    f7.some((f) => String(f.file).indexOf("kept.jpg") >= 0), f7.map((f) => f.file).slice(0, 4));
+  r.check("s15-c 今回取得した分も入っている", f7.length >= 2, f7.length);
+  fs.rmSync(sandbox7, { recursive: true, force: true });
+
+  // SKIP_MATSUHISA=1: 個人運用のCGI(matsuhisa.info)への負荷を抑えるため、その回は27拠点を取得しない
+  const sandbox8 = makeSandbox("skipmatsu");
+  await runPoll(sandbox8, handler, "11");          // 1回目は通常どおり全拠点
+  process.env.SKIP_MATSUHISA = "1";
+  await runPoll(sandbox8, handler, "12");          // 2回目はmatsuhisaをスキップ
+  delete process.env.SKIP_MATSUHISA;
+  const rec8 = readCsv(sandbox8, "recent.csv");
+  const latest8 = JSON.parse(fs.readFileSync(path.join(sandbox8, "data", "latest.json"), "utf8"));
+  const matsuRows = rec8.filter((l) => l.includes("サーバー(直接取得)")).length;
+  const kawabouRows = rec8.filter((l) => l.includes("川の防災情報")).length;
+  r.check("s16-a スキップ回はmatsuhisaの行が増えない(1回目の27行のまま)", matsuRows === 27, matsuRows);
+  r.check("s16-b 国交省の拠点は両方の回で取得する(11×2)", kawabouRows === 22, kawabouRows);
+  r.check("s16-c スキップした拠点もlatest.jsonから消えない",
+    Object.keys(latest8.sites).length === 38, Object.keys(latest8.sites).length);
+  r.check("s16-d スキップした拠点は前回の水位を引き継ぐ",
+    typeof latest8.sites.cam02.waterLevelM === "number", latest8.sites.cam02);
+  fs.rmSync(sandbox8, { recursive: true, force: true });
+
   /* ============ 純粋関数 ============ */
   const { parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID } = first.mod;
   const parsed = parsePowerCsv(powerCsv(relayRows));
