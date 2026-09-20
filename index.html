@@ -3486,13 +3486,26 @@
     var limit = Date.now() + GRAPHLIST_FORECAST_HORIZON_MS;
     return cachedPrediction(site, "water").filter(function (f) { return f.t <= limit; });
   }
-  // 直近12時間ぶんの実測 + 6時間先までの予測を1本の系列にまとめる。
-  // 実測が少ない場合(サーバー側の取得間隔が広い場合)は selectRecentForChart が自動で範囲を広げるため、
-  // グラフが1〜2点だけになってしまうことはない。
-  function buildGraphlistChartData(site) {
+  // グラフ一覧で使う実測点(直近12時間ぶん)。
+  // 拠点詳細の selectRecentForChart は「枠内の点が少なければ過去へ範囲を広げる」動作をするが、
+  // サーバー側(GitHub Actionsの無料枠cron)は実行間隔が数時間空くことがあり、12時間枠内の点が
+  // 数点しか無いのが通常のため、それを使うと常に全期間(数週間)が表示されてしまう。
+  // ここでは「直近12時間まで」というご指定を優先し、枠内の点が極端に少ない場合
+  // (線が引けない1点以下)だけ、直近の点を最低限そのまま使う。
+  var GRAPHLIST_MIN_POINTS_IN_WINDOW = 2;
+  function selectGraphlistWaterPoints(site) {
     var s = siteStates[site.id];
-    var sel = selectRecentForChart(s.points, waterLevelFilter, GRAPHLIST_PAST_WINDOW_MS);
-    var data = sel.points.map(function (p) {
+    var all = s.points.filter(waterLevelFilter);
+    var cutoff = Date.now() - GRAPHLIST_PAST_WINDOW_MS;
+    var win = all.filter(function (p) { return p.fetchedAt.getTime() >= cutoff; });
+    if (win.length >= GRAPHLIST_MIN_POINTS_IN_WINDOW) {
+      return win.length > MAX_CHART_POINTS ? win.slice(win.length - MAX_CHART_POINTS) : win;
+    }
+    return all.slice(Math.max(0, all.length - GRAPHLIST_MIN_POINTS_IN_WINDOW));
+  }
+  // 直近12時間ぶんの実測 + 6時間先までの予測を1本の系列にまとめる。
+  function buildGraphlistChartData(site) {
+    var data = selectGraphlistWaterPoints(site).map(function (p) {
       return { label: fmtClockHm(p.fetchedAt), value: p.waterLevelM, t: p.fetchedAt.getTime(), rainMm: findNearestRainMm(p.fetchedAt) };
     });
     graphlistForecastFor(site).forEach(function (f) {
@@ -4831,6 +4844,8 @@
     GRAPHLIST_PAST_WINDOW_MS: GRAPHLIST_PAST_WINDOW_MS,
     GRAPHLIST_FORECAST_HORIZON_MS: GRAPHLIST_FORECAST_HORIZON_MS,
     GRAPHLIST_SITES: GRAPHLIST_SITES, graphlistForecastFor: graphlistForecastFor,
+    GRAPHLIST_MIN_POINTS_IN_WINDOW: GRAPHLIST_MIN_POINTS_IN_WINDOW,
+    selectGraphlistWaterPoints: selectGraphlistWaterPoints,
     buildGraphlistChartData: buildGraphlistChartData, refreshGraphlistCard: refreshGraphlistCard,
     loadForecastHourly: loadForecastHourly, parseLocalHour: parseLocalHour,
     getForecastState: function () { return forecastState; },
