@@ -10,11 +10,14 @@
 //
 // あわせて、水位・電源データを持たない画像専用拠点(kc01〜kc08)を含む全46拠点の
 // カメラ画像を取得し、data/images/<拠点ID>/配下へ保存する(直近IMAGE_RETENTION_DAYS日分のみ保持、
-// それより古いものは自動削除)。data/images/manifest.jsonに拠点ごとの保存済み画像一覧を書き出し、
-// ダッシュボードの「データダウンロード」画面はこれを読み込んでZIPダウンロードを提供する。
+// それより古いものは自動削除)。画像の実体はmainではなく履歴を持たない専用ブランチ(images)へ
+// 置く(scripts/publish-images.sh)。data/images/manifest.jsonだけはmainに置き、各画像の
+// 「ダッシュボードが読むURL(file)」と「リポジトリ内の実体の位置(path)」を記録する。
+// ダッシュボードのタイムラプス再生と「データダウンロード」画面はこのマニフェストを使う。
 "use strict";
 
 import { readFile, writeFile, appendFile, mkdir, unlink } from "node:fs/promises";
+import { execFile } from "node:child_process";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,15 +30,24 @@ const WATER_RECENT_CSV_PATH = path.join(DATA_DIR, "recent_water.csv");
 const LATEST_JSON_PATH = path.join(DATA_DIR, "latest.json");
 const IMAGES_DIR = path.join(DATA_DIR, "images");
 const IMAGE_MANIFEST_PATH = path.join(IMAGES_DIR, "manifest.json");
-// 画像は直近2日分のみ保持する(ご要望によりタイムラプス再生の対象を直近2日間へ変更したため、
-// サーバー側の保持期間も2日に合わせた。リポジトリの肥大化を抑える意味でも有効。
-// なお git の性質上、削除しても過去コミットの履歴には画像バイトが残り続けるため、リポジトリの
-// 「.git」自体のサイズは長期的には増加し続ける。厳密にサイズを一定に保つには、履歴を持たない
-// 専用ブランチをforce-pushで定期的に作り直す等の追加対応が必要(今回はスコープ外)。
-const IMAGE_RETENTION_DAYS = 2;
+// 画像は直近2日分のみ保持する(タイムラプス再生の対象が直近2日間のため)。
+// 画像はmainではなく履歴を持たない専用ブランチ(images)へ置く運用に変更した(2026-09-20)。
+// mainへ画像をコミットし続けると、削除しても過去コミットに画像バイトが残るため .git が
+// 際限なく増える(実測: 約5週間でリポジトリ2.81GB)。専用ブランチ側は定期的に履歴を畳むことで
+// 常に「直近2日分の実体」だけを保持する。scripts/publish-images.sh を参照。
+const IMAGE_RETENTION_DAYS = Number(process.env.IMAGE_RETENTION_DAYS || 2);
 const IMAGE_RETENTION_MS = IMAGE_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 const MAX_IMAGE_BYTES = 3 * 1024 * 1024; // 3MB(異常な応答を保存しないための安全上限)
 const IMAGE_CONCURRENCY = 5;
+// アーカイブ画像は長辺をIMAGE_MAX_WIDTHへ縮小して保存する(タイムラプス表示には十分で、
+// 元のまま(1920px・約200KB)保存すると高頻度化したときに容量が膨らみすぎるため)。
+// 画面に出ている「現在のライブ映像」は取得元から直接読み込むので、この縮小の影響を受けない。
+const IMAGE_MAX_WIDTH = Number(process.env.IMAGE_MAX_WIDTH || 640);
+const IMAGE_QUALITY = Number(process.env.IMAGE_QUALITY || 72);
+// 画像の公開URLの先頭(専用ブランチのraw URL)。未指定ならmain配下の相対パス(従来どおり)。
+const IMAGE_BASE_URL = process.env.IMAGE_BASE_URL || "";
+// データ(CSV)だけ更新して画像アーカイブは行わない回に使う(データ10分・画像20分などの使い分け)。
+const SKIP_IMAGES = process.env.SKIP_IMAGES === "1";
 
 // 拠点,取得時刻,機器の計測時刻,PV(W),BAT(V),水位(m),取得方法 の7列
 // (旧バージョンは水位(m)列が無い6列だったため、recent.csv再構築時に旧形式の行は破棄する)
@@ -426,12 +438,47 @@ async function readManifest() {
   }
 }
 
+// ImageMagickのconvertで縮小する(GitHubのubuntuランナーには標準で入っている)。
+// 使えない環境では縮小せずそのまま保存する(機能は落とさない)。
+let imageMagickUsable = null;
+function shrinkJpeg(buffer) {
+  if (!(IMAGE_MAX_WIDTH > 0) || imageMagickUsable === false) return Promise.resolve(buffer);
+  return new Promise(function (resolve) {
+    let settled = false;
+    const done = function (buf) { if (!settled) { settled = true; resolve(buf); } };
+    try {
+      const child = execFile("convert",
+        ["-", "-resize", IMAGE_MAX_WIDTH + ">", "-quality", String(IMAGE_QUALITY), "-strip", "jpg:-"],
+        { encoding: "buffer", maxBuffer: 64 * 1024 * 1024 },
+        function (err, stdout) {
+          if (err) {
+            if (imageMagickUsable === null) {
+              imageMagickUsable = false;
+              console.warn("画像の縮小をスキップします(ImageMagickが使えません): " + (err && err.message ? err.message : String(err)));
+            }
+            return done(buffer);
+          }
+          imageMagickUsable = true;
+          // 縮小に失敗してJPEG以外が返った場合や、かえって大きくなった場合は元のまま保存する
+          if (stdout && stdout.length > 2 && stdout[0] === 0xff && stdout[1] === 0xd8 && stdout.length < buffer.length) return done(stdout);
+          done(buffer);
+        });
+      child.on("error", function () { imageMagickUsable = false; done(buffer); });
+      child.stdin.on("error", function () { done(buffer); });
+      child.stdin.end(buffer);
+    } catch (e) { imageMagickUsable = false; done(buffer); }
+  });
+}
 async function saveSiteImage(site, buffer, fetchedAt) {
   const siteDir = path.join(IMAGES_DIR, site.id);
   await mkdir(siteDir, { recursive: true });
   const fileName = imageFileNameFor(fetchedAt);
-  await writeFile(path.join(siteDir, fileName), buffer);
-  return "data/images/" + site.id + "/" + fileName;
+  const saved = await shrinkJpeg(buffer);
+  await writeFile(path.join(siteDir, fileName), saved);
+  // path: リポジトリ内の実体の位置(保持期間を過ぎた分の削除に使う)
+  // url : ダッシュボードが読み込むURL(専用ブランチのraw URL、未設定なら相対パス)
+  const relPath = "data/images/" + site.id + "/" + fileName;
+  return { path: relPath, url: IMAGE_BASE_URL ? (IMAGE_BASE_URL + site.id + "/" + fileName) : relPath };
 }
 
 // 全46拠点(matsuhisa 27 + kawabou-water 11 + kawabou-camera 8)の画像取得・保存・
@@ -467,10 +514,10 @@ async function archiveImages(readingsBySiteId) {
       const url = await task.resolveUrl();
       if (!url) throw new Error("画像URLを解決できませんでした");
       const buffer = await fetchImageBuffer(url);
-      const relPath = await saveSiteImage(task.site, buffer, fetchedAt);
+      const saved = await saveSiteImage(task.site, buffer, fetchedAt);
       if (!manifest.sites[task.site.id]) manifest.sites[task.site.id] = { name: task.site.name, files: [] };
       manifest.sites[task.site.id].name = task.site.name;
-      manifest.sites[task.site.id].files.push({ ts: fetchedAt.toISOString(), file: relPath });
+      manifest.sites[task.site.id].files.push({ ts: fetchedAt.toISOString(), file: saved.url, path: saved.path });
       okCount++;
     } catch (err) {
       ngCount++;
@@ -492,7 +539,10 @@ async function archiveImages(readingsBySiteId) {
     kept.sort(function (a, b) { return Date.parse(a.ts) - Date.parse(b.ts); });
     entry.files = kept;
     for (const f of removed) {
-      try { await unlink(path.join(ROOT, f.file)); } catch (e) { /* 既に削除済みの場合は無視 */ }
+      // 古い形式(fileが相対パス)のマニフェストも扱えるようにpathが無ければfileを使う
+      const rel = f.path || f.file;
+      if (!rel || /^https?:/i.test(rel)) continue;
+      try { await unlink(path.join(ROOT, rel)); } catch (e) { /* 既に削除済みの場合は無視 */ }
     }
   }
 
@@ -707,6 +757,10 @@ async function main() {
 
   // 画像アーカイブはデータ取得(上記)とは独立したベストエフォート処理とし、
   // ここで失敗してもデータ取得自体の成功/終了コードには影響させない。
+  if (SKIP_IMAGES) {
+    console.log("画像アーカイブはスキップしました(SKIP_IMAGES=1)。");
+    return;
+  }
   try {
     await archiveImages(readingsBySiteId);
   } catch (err) {
