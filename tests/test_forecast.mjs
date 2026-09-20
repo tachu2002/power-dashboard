@@ -208,6 +208,39 @@ export async function run() {
   r.check("g2-g 系列全体が時刻の昇順", gl.sorted, gl);
   r.check("g2-h 時刻ラベルに秒が入らない", gl.labelsHaveNoSeconds, gl);
 
+  // サーバー側の取得間隔が空き、12時間枠内の実測が数点しか無い場合でも、
+  // 範囲を全期間へ広げず「直近12時間」を保つこと(GitHub Actionsのcronは実行間隔が空くため、
+  // これが実運用での通常状態になる)。
+  const sparse = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const s = d.siteStates.cam02;
+    const keep = s.points.slice();
+    const now = Date.now();
+    // 12時間枠内に3点だけ、ほかは3日以上前という状態を作る
+    s.points = [
+      { fetchedAt: new Date(now - 80 * 3600000), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.50, via: "t" },
+      { fetchedAt: new Date(now - 70 * 3600000), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.52, via: "t" },
+      { fetchedAt: new Date(now - 60 * 3600000), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.54, via: "t" },
+      { fetchedAt: new Date(now - 9 * 3600000), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.61, via: "t" },
+      { fetchedAt: new Date(now - 5 * 3600000), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.63, via: "t" },
+      { fetchedAt: new Date(now - 20 * 60000), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.66, via: "t" }
+    ];
+    const picked = d.selectGraphlistWaterPoints(d.SITE_CATALOG.cam02);
+    const oldestAgoH = (now - picked[0].fetchedAt.getTime()) / 3600000;
+    // 12時間枠内に1点も無い場合は、線が引けるよう直近の点を使う
+    s.points = [
+      { fetchedAt: new Date(now - 80 * 3600000), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.50, via: "t" },
+      { fetchedAt: new Date(now - 70 * 3600000), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.52, via: "t" },
+      { fetchedAt: new Date(now - 60 * 3600000), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.54, via: "t" }
+    ];
+    const stale = d.selectGraphlistWaterPoints(d.SITE_CATALOG.cam02);
+    s.points = keep;
+    return { count: picked.length, oldestAgoH, staleCount: stale.length, min: d.GRAPHLIST_MIN_POINTS_IN_WINDOW };
+  });
+  r.check("g2-i 枠内の実測が少なくても12時間表示を保つ(全期間へ広げない)", sparse.count === 3, sparse);
+  r.check("g2-j 12時間より古い点は混ざらない", sparse.oldestAgoH <= 12.01, sparse);
+  r.check("g2-k 枠内に点が無い場合だけ直近の点で線を引く", sparse.staleCount === sparse.min, sparse);
+
   const glSvg = await page.evaluate(() => {
     const box = document.getElementById("gchart-cam02");
     const el = box ? box.querySelector("svg") : null;
