@@ -438,36 +438,43 @@ async function readManifest() {
   }
 }
 
-// ImageMagickのconvertで縮小する(GitHubのubuntuランナーには標準で入っている)。
-// 使えない環境では縮小せずそのまま保存する(機能は落とさない)。
-let imageMagickUsable = null;
-function shrinkJpeg(buffer) {
-  if (!(IMAGE_MAX_WIDTH > 0) || imageMagickUsable === false) return Promise.resolve(buffer);
+// ImageMagickで縮小する。コマンド名は環境によって "magick"(v7) と "convert"(v6) のどちらかなので
+// 両方を順に試し、どちらも使えない環境では縮小せずそのまま保存する(機能は落とさない)。
+const IMAGE_RESIZE_COMMANDS = ["magick", "convert"];
+let imageResizeCmd = null;      // 使えると分かったコマンド
+let imageResizeUnusable = false; // どれも使えないと分かった
+function runResize(cmd, buffer) {
   return new Promise(function (resolve) {
     let settled = false;
     const done = function (buf) { if (!settled) { settled = true; resolve(buf); } };
     try {
-      const child = execFile("convert",
+      const child = execFile(cmd,
         ["-", "-resize", IMAGE_MAX_WIDTH + ">", "-quality", String(IMAGE_QUALITY), "-strip", "jpg:-"],
         { encoding: "buffer", maxBuffer: 64 * 1024 * 1024 },
         function (err, stdout) {
-          if (err) {
-            if (imageMagickUsable === null) {
-              imageMagickUsable = false;
-              console.warn("画像の縮小をスキップします(ImageMagickが使えません): " + (err && err.message ? err.message : String(err)));
-            }
-            return done(buffer);
-          }
-          imageMagickUsable = true;
-          // 縮小に失敗してJPEG以外が返った場合や、かえって大きくなった場合は元のまま保存する
+          if (err) return done(null);
+          // JPEG以外が返った場合や、かえって大きくなった場合は縮小しなかったことにする
           if (stdout && stdout.length > 2 && stdout[0] === 0xff && stdout[1] === 0xd8 && stdout.length < buffer.length) return done(stdout);
-          done(buffer);
+          done(null);
         });
-      child.on("error", function () { imageMagickUsable = false; done(buffer); });
-      child.stdin.on("error", function () { done(buffer); });
+      child.on("error", function () { done(null); });
+      child.stdin.on("error", function () { done(null); });
       child.stdin.end(buffer);
-    } catch (e) { imageMagickUsable = false; done(buffer); }
+    } catch (e) { done(null); }
   });
+}
+async function shrinkJpeg(buffer) {
+  if (!(IMAGE_MAX_WIDTH > 0) || imageResizeUnusable) return buffer;
+  const candidates = imageResizeCmd ? [imageResizeCmd] : IMAGE_RESIZE_COMMANDS;
+  for (const cmd of candidates) {
+    const out = await runResize(cmd, buffer);
+    if (out) { imageResizeCmd = cmd; return out; }
+  }
+  if (!imageResizeCmd) {
+    imageResizeUnusable = true;
+    console.warn("画像の縮小をスキップします(ImageMagickが使えません: " + IMAGE_RESIZE_COMMANDS.join(" / ") + ")");
+  }
+  return buffer;
 }
 async function saveSiteImage(site, buffer, fetchedAt) {
   const siteDir = path.join(IMAGES_DIR, site.id);
