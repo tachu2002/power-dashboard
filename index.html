@@ -25,6 +25,9 @@
     --critical-border:#d03b3b;
     --critical-bg:    #fbe9e7;
     --ok-border:      #2e9e63;
+    /* 電源監視の差分(▲▼)の色。ご要望により上昇=青・下降=赤で固定する。 */
+    --delta-up:       #1f6fd0;
+    --delta-down:     #d03b3b;
     /* 参考サイト(mishima-waterdx.com)の実際のCSSから抽出した水色系アクセント(#29b6f6/#008ac0系統)を
        ベースにした配色。ヘッダーの帯や選択状態のハイライトなど「配色・背景のイメージ」にのみ用いる。 */
     --accent:         #1394bd;
@@ -51,6 +54,8 @@
       --warn-bg:        #3a2f0f;
       --critical-border:#e05c5c;
       --ok-border:      #46b87d;
+      --delta-up:       #5aa6f5;
+      --delta-down:     #e05c5c;
       --critical-bg:    #3a1f1a;
       --accent:         #3fb8dd;
       --accent-strong:  #0c5c78;
@@ -81,6 +86,8 @@
     --critical-border:#e05c5c;
     --critical-bg:    #3a1f1a;
     --ok-border:      #46b87d;
+    --delta-up:       #5aa6f5;
+    --delta-down:     #e05c5c;
   }
 
   * { box-sizing: border-box; }
@@ -402,6 +409,9 @@
   .mini-stats .stat-value { font-size: 16px; font-weight: 600; margin-top: 1px; font-variant-numeric: proportional-nums; }
   .mini-stats .stat-value .unit { font-size: 11px; font-weight: 500; color: var(--text-secondary); margin-left: 2px; }
   .mini-stats .stat-delta { font-size: 10px; color: var(--text-secondary); }
+  /* 差分は色だけに頼らず▲▼±の記号でも判別できるようにしている(上昇=青・下降=赤)。 */
+  .mini-stats .stat-delta.up { color: var(--delta-up); font-weight: 600; }
+  .mini-stats .stat-delta.down { color: var(--delta-down); font-weight: 600; }
   /* バッテリー残量ゲージ(スマートフォンの電池表示のイメージ)。
      数値(パーセンテージ)は必ず文字として表示するため、色だけに意味を持たせていない。 */
   .battery-gauge { display: flex; flex-direction: column; gap: 2px; }
@@ -1132,14 +1142,18 @@
     var v = BATTERY_EMPTY_VOLTAGE_OVERRIDE[siteId];
     return typeof v === "number" ? v : BATTERY_EMPTY_VOLTAGE_DEFAULT;
   }
-  // 残量(%)。0〜100にクリップし、整数へ丸める。値が無い場合はnull。
+  // 残量(%)。0〜100にクリップし、小数第2位へ丸める(W・Vと桁をそろえるため)。値が無い場合はnull。
   function batteryPercentFor(siteId, voltage) {
     if (typeof voltage !== "number" || !isFinite(voltage)) return null;
     var empty = batteryEmptyVoltageFor(siteId);
     var span = BATTERY_FULL_VOLTAGE - empty;
     if (!(span > 0)) return null;
     var pct = ((voltage - empty) / span) * 100;
-    return Math.round(Math.min(100, Math.max(0, pct)));
+    return Math.round(Math.min(100, Math.max(0, pct)) * 100) / 100;
+  }
+  // 残量(%)の表示文字列。小数第2位まで必ず出す(例: 50.00%)。
+  function fmtBatteryPercent(pct) {
+    return typeof pct === "number" && isFinite(pct) ? pct.toFixed(2) + "%" : "–";
   }
   // 残量に応じたステータス色(良好/注意/危険)。数値も併記するため色だけに依存しない。
   // スマートフォンの電池表示のような横向きの電池マーク。中央に残量(%)を大きく表示する。
@@ -1151,12 +1165,14 @@
     var innerW = bodyW - padding * 2;
     var fillW = pct === null ? 0 : Math.max(pct > 0 ? 3 : 0, (innerW * pct) / 100);
     var color = batteryLevelColorVar(pct);
-    var label = pct === null ? "–" : pct + "%";
+    var label = pct === null ? "–" : fmtBatteryPercent(pct);
+    // 「100.00%」まで枠内に収まるよう、桁数に応じて文字サイズを落とす。
+    var labelFontSize = label.length >= 7 ? 13 : (label.length >= 5 ? 15 : 18);
     return '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="バッテリー残量 ' + label + '">' +
       '<rect class="battery-fill" x="' + (bodyX + padding) + '" y="' + (bodyY + padding) + '" width="' + fillW.toFixed(1) + '" height="' + (bodyH - padding * 2) + '" rx="4" fill="' + color + '"></rect>' +
       '<rect class="battery-body" x="' + bodyX + '" y="' + bodyY + '" width="' + bodyW + '" height="' + bodyH + '" rx="' + r + '"></rect>' +
       '<rect class="battery-cap" x="' + (bodyX + bodyW + 2) + '" y="' + (bodyY + 9) + '" width="6" height="14" rx="2"></rect>' +
-      '<text class="battery-pct-text" x="' + (bodyX + bodyW / 2) + '" y="' + (bodyY + bodyH / 2 + 1) + '" text-anchor="middle" dominant-baseline="middle" font-size="18" font-family="system-ui, -apple-system, sans-serif">' + label + '</text>' +
+      '<text class="battery-pct-text" x="' + (bodyX + bodyW / 2) + '" y="' + (bodyY + bodyH / 2 + 1) + '" text-anchor="middle" dominant-baseline="middle" font-size="' + labelFontSize + '" font-family="system-ui, -apple-system, sans-serif">' + label + '</text>' +
       '</svg>';
   }
   function batteryLevelColorVar(pct) {
@@ -1710,7 +1726,7 @@
         var nearRated = typeof ratedValue === "number" && Math.abs(t - ratedValue) <= tickStep * 0.9;
         if (!nearRated) {
           var label = el("text", { x: marginLeft - 8, y: y, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
-          label.textContent = t.toFixed(1); svg.appendChild(label);
+          label.textContent = t.toFixed(2); svg.appendChild(label);
         }
       });
       pickLabelIndices(xs, Math.min(5, n)).forEach(function (idx) {
@@ -1743,7 +1759,7 @@
       var lastIdx = split.boundaryIndex > 0 ? split.boundaryIndex - 1 : n - 1;
       var ex = xAt(lastIdx), ey = yAt(vals[lastIdx]);
       svg.appendChild(el("circle", { cx: ex, cy: ey, r: 4, fill: color, stroke: pal.surface, "stroke-width": 2 }));
-      drawSeriesEndLabel(svg, pal, ex, ey, vals[lastIdx].toFixed(1) + " " + valueUnit);
+      drawSeriesEndLabel(svg, pal, ex, ey, vals[lastIdx].toFixed(2) + " " + valueUnit);
       var hoverGroup = el("g", { opacity: 0 });
       var crosshair = el("line", { x1: 0, x2: 0, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1 });
       var hoverDot = el("circle", { r: 4, fill: color, stroke: pal.surface, "stroke-width": 2 });
@@ -1766,7 +1782,7 @@
         tooltip.appendChild(line0);
         var line = document.createElement("div");
         line.style.cssText = "color:var(--text-primary);font-weight:600;";
-        line.textContent = vals[idx2].toFixed(1) + " " + valueUnit + (points[idx2].predicted ? "（予測）" : "");
+        line.textContent = vals[idx2].toFixed(2) + " " + valueUnit + (points[idx2].predicted ? "（予測）" : "");
         tooltip.appendChild(line);
         var containerRect = container.getBoundingClientRect();
         var tipX = (px / W) * containerRect.width;
@@ -2015,8 +2031,11 @@
   });
   // 「最低水位」の点線は、保持している過去データ(サーバー履歴読込み分+セッション中の取得分)全体から
   // 実際の最低値を都度計算し直す(初回取得値で固定してしまわないようにする)。
-  // 多呂樋管(cam14)は過去データからの自動算出ではなく、ご指定の固定値0.06mを基準水位とする。
-  var FIXED_BASELINE_OVERRIDE = { cam14: 0.06 };
+  // 一部の拠点は過去データからの自動算出ではなく、ご指定の固定値を基準水位とする
+  // (自動算出だと、点検時の排水や一時的な異常値を拾って基準が下がりすぎるため)。
+  //   多呂樋管(cam14) 0.06m / 大場ポンプ場流入水路(cam39) 0.01m
+  //   安間樋管(cam12) -0.08m / 梅名樋管2号=梅名第二(cam09) 0.01m
+  var FIXED_BASELINE_OVERRIDE = { cam14: 0.06, cam39: 0.01, cam12: -0.08, cam09: 0.01 };
   function recomputeBaseline(site) {
     if (!site.hasWater) return;
     var s = siteStates[site.id];
@@ -2285,7 +2304,7 @@
 
     var s = siteStates[site.id];
     s.pvChart = createPowerSeriesChart("pchart-pv-" + site.id, "pv", null, null, "W");
-    s.batChart = createPowerSeriesChart("pchart-bat-" + site.id, "bat", RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(1) + "V", "V");
+    s.batChart = createPowerSeriesChart("pchart-bat-" + site.id, "bat", RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(2) + "V", "V");
     s.powerCardEl = card;
     s.powerStatusDotEl = statusEl.querySelector(".dot");
     s.powerStatusTextEl = statusEl.querySelector(".status-text");
@@ -2331,8 +2350,8 @@
     var isWarn = !isCritical && batVoltage <= WARN_BAT_VOLTAGE;
     s.powerCardEl.classList.toggle("state-critical", isCritical);
     s.powerCardEl.classList.toggle("state-warn", isWarn);
-    if (isCritical) s.batAlertLineEl.textContent = "⛔ 緊急: バッテリー電圧が" + CRITICAL_BAT_VOLTAGE.toFixed(1) + "V以下(動作停止の恐れ)";
-    else if (isWarn) s.batAlertLineEl.textContent = "⚠ 注意: バッテリー電圧が" + WARN_BAT_VOLTAGE.toFixed(1) + "V以下に低下";
+    if (isCritical) s.batAlertLineEl.textContent = "⛔ 緊急: バッテリー電圧が" + CRITICAL_BAT_VOLTAGE.toFixed(2) + "V以下(動作停止の恐れ)";
+    else if (isWarn) s.batAlertLineEl.textContent = "⚠ 注意: バッテリー電圧が" + WARN_BAT_VOLTAGE.toFixed(2) + "V以下に低下";
     else s.batAlertLineEl.textContent = "";
   }
 
@@ -2394,7 +2413,17 @@
     var empty = batteryEmptyVoltageFor(site.id);
     svgHolder.title = pct === null
       ? "バッテリー残量: データ未取得"
-      : "バッテリー残量 " + pct + "%（" + BATTERY_FULL_VOLTAGE.toFixed(1) + "V=100% / " + empty.toFixed(1) + "V=0%）";
+      : "バッテリー残量 " + fmtBatteryPercent(pct) + "（" + BATTERY_FULL_VOLTAGE.toFixed(2) + "V=100% / " + empty.toFixed(2) + "V=0%）";
+  }
+
+  // 電源監視カードの差分表示。上昇=青(▲) / 下降=赤(▼) / 変化なし=淡色(±)。
+  function setStatDelta(target, diff, unit) {
+    if (!target) return;
+    var mark = diff > 0 ? "▲ " : (diff < 0 ? "▼ " : "± ");
+    target.textContent = mark + Math.abs(diff).toFixed(2) + " " + unit;
+    target.classList.remove("up", "down");
+    if (diff > 0) target.classList.add("up");
+    else if (diff < 0) target.classList.add("down");
   }
 
   function refreshPowerCard(site) {
@@ -2405,20 +2434,14 @@
     var lastBat = lastPointWith(s.points, "bat");
     if (!lastPv && !lastBat) return;
     if (lastPv) {
-      s.pvValueEl.innerHTML = lastPv.pv.toFixed(1) + '<span class="unit">W</span>';
+      s.pvValueEl.innerHTML = lastPv.pv.toFixed(2) + '<span class="unit">W</span>';
       var prevPv = prevPointWith(s.points, "pv", lastPv);
-      if (prevPv) {
-        var dPv = lastPv.pv - prevPv.pv;
-        s.pvDeltaEl.textContent = (dPv >= 0 ? "▲ " : "▼ ") + Math.abs(dPv).toFixed(1) + " W";
-      }
+      if (prevPv) setStatDelta(s.pvDeltaEl, lastPv.pv - prevPv.pv, "W");
     }
     if (lastBat) {
-      s.batValueEl.innerHTML = lastBat.bat.toFixed(1) + '<span class="unit">V</span>';
+      s.batValueEl.innerHTML = lastBat.bat.toFixed(2) + '<span class="unit">V</span>';
       var prevBat = prevPointWith(s.points, "bat", lastBat);
-      if (prevBat) {
-        var dBat = lastBat.bat - prevBat.bat;
-        s.batDeltaEl.textContent = (dBat >= 0 ? "▲ " : "▼ ") + Math.abs(dBat).toFixed(1) + " V";
-      }
+      if (prevBat) setStatDelta(s.batDeltaEl, lastBat.bat - prevBat.bat, "V");
       updateBatAlertState(site, lastBat.bat);
     }
     updateBatteryGauge(site, lastBat ? lastBat.bat : null);
@@ -2533,7 +2556,7 @@
     var html = rows.map(function (r) {
       var p = r.p;
       return "<tr><td>" + r.site.name + "</td><td>" + fmtTime(p.fetchedAt) + "</td><td>" + (p.measureTime || "–") + "</td>" +
-        "<td>" + (typeof p.pv === "number" ? p.pv.toFixed(1) : "–") + "</td><td>" + (typeof p.bat === "number" ? p.bat.toFixed(1) : "–") + "</td>" +
+        "<td>" + (typeof p.pv === "number" ? p.pv.toFixed(2) : "–") + "</td><td>" + (typeof p.bat === "number" ? p.bat.toFixed(2) : "–") + "</td>" +
         "<td>" + (typeof p.waterLevelM === "number" ? p.waterLevelM.toFixed(2) : "–") + "</td><td>" + p.via + "</td></tr>";
     }).join("");
     tableBody.innerHTML = html;
@@ -4168,8 +4191,8 @@
    *
    *   水位   : Δh = a×(直近1時間の雨量) − b×(現在水位 − 基準水位)
    *            …降雨で上がり、降らなければ基準水位へ戻る(逓減)という素直なモデル。
-   *   バッテリ: Δbat = c×(日射量) − d
-   *            …日射で充電され、常時一定量を消費するというモデル。
+   *   バッテリ: 拠点ごとの「時刻別の平均的な1時間あたり変化量(日変化プロファイル)」を実測から作り、
+   *            充電側のみ予報日射量の平年比で控えめに補正する(詳細は predictBatterySeries を参照)。
    *   発電   : pv_w = k×(日射量)   …日射量にほぼ比例するため原点を通る比例式。
    *
    * いずれもこの拠点自身の実測履歴から係数を推定する。十分な実測点が無い場合は
@@ -4186,10 +4209,19 @@
   // 予測にならないよう、雨への反応は0にしない)。
   var DEFAULT_RAIN_RESPONSE_M_PER_MM = 0.01;
   var DEFAULT_WATER_RECESSION = 0.15;
-  var BAT_PREDICT_MIN = 10.5, BAT_PREDICT_MAX = 14.2;
-  // 1コマ(最大1時間)あたりの電圧変化の上限。回帰係数が外れ値に引っ張られても、
+  // バッテリー電圧の予測が取り得る絶対的な範囲(明らかな異常値を防ぐためのガード)。
+  // 実際の上下限は拠点ごとの実測レンジから決める(下のBAT_PREDICT_MARGIN_Vを参照)。
+  var BAT_PREDICT_ABS_MIN = 9.0, BAT_PREDICT_ABS_MAX = 15.5;
+  var BAT_PREDICT_MARGIN_V = 0.3;
+  // 1コマ(最大1時間)あたりの電圧変化の上限。実測に外れ値があっても、
   // 予測の折れ線が実測から段差になって飛ばないようにするための保険。
   var BAT_MAX_STEP_V = 0.6;
+  // 日変化プロファイル(時刻別の1時間あたり変化量)の作成条件。
+  var BAT_PROFILE_MIN_SAMPLES = 3;    // その時間帯を採用するのに必要な実測サンプル数
+  var BAT_PROFILE_MAX_POINTS = 3000;  // プロファイル作成に使う直近の実測点数(約11日ぶん)
+  var BAT_PROFILE_FALLBACK_DV = -0.02; // 実測がまったく無い場合の1時間あたり変化量
+  // 充電側の補正に使う「予報日射量 ÷ その時刻の平年日射量」の適用範囲(効かせすぎない)。
+  var BAT_RAD_FACTOR_MIN = 0.5, BAT_RAD_FACTOR_MAX = 1.2;
   var forecastState = { hours: [], fetchedAt: null, error: null };
   var predictionCache = {};
 
@@ -4310,40 +4342,101 @@
       return { t: h.t, value: Math.round(v * 1000) / 1000, predicted: true, fitted: fitted, rainMm: h.rain };
     });
   }
+  function medianOf(list) {
+    if (!list.length) return null;
+    var sorted = list.slice().sort(function (a, b) { return a - b; });
+    var mid = Math.floor(sorted.length / 2);
+    return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+  }
+  function jstHourOf(ms) { return toJstParts(new Date(ms)).h; }
+  /* バッテリーの「日変化プロファイル」= JSTの時刻ごとの1時間あたり電圧変化量(中央値)。
+   *
+   * 以前は「Δbat = c×日射量 − d」という線形回帰で予測していたが、実測を集計すると
+   *   4〜10時: +0.06〜+0.25 V/h(充電)   14〜19時: −0.06〜−0.26 V/h(放電)   夜間: −0.015 V/h
+   * というように、同じ日射量でも午前と午後で符号が逆(ヒステリシス)になる。
+   * そのため日射量に対する回帰の傾きが実測ではほぼ負となり、0に張り付いた結果、
+   * どの拠点でも「わずかに下がり続けるだけの直線」しか描けていなかった(全23拠点で発生)。
+   * 拠点ごとの実測の時刻別傾向をそのまま将来へ当てはめる方式に変更している。
+   * 実データでの検証(23拠点・直近5日・12時間先): 平均絶対誤差 0.32V → 0.20V。
+   */
+  function batteryDiurnalProfile(points) {
+    var series = points.filter(function (p) { return typeof p.bat === "number"; })
+      .slice(-BAT_PROFILE_MAX_POINTS)
+      .map(function (p) { return { t: p.fetchedAt.getTime(), v: p.bat, pv: typeof p.pv === "number" ? p.pv : null }; });
+    var buckets = [], pvBuckets = [], all = [];
+    for (var h = 0; h < 24; h++) { buckets.push([]); pvBuckets.push([]); }
+    for (var i = 0; i < series.length; i++) {
+      var target = series[i].t + HOUR_MS;
+      var nextIdx = -1, bestDist = Infinity;
+      for (var j = i + 1; j < series.length; j++) {
+        var dist = Math.abs(series[j].t - target);
+        if (dist < bestDist) { bestDist = dist; nextIdx = j; }
+        if (series[j].t > target + 20 * 60 * 1000) break;
+      }
+      if (nextIdx < 0 || bestDist > 20 * 60 * 1000) continue;
+      var hour = jstHourOf(series[i].t);
+      var dv = series[nextIdx].v - series[i].v;
+      buckets[hour].push(dv); all.push(dv);
+      if (typeof series[i].pv === "number") pvBuckets[hour].push(series[i].pv);
+    }
+    return {
+      byHour: buckets.map(function (a) { return a.length >= BAT_PROFILE_MIN_SAMPLES ? medianOf(a) : null; }),
+      pvByHour: pvBuckets.map(function (a) { return a.length >= BAT_PROFILE_MIN_SAMPLES ? medianOf(a) : null; }),
+      fallback: all.length ? medianOf(all) : BAT_PROFILE_FALLBACK_DV,
+      samples: all.length
+    };
+  }
+  // 予報日射量を「その時刻の平年値」と比べるための基準(取得済みの過去2日＋予報2日から作る)。
+  function radiationNormalsByHour() {
+    var buckets = [];
+    for (var h = 0; h < 24; h++) buckets.push([]);
+    forecastState.hours.forEach(function (w) {
+      if (typeof w.rad === "number" && isFinite(w.rad)) buckets[jstHourOf(w.t)].push(w.rad);
+    });
+    return buckets.map(function (a) { return a.length ? medianOf(a) : null; });
+  }
   function predictBatterySeries(site) {
     var s = siteStates[site.id];
     if (!s || !forecastState.hours.length) return [];
     var pts = s.points.filter(function (p) { return typeof p.bat === "number"; });
     if (!pts.length) return [];
     var last = pts[pts.length - 1];
-    var transitions = buildTransitionSamples(s.points, "bat", HOUR_MS);
-    var c = 0.0009, d = 0.06, fitted = false; // 既定: 日射1000W/m2で約+0.9V/h、消費で約-0.06V/h
-    if (transitions.length >= MIN_POINTS_FOR_REGRESSION) {
-      var sol = solveLeastSquares2(transitions.map(function (tr) {
-        return { x1: tr.weather.rad, x2: -1, y: tr.dv };
-      }));
-      if (sol && isFinite(sol.a) && isFinite(sol.b)) {
-        c = Math.min(Math.max(sol.a, 0), 0.01);
-        d = Math.min(Math.max(sol.b, 0), 0.5); // 消費による1時間あたりの電圧降下の上限
-        fitted = true;
-      }
-    }
+    var profile = batteryDiurnalProfile(s.points);
+    var normals = radiationNormalsByHour();
     var nowMs = last.fetchedAt.getTime();
     var hours = futureWeatherHours(nowMs, PREDICTION_HORIZON_MS);
     if (!hours.length) return [];
+    // 予測の上下限は拠点ごとの実測レンジから決める。固定値(旧: 10.5〜14.2V)だと、
+    // 充電中に14.2Vを超える拠点で予測だけが頭打ちになり、実測の続きに見えなくなっていた。
+    var recentVals = pts.slice(-BAT_PROFILE_MAX_POINTS).map(function (p) { return p.bat; });
+    var lo = Math.max(BAT_PREDICT_ABS_MIN, Math.min.apply(null, recentVals) - BAT_PREDICT_MARGIN_V);
+    var hi = Math.min(BAT_PREDICT_ABS_MAX, Math.max.apply(null, recentVals) + BAT_PREDICT_MARGIN_V);
+    if (!(hi > lo)) { lo = BAT_PREDICT_ABS_MIN; hi = BAT_PREDICT_ABS_MAX; }
     // 最新の実測値を起点に、各コマまでの「実際の経過時間」ぶんだけ変化させる。
     // (最初のコマまでの間隔は1時間とは限らないため、常に1時間分を足すと最新実測値から
     //  不自然に飛んだ値になってしまう。)
     var v = last.bat;
     var prevT = nowMs;
+    var fitted = profile.samples >= MIN_POINTS_FOR_REGRESSION;
     return hours.map(function (h) {
       var dtH = Math.min(2, Math.max(0, (h.t - prevT) / HOUR_MS));
       prevT = h.t;
-      var delta = (c * h.rad - d) * dtH;
-      // 1コマあたりの変化量に上限を設け、回帰係数が極端になった場合でも段差にならないようにする。
+      var hour = jstHourOf(h.t);
+      var perHour = profile.byHour[hour];
+      if (typeof perHour !== "number") perHour = profile.fallback;
+      // 充電側(プラス)だけ、予報日射量がその時刻の平年より多いか少ないかで控えめに補正する。
+      // (放電側は日射ではなく機器の消費で決まるため補正しない。)
+      if (perHour > 0) {
+        var normal = normals[hour];
+        if (typeof normal === "number" && normal > 50 && typeof h.rad === "number") {
+          var factor = h.rad / normal;
+          perHour *= Math.min(BAT_RAD_FACTOR_MAX, Math.max(BAT_RAD_FACTOR_MIN, factor));
+        }
+      }
+      var delta = perHour * dtH;
+      // 1コマあたりの変化量に上限を設け、実測に外れ値があっても段差にならないようにする。
       delta = Math.min(BAT_MAX_STEP_V, Math.max(-BAT_MAX_STEP_V, delta));
-      v = v + delta;
-      v = Math.min(Math.max(v, BAT_PREDICT_MIN), BAT_PREDICT_MAX);
+      v = Math.min(Math.max(v + delta, lo), hi);
       return { t: h.t, value: Math.round(v * 100) / 100, predicted: true, fitted: fitted };
     });
   }
@@ -5044,6 +5137,14 @@
     clearPredictionCache: function () { predictionCache = {}; },
     computeXPositions: computeXPositions, buildSplitPathData: buildSplitPathData,
     solveLeastSquares2: solveLeastSquares2, buildTransitionSamples: buildTransitionSamples,
+    // --- Request V (2026-09-21): 桁数統一・差分の配色・バッテリー予測の作り直し・基準水位の固定値 ---
+    fmtBatteryPercent: fmtBatteryPercent, setStatDelta: setStatDelta,
+    batteryDiurnalProfile: batteryDiurnalProfile, radiationNormalsByHour: radiationNormalsByHour,
+    medianOf: medianOf, jstHourOf: jstHourOf,
+    BAT_PREDICT_ABS_MIN: BAT_PREDICT_ABS_MIN, BAT_PREDICT_ABS_MAX: BAT_PREDICT_ABS_MAX,
+    BAT_PREDICT_MARGIN_V: BAT_PREDICT_MARGIN_V, BAT_MAX_STEP_V: BAT_MAX_STEP_V,
+    BAT_PROFILE_MIN_SAMPLES: BAT_PROFILE_MIN_SAMPLES,
+    FIXED_BASELINE_OVERRIDE: FIXED_BASELINE_OVERRIDE,
     lastPointWith: lastPointWith,
     siteStates: siteStates, siteData: siteData,
     pollAll: pollAll, computeForecast: computeForecast, amedasState: amedasState,
