@@ -227,6 +227,13 @@ export async function newPage(viewport, opts) {
     r.fulfill({ contentType: "application/json", body: JSON.stringify(opts.manifest || buildImageManifest({ nowMs })) });
   });
   await page.route("**/data/images/*/*.jpg*", (r) => r.fulfill({ contentType: "image/jpeg", body: TINY_JPEG }));
+  // サーバー側が保存した最新値と雨量(ブラウザから取得できない取得元の退避先)。既定は未作成=404。
+  await page.route("**/data/latest.json*", (r) => opts.serverLatest
+    ? r.fulfill({ contentType: "application/json", body: JSON.stringify(opts.serverLatest) })
+    : r.fulfill({ status: 404, body: "not found" }));
+  await page.route("**/data/rainfall.json*", (r) => opts.serverRainfall
+    ? r.fulfill({ contentType: "application/json", body: JSON.stringify(opts.serverRainfall) })
+    : r.fulfill({ status: 404, body: "not found" }));
 
   // r.jina.ai プロキシ。URLの中に本来の取得先(例: mini.lhlab-vps.net/power/logs/...)を含むため、
   // 他のルートより後に登録して最優先にする(Playwrightのルートは後勝ち)。
@@ -238,6 +245,32 @@ export async function newPage(viewport, opts) {
 
 
   return page;
+}
+
+// data/latest.json 相当(サーバー側が10分ごとに保存している各拠点の最新値)
+export function buildServerLatest(opts = {}) {
+  const nowMs = opts.nowMs || Date.now();
+  const ageMs = opts.ageMs != null ? opts.ageMs : 4 * 60 * 1000;
+  const at = new Date(nowMs - ageMs).toISOString();
+  const sites = {};
+  Object.entries(opts.water || { kw05: -1.11 }).forEach(([id, waterLevelM]) => {
+    sites[id] = {
+      pv: null, bat: null, measureTime: "2026-09-21 09:00:00", waterLevelM,
+      via: "サーバー(国交省 川の防災情報)", lastSuccessAt: at, lastFetchAt: at, lastFetchOk: true, lastError: null
+    };
+  });
+  return { generatedAt: at, sites };
+}
+
+// data/rainfall.json 相当(10分雨量)
+export function buildServerRainfall(opts = {}) {
+  const nowMs = opts.nowMs || Date.now();
+  const count = opts.count || 6;
+  const values = [];
+  for (let i = count - 1; i >= 0; i--) {
+    values.push({ obsTime: new Date(nowMs - i * 10 * 60 * 1000).toISOString(), rn10m: opts.rn10m != null ? opts.rn10m : 1.5 });
+  }
+  return { generatedAt: new Date(nowMs).toISOString(), obsCd13: "0563300100034", stationName: "三島", values };
 }
 
 // ダッシュボードの初期化完了(デバッグフックの公開)を待つ

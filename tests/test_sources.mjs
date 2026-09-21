@@ -3,7 +3,9 @@
 //  ② 国交省カメラが停止中(.jsonが案内画像を返す) → 配信停止中として扱い画像を出すこと
 //  ③ 5分区切りのファイルが未公開(404) → 1つ前・2つ前の区切りへフォールバックすること
 //  ④ 日本時間への変換 → URLが9時間ずれないこと(test_core.mjsのc10で検証)
-import { setup, teardown, newPage, openDashboard, createReporter } from "./harness.mjs";
+//  ⑤ プロキシ(r.jina.ai)が river.go.jp を遮断(2026-09-21、403 AbuseAlleviationError)
+//     → サーバー側が保存した最新値・雨量(同一オリジン)へ退避できること
+import { setup, teardown, newPage, openDashboard, createReporter, buildServerLatest, buildServerRainfall } from "./harness.mjs";
 
 const NOW = Date.now();
 const TINY_JPEG = Buffer.from(
@@ -196,6 +198,85 @@ export async function run() {
   r.check("x5-g 60分以上は「約N時間ごと」", disc.fmt[1] === "約3時間ごと", disc.fmt);
   r.check("x5-h 算出できない場合は「不明」", disc.fmt[2] === "不明", disc.fmt);
   await page5.close();
+
+  /* ===== ⑥ プロキシがriver.go.jpを遮断 → サーバー保存値へ退避 ===== */
+  // 2026-09-21: r.jina.ai が www.river.go.jp への匿名アクセスを403で返すようになり、
+  // 危機管理型水位計(CORS非対応)はブラウザから一切取得できなくなった。
+  const blockProxy = (route) => {
+    const url = route.request().url();
+    if (url.indexOf("river.go.jp") >= 0) {
+      return route.fulfill({ status: 403, contentType: "application/json",
+        headers: { "Access-Control-Allow-Origin": "*" },
+        body: JSON.stringify({ data: null, code: 403, name: "AbuseAlleviationError", status: 40305 }) });
+    }
+    route.fulfill({ contentType: "text/plain", headers: { "Access-Control-Allow-Origin": "*" },
+      body: 'Markdown Content:\n{"obsdate":"2026\\/09\\/20 20:04"}' });
+  };
+
+  const page6 = await newPage(null, {
+    nowMs: NOW,
+    serverLatest: buildServerLatest({ nowMs: NOW, water: { kw05: -1.11, kw06: -2.4 } }),
+    serverRainfall: buildServerRainfall({ nowMs: NOW, rn10m: 2.5 })
+  });
+  await page6.route("**/www.river.go.jp/kawabou/file/files/tmlist/swstg/**", (route) => route.abort("failed"));
+  await page6.route("**/r.jina.ai/**", blockProxy);
+  await openDashboard(page6);
+  await page6.waitForFunction(() => {
+    const d = window.__dashboardDebug;
+    const s = d.siteStates.kw05;
+    return s && s.points.some((p) => typeof p.waterLevelM === "number");
+  }, { timeout: 60000 });
+  const fallback = await page6.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const last = d.lastPointWith(d.siteStates.kw05.points, "waterLevelM");
+    return {
+      value: last ? last.waterLevelM : null,
+      via: last ? last.via : null,
+      state: d.siteData.kw05.lastState,
+      serverSites: Object.keys(d.getServerLatestState().sites).length,
+      rain: d.getRainfallState().points.length,
+      rainMm: d.getRainfallState().points.length ? d.getRainfallState().points[0].rn10m : null,
+      label: d.VIA_LABEL_SERVER_FALLBACK
+    };
+  });
+  r.check("x6-a プロキシが403でもサーバー保存値で水位を表示できる", fallback.value === -1.11, fallback);
+  r.check("x6-b 拠点は正常扱いになる(赤の取得失敗にしない)", fallback.state === "ok", fallback);
+  r.check("x6-c 取得経路が「サーバー保存値」と分かる", fallback.via === fallback.label, fallback);
+  r.check("x6-d サーバー保存の最新値を読み込んでいる", fallback.serverSites === 2, fallback);
+  r.check("x6-e 雨量もサーバー保存値から取り込める", fallback.rain > 0 && fallback.rainMm === 2.5, fallback);
+  r.check("x6-f ページ例外にはならない", page6.errMsgs().length === 0, page6.errMsgs());
+
+  // 古すぎるサーバー保存値は使わない(現在値として誤解させない)
+  const stale = await page6.evaluate((maxAge) => {
+    const d = window.__dashboardDebug;
+    const st = d.getServerLatestState();
+    const keep = st.sites.kw05.lastSuccessAt;
+    st.sites.kw05.lastSuccessAt = new Date(Date.now() - maxAge - 60000).toISOString();
+    const tooOld = d.serverLatestWaterReading(d.SITE_CATALOG.kw05);
+    st.sites.kw05.lastSuccessAt = keep;
+    const fresh = d.serverLatestWaterReading(d.SITE_CATALOG.kw05);
+    const unknown = d.serverLatestWaterReading(d.SITE_CATALOG.cam02);
+    return { tooOld, fresh: fresh ? fresh.waterLevelM : null, unknown };
+  }, await page6.evaluate(() => window.__dashboardDebug.SERVER_LATEST_MAX_AGE_MS));
+  r.check("x6-g 1時間より古い保存値は使わない", stale.tooOld === null, stale);
+  r.check("x6-h 新しい保存値は使う", stale.fresh === -1.11, stale);
+  r.check("x6-i 保存値が無い拠点はnull", stale.unknown === null, stale);
+  await page6.close();
+
+  // サーバー保存の雨量が無い場合は従来どおりプロキシ経由を試す
+  const page7 = await newPage(null, { nowMs: NOW });
+  await openDashboard(page7);
+  const rainProxy = await page7.evaluate(async () => {
+    const d = window.__dashboardDebug;
+    let serverErr = null;
+    try { await d.fetchRainfallFromServer(); } catch (e) { serverErr = e.message; }
+    const pts = d.rainPointsFromKawabouJson({ min10Values: [{ obsTime: "2026-09-21T10:00:00+09:00", rn10m: 3 }],
+      obsValue: { obsTime: "2026-09-21T10:10:00+09:00", rn10m: 4 } });
+    return { serverErr, parsed: pts.length, last: pts[pts.length - 1].rn10m };
+  });
+  r.check("x6-j サーバー保存の雨量が無ければエラーになる(=プロキシへ退避する)", !!rainProxy.serverErr, rainProxy);
+  r.check("x6-k 国交省JSONの10分雨量を解釈できる", rainProxy.parsed === 2 && rainProxy.last === 4, rainProxy);
+  await page7.close();
 
   return r.finish();
 }

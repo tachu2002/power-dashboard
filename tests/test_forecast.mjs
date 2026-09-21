@@ -352,9 +352,9 @@ export async function run() {
     const s = d.siteStates.cam02;
     const keep = s.points.slice();
     const now = Date.now();
-    const STEP = 30 * 60 * 1000;
+    const STEP = 15 * 60 * 1000; // 1時間帯あたり4件以上のサンプルになるようにする
     // 実測に近い日変化(朝に充電・午後に放電・夜間は微減)を3日ぶん作る
-    const perHourFor = (h) => (h >= 5 && h < 10) ? 0.15 : (h >= 10 && h < 14) ? 0.02 : (h >= 14 && h < 19) ? -0.12 : -0.02;
+    const perHourFor = (h) => (h >= 5 && h < 10) ? 0.15 : (h >= 10 && h < 14) ? 0.08 : (h >= 14 && h < 19) ? -0.12 : -0.02;
     const make = (startV) => {
       const pts = []; let v = startV;
       for (let t = now - 72 * 3600000; t <= now; t += STEP) {
@@ -370,14 +370,14 @@ export async function run() {
     const prof = d.batteryDiurnalProfile(s.points);
     const series = d.predictBatterySeries(site);
     // 各コマの変化の向きが、その時刻の傾向と一致しているか
-    let signOk = true, rising = 0, falling = 0;
+    let signOk = true, rising = 0, falling = 0, expectedRising = 0, expectedFalling = 0;
     let prevV = s.points[s.points.length - 1].bat;
     series.forEach((p) => {
       const want = prof.byHour[d.jstHourOf(p.t)];
       const diff = p.value - prevV;
       if (typeof want === "number" && Math.abs(want) > 0.03) {
-        if (want > 0 && diff < 0) signOk = false;
-        if (want < 0 && diff > 0) signOk = false;
+        if (want > 0) { expectedRising++; if (diff < 0) signOk = false; }
+        if (want < 0) { expectedFalling++; if (diff > 0) signOk = false; }
       }
       if (diff > 0) rising++; else if (diff < 0) falling++;
       prevV = p.value;
@@ -393,6 +393,7 @@ export async function run() {
     return {
       morning: prof.byHour[7], afternoon: prof.byHour[16], night: prof.byHour[2],
       samples: prof.samples, len: series.length, signOk, rising, falling,
+      expectedRising, expectedFalling,
       highMax, measuredMax, absMax: d.BAT_PREDICT_ABS_MAX, margin: d.BAT_PREDICT_MARGIN_V
     };
   });
@@ -401,8 +402,12 @@ export async function run() {
   r.check("f6-c 夜間(2時)の傾向は微減", batProfile.night < 0 && batProfile.night > -0.1, batProfile);
   r.check("f6-d プロファイルの作成に十分なサンプルが集まる", batProfile.samples >= 100, batProfile.samples);
   r.check("f6-e 予測の増減が時刻別の傾向と一致する", batProfile.signOk, batProfile);
-  r.check("f6-f 「下がり続けるだけの直線」にならない(上昇する区間がある)",
-    batProfile.rising > 0 && batProfile.falling > 0, batProfile);
+  // 予測の範囲(12時間先まで)に充電の時間帯が含まれていれば必ず上昇する区間ができる。
+  // 旧実装は係数が0に張り付いて、どの時間帯でも下がり続けるだけの直線になっていた。
+  r.check("f6-f 傾向がプラスの時間帯では上昇する(「下がり続けるだけの直線」にならない)",
+    batProfile.expectedRising > 0 ? batProfile.rising > 0 : batProfile.rising === 0, batProfile);
+  r.check("f6-f2 傾向がマイナスの時間帯では下降する",
+    batProfile.expectedFalling > 0 ? batProfile.falling > 0 : true, batProfile);
   r.check("f6-g 実測が14.2Vを超える拠点では予測も頭打ちにならない",
     batProfile.highMax > 14.2 && batProfile.highMax <= Math.min(batProfile.absMax, batProfile.measuredMax + batProfile.margin) + 1e-9,
     batProfile);

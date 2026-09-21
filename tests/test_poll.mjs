@@ -87,6 +87,16 @@ export async function run() {
     if (u.includes("matsuhisa.info")) {
       return { text: async () => 'PV=18500mV BAT=12600mV Measure Time=2026-09-19 20:00:00 Distance=120.5cm <img src="pic.jpg">' };
     }
+    if (u.includes("www.river.go.jp") && u.includes("/tmlist/rn/")) {
+      // 雨量計(10分雨量)。min10Valuesに過去の並び、obsValueに最新が入る実データの形に合わせる。
+      return { json: async () => ({
+        min10Values: [
+          { obsTime: new Date(now - 30 * 60000).toISOString(), rn10m: 0 },
+          { obsTime: new Date(now - 20 * 60000).toISOString(), rn10m: 1.5 }
+        ],
+        obsValue: { obsTime: new Date(now - 10 * 60000).toISOString(), rn10m: 2.5 }
+      }) };
+    }
     if (u.includes("www.river.go.jp") && u.includes("swstg")) {
       return { json: async () => ({ obsValue: { stg: 26.29, stgHght: -1.27, obsTime: "2026-09-19T20:00:00+09:00" } }) };
     }
@@ -99,6 +109,7 @@ export async function run() {
     return { text: async () => "" };
   };
   const first = await runPoll(sandbox, handler, "1");
+  const calls1 = first.calls;
 
   const constants = {
     retention: first.mod.IMAGE_RETENTION_DAYS,
@@ -369,6 +380,47 @@ export async function run() {
     kawabouWaterJsonUrl("1234567890123", new Date("2026-09-19T03:00:00Z")));
   r.check("s9-i 危機管理型水位計のURLも組み立てられる",
     typeof kawabouSwstgJsonUrl("abc", new Date()) === "string");
+
+  /* ============ 雨量(data/rainfall.json) ============ */
+  // ブラウザからは取得できなくなった(プロキシがriver.go.jpを遮断)ため、サーバー側で取得して配る。
+  const rainPath = path.join(sandbox, "data", "rainfall.json");
+  const rain1 = fs.existsSync(rainPath) ? JSON.parse(fs.readFileSync(rainPath, "utf8")) : null;
+  r.check("s17-a data/rainfall.jsonが作られる", !!rain1, rain1 && rain1.values.length);
+  r.check("s17-b 10分雨量が3件入る(min10Values 2件 + obsValue 1件)", rain1 && rain1.values.length === 3, rain1 && rain1.values);
+  r.check("s17-c 時刻の昇順で並ぶ",
+    rain1 && rain1.values.every((v, i) => i === 0 || new Date(v.obsTime) > new Date(rain1.values[i - 1].obsTime)), rain1 && rain1.values);
+  r.check("s17-d 観測所は「三島」", rain1 && rain1.stationName === "三島" && rain1.obsCd13 === "0563300100034", rain1);
+  r.check("s17-e 雨量のURLは10分区切り",
+    calls1.some((u) => /\/tmlist\/rn\/\d{8}\/\d{2}[0-5]0\/0563300100034\.json$/.test(u)),
+    calls1.filter((u) => u.includes("/tmlist/rn/")).slice(0, 3));
+
+  // 前回値との併合と、保持期間(3日)を過ぎた値の切り捨て
+  const rainSandbox = makeSandbox("rain");
+  fs.mkdirSync(path.join(rainSandbox, "data"), { recursive: true });
+  fs.writeFileSync(path.join(rainSandbox, "data", "rainfall.json"), JSON.stringify({
+    generatedAt: new Date(now - 4 * 86400000).toISOString(),
+    values: [
+      { obsTime: new Date(now - 4 * 86400000).toISOString(), rn10m: 9 },   // 3日より古い→落ちる
+      { obsTime: new Date(now - 60 * 60000).toISOString(), rn10m: 0.5 }    // 残る
+    ]
+  }), "utf8");
+  await runPoll(rainSandbox, handler, "rain1");
+  const rain2 = JSON.parse(fs.readFileSync(path.join(rainSandbox, "data", "rainfall.json"), "utf8"));
+  r.check("s17-f 前回値と併合する", rain2.values.length === 4, rain2.values.length);
+  r.check("s17-g 保持期間(3日)より古い値は落とす",
+    !rain2.values.some((v) => Date.now() - new Date(v.obsTime).getTime() > 3 * 86400000), rain2.values.map((v) => v.obsTime));
+  r.check("s17-h 前回の新しい値は残る", rain2.values.some((v) => v.rn10m === 0.5), rain2.values);
+
+  // 雨量が取れなくてもデータ取得全体は続く
+  const rainFailSandbox = makeSandbox("rainfail");
+  const noRainHandler = (u) => (u.includes("/tmlist/rn/") ? null : handler(u));
+  await runPoll(rainFailSandbox, noRainHandler, "rainfail1");
+  const latestNoRain = JSON.parse(fs.readFileSync(path.join(rainFailSandbox, "data", "latest.json"), "utf8"));
+  r.check("s17-i 雨量が取れなくても拠点データは書かれる",
+    Object.keys(latestNoRain.sites).length === 38, Object.keys(latestNoRain.sites).length);
+  r.check("s17-j 雨量が取れない場合はrainfall.jsonを作らない",
+    !fs.existsSync(path.join(rainFailSandbox, "data", "rainfall.json")), "rainfall.json");
+
 
   /* ---- 後片付け ---- */
   fs.rmSync(sandbox, { recursive: true, force: true });
