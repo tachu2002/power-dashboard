@@ -405,12 +405,30 @@ function rainfallJsonUrl(d) {
   const timePart = p2(p.h) + p2(flooredMin);
   return "https://www.river.go.jp/kawabou/file/files/tmlist/rn/" + datePart + "/" + timePart + "/" + MISHIMA_RAIN_OBS_CD13 + ".json";
 }
+// 観測時刻は "2026-09-21T11:50:00+09:00" のようにオフセット付きのこともあれば、
+// "2026/09/21 11:50" のようにオフセット無し(=日本時間)のこともある。
+// オフセットが無い文字列を new Date() に渡すと「実行環境のローカル時刻」として解釈されるため、
+// UTCで動くGitHub Actions上では9時間ずれる(2026-09-21に実測)。無い場合は日本時間として解釈する。
+function parseJstTime(s) {
+  const str = String(s || "").trim();
+  if (!str) return null;
+  if (/(?:[+-]\d{2}:?\d{2}|Z)$/.test(str)) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  const m = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})[T ](\d{1,2}):(\d{2})(?::(\d{2}))?/);
+  if (!m) {
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }
+  return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - 9, +m[5], +(m[6] || 0)));
+}
 function parseRainfallJson(json) {
   const out = [];
   const push = function (v) {
     if (v && v.obsTime && typeof v.rn10m === "number") {
-      const t = new Date(v.obsTime);
-      if (!isNaN(t.getTime())) out.push({ obsTime: t.toISOString(), rn10m: v.rn10m });
+      const t = parseJstTime(v.obsTime);
+      if (t) out.push({ obsTime: t.toISOString(), rn10m: v.rn10m });
     }
   };
   if (json && Array.isArray(json.min10Values)) json.min10Values.forEach(push);
@@ -444,8 +462,10 @@ async function updateRainfallFile() {
   const fetched = await fetchRainfallPoints();
   fetched.forEach(function (v) { byTime[v.obsTime] = v; });
   const cutoff = Date.now() - RAINFALL_WINDOW_MS;
+  // 明らかに未来の観測時刻(時刻解釈の取り違えなど)も残さない。
+  const future = Date.now() + 2 * 60 * 60 * 1000;
   let values = Object.keys(byTime).map(function (k) { return byTime[k]; })
-    .filter(function (v) { return new Date(v.obsTime).getTime() >= cutoff; })
+    .filter(function (v) { const t = new Date(v.obsTime).getTime(); return t >= cutoff && t <= future; })
     .sort(function (a, b) { return new Date(a.obsTime) - new Date(b.obsTime); });
   if (values.length > RAINFALL_MAX_POINTS) values = values.slice(values.length - RAINFALL_MAX_POINTS);
   await writeFile(RAINFALL_JSON_PATH, JSON.stringify({
@@ -888,5 +908,5 @@ export {
   fetchKawabouWaterReading, kawabouWaterJsonUrl, kawabouSwstgJsonUrl,
   WATER_RECENT_CSV_PATH, WATER_RECENT_WINDOW_MS,
   parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID, POWER_CSV_BASE_URL,
-  RAINFALL_JSON_PATH, rainfallJsonUrl, parseRainfallJson, MISHIMA_RAIN_OBS_CD13
+  RAINFALL_JSON_PATH, rainfallJsonUrl, parseRainfallJson, parseJstTime, MISHIMA_RAIN_OBS_CD13
 };
