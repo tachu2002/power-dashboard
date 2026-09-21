@@ -463,7 +463,8 @@ async function updateRainfallFile() {
   fetched.forEach(function (v) { byTime[v.obsTime] = v; });
   const cutoff = Date.now() - RAINFALL_WINDOW_MS;
   // 明らかに未来の観測時刻(時刻解釈の取り違えなど)も残さない。
-  const future = Date.now() + 2 * 60 * 60 * 1000;
+  // 10分雨量の観測時刻が現在より先になることは無いため、余裕を30分だけ見る。
+  const future = Date.now() + 30 * 60 * 1000;
   let values = Object.keys(byTime).map(function (k) { return byTime[k]; })
     .filter(function (v) { const t = new Date(v.obsTime).getTime(); return t >= cutoff && t <= future; })
     .sort(function (a, b) { return new Date(a.obsTime) - new Date(b.obsTime); });
