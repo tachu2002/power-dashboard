@@ -5032,7 +5032,13 @@
     var hhmm = pad2(d.getHours()) + pad2(flooredMin);
     return { ymd: ymd, hhmm: hhmm };
   }
+  // 観測時刻が未来の点は取り込まない(取得元の時刻解釈の取り違えなどで混ざった場合の保険)。
+  var RAIN_FUTURE_TOLERANCE_MS = 30 * 60 * 1000;
   function mergeRainPoints(newPoints) {
+    var limit = Date.now() + RAIN_FUTURE_TOLERANCE_MS;
+    newPoints = (newPoints || []).filter(function (p) {
+      return p && p.time && p.time.getTime() <= limit;
+    });
     var byTime = {};
     rainfallState.points.forEach(function (p) { byTime[p.time.getTime()] = p; });
     newPoints.forEach(function (p) { if (p.time && typeof p.rn10m === "number") byTime[p.time.getTime()] = p; });
@@ -5298,6 +5304,7 @@
     isNowcastPlaybackActive: function () { return nowcastPlaybackActive; },
     getThresholdsForSite: getThresholdsForSite, pollRainfallGauge: pollRainfallGauge,
     findNearestRainMm: findNearestRainMm, mergeRainPoints: mergeRainPoints,
+    RAIN_FUTURE_TOLERANCE_MS: RAIN_FUTURE_TOLERANCE_MS,
     getRainfallState: function () { return rainfallState; },
     MISHIMA_RAIN_OBS_CD13: MISHIMA_RAIN_OBS_CD13, RAIN_MATCH_TOLERANCE_MS: RAIN_MATCH_TOLERANCE_MS,
     updateDetailChart: updateDetailChart, getDetailChart: function () { return detailChart; },
