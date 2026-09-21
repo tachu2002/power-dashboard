@@ -86,11 +86,49 @@ export async function run() {
     const d = window.__dashboardDebug;
     return { p100: d.batteryGaugeSvg(100), p0: d.batteryGaugeSvg(0), pNull: d.batteryGaugeSvg(null), p50: d.batteryGaugeSvg(50) };
   });
-  r.check("c2-o 電池マークSVGに残量%が入る", gauge.p50.includes(">50%<"), gauge.p50.slice(0, 120));
+  r.check("c2-o 電池マークSVGに残量%が小数第2位まで入る", gauge.p50.includes(">50.00%<"), gauge.p50.slice(0, 120));
   r.check("c2-p データ無しは「–」表示", gauge.pNull.includes(">–<"), gauge.pNull.slice(0, 120));
   r.check("c2-q 0%のとき塗りつぶし幅が0", /battery-fill[^>]*width="0\.0"/.test(gauge.p0), gauge.p0.slice(0, 160));
   r.check("c2-r 100%の塗りつぶし幅が80(=88-4*2)", /battery-fill[^>]*width="80\.0"/.test(gauge.p100), gauge.p100.slice(0, 160));
-  r.check("c2-s 文字サイズが18px(大きく表示)", gauge.p50.includes('font-size="18"'), gauge.p50.slice(0, 200));
+  r.check("c2-s 桁数に応じて文字サイズを調整する(50.00%は15px / 100.00%は13px)",
+    gauge.p50.includes('font-size="15"') && gauge.p100.includes('font-size="13"'), [gauge.p50.slice(0, 200), gauge.p100.slice(0, 200)]);
+
+  /* ---- 2.5 Request V: 基準(最低)水位の固定値 ---- */
+  const fixedBase = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const ov = d.FIXED_BASELINE_OVERRIDE;
+    const s = d.siteStates.cam39;
+    const keep = s.points.slice();
+    // 実測に固定値より低い値があっても、固定値のままであること
+    s.points = [{ fetchedAt: new Date(), measureTime: null, pv: null, bat: null,
+      pvVoltage: null, waterLevelM: -0.55, via: "t" }];
+    d.recomputeBaseline(d.SITE_CATALOG.cam39);
+    const fixedStays = s.baselineLevelM;
+    s.points = keep;
+    d.recomputeBaseline(d.SITE_CATALOG.cam39);
+    // 固定値が無い拠点は実測の最小値から算出されること
+    const auto = d.siteStates.cam02;
+    const autoKeep = auto.points.slice();
+    auto.points = [
+      { fetchedAt: new Date(), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.42, via: "t" },
+      { fetchedAt: new Date(), measureTime: null, pv: null, bat: null, pvVoltage: null, waterLevelM: 0.31, via: "t" }
+    ];
+    d.recomputeBaseline(d.SITE_CATALOG.cam02);
+    const autoMin = auto.baselineLevelM;
+    auto.points = autoKeep;
+    d.recomputeBaseline(d.SITE_CATALOG.cam02);
+    return { ov, fixedStays, autoMin, names: {
+      cam39: d.SITE_CATALOG.cam39.name, cam12: d.SITE_CATALOG.cam12.name, cam09: d.SITE_CATALOG.cam09.name } };
+  });
+  r.check("c2-t 大場ポンプ場流入水路(cam39)の基準水位が0.01m", fixedBase.ov.cam39 === 0.01, fixedBase.ov);
+  r.check("c2-u 安間樋管(cam12)の基準水位が-0.08m", fixedBase.ov.cam12 === -0.08, fixedBase.ov);
+  r.check("c2-v 梅名樋管2号(cam09)の基準水位が0.01m", fixedBase.ov.cam09 === 0.01, fixedBase.ov);
+  r.check("c2-w 多呂樋管(cam14)の基準水位は0.06mのまま", fixedBase.ov.cam14 === 0.06, fixedBase.ov);
+  r.check("c2-x 固定値の拠点は実測がそれより低くても固定値を使う", fixedBase.fixedStays === 0.01, fixedBase);
+  r.check("c2-y 固定値が無い拠点は実測の最小値を使う", fixedBase.autoMin === 0.31, fixedBase);
+  r.check("c2-z 対象拠点名が想定どおり",
+    fixedBase.names.cam39.indexOf("大場ポンプ場") === 0 && fixedBase.names.cam12.indexOf("安間樋管") === 0 &&
+    fixedBase.names.cam09.indexOf("梅名樋管2号") === 0, fixedBase.names);
 
   /* ---- 3. 中継サーバー電源CSVの解析 ---- */
   const csv = await page.evaluate((header) => {

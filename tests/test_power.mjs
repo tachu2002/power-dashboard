@@ -84,11 +84,11 @@ export async function run() {
     };
     return { cam02: read("cam02"), cam41: read("cam41"), cam45: read("cam45"), cam44: read("cam44"), cam03: read("cam03") };
   });
-  r.check("p3-a 12.7V→100%", pct.cam02 === "100%", pct);
-  r.check("p3-b こも池 12.6V→92%", pct.cam41 === "92%", pct);
-  r.check("p3-c 竹倉用水路 12.3V→67%", pct.cam45 === "67%", pct);
-  r.check("p3-d ほたるの里 12.0V→42%", pct.cam44 === "42%", pct);
-  r.check("p3-e 北沢アンダーパス 12.1V→81%(下限9.5V)", pct.cam03 === "81%", pct);
+  r.check("p3-a 12.7V→100.00%", pct.cam02 === "100.00%", pct);
+  r.check("p3-b こも池 12.6V→91.67%", pct.cam41 === "91.67%", pct);
+  r.check("p3-c 竹倉用水路 12.3V→66.67%", pct.cam45 === "66.67%", pct);
+  r.check("p3-d ほたるの里 12.0V→41.67%", pct.cam44 === "41.67%", pct);
+  r.check("p3-e 北沢アンダーパス 12.1V→81.25%(下限9.5V)", pct.cam03 === "81.25%", pct);
 
   // 表示順が河川別拠点一覧(上流→下流)と同じであること
   const order = await page.evaluate(() => {
@@ -99,6 +99,36 @@ export async function run() {
   });
   r.check("p3-f カードの並びが河川順(上流→下流)と一致",
     JSON.stringify(order.ids) === JSON.stringify(order.riverIds), order);
+
+  /* ---- Request V: 表示桁数(小数第2位)と差分の色(上昇=青 / 下降=赤) ---- */
+  const digits = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const s = d.siteStates.cam02;
+    const read = (diff) => {
+      d.setStatDelta(s.pvDeltaEl, diff, "W");
+      const cs = getComputedStyle(s.pvDeltaEl);
+      return { text: s.pvDeltaEl.textContent, cls: s.pvDeltaEl.className, color: cs.color, weight: cs.fontWeight };
+    };
+    const up = read(0.5), down = read(-1.25), flat = read(0);
+    const svgTexts = Array.from(document.querySelectorAll("#pchart-bat-cam02 svg text")).map((t) => t.textContent);
+    const tableRow = (document.querySelector("#tableBody tr") || { textContent: "" }).textContent;
+    return {
+      pv: s.pvValueEl.textContent, bat: s.batValueEl.textContent,
+      gauge: s.batteryGaugeEl.querySelector(".battery-pct-text").textContent,
+      up, down, flat, svgTexts, tableRow
+    };
+  });
+  r.check("p7-a 発電(W)が小数第2位まで", /^\d+\.\d{2}W$/.test(digits.pv.replace(/\s/g, "")), digits.pv);
+  r.check("p7-b BAT(V)が小数第2位まで", /^\d+\.\d{2}V$/.test(digits.bat.replace(/\s/g, "")), digits.bat);
+  r.check("p7-c 残量%が小数第2位まで", /^\d+\.\d{2}%$/.test(digits.gauge), digits.gauge);
+  r.check("p7-d グラフの目盛・端点ラベルも小数第2位",
+    digits.svgTexts.some((t) => /^\d+\.\d{2}$/.test(t)) && digits.svgTexts.some((t) => /^\d+\.\d{2} V$/.test(t)), digits.svgTexts);
+  r.check("p7-e 上昇は▲で青", digits.up.text.indexOf("▲") === 0 && digits.up.cls.includes("up"), digits.up);
+  r.check("p7-f 下降は▼で赤", digits.down.text.indexOf("▼") === 0 && digits.down.cls.includes("down"), digits.down);
+  r.check("p7-g 上昇と下降で色が違う", digits.up.color !== digits.down.color, { up: digits.up.color, down: digits.down.color });
+  r.check("p7-h 変化なしは±で色を付けない",
+    digits.flat.text.indexOf("±") === 0 && !digits.flat.cls.includes("up") && !digits.flat.cls.includes("down"), digits.flat);
+  r.check("p7-i 差分の数値も小数第2位", /1\.25 W$/.test(digits.down.text) && /0\.50 W$/.test(digits.up.text), [digits.up.text, digits.down.text]);
 
   await page.close();
 

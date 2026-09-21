@@ -342,6 +342,71 @@ export async function run() {
   r.check("g3-e 説明文が12時間・6時間に言及", glSubtitle.includes("12時間") && glSubtitle.includes("6時間"), glSubtitle);
 
   r.check("f4-g ページ例外が発生しない", page.errMsgs().length === 0, page.errMsgs());
+  /* ---- 5.5 Request V: バッテリー予測の作り直し(時刻別の日変化プロファイル) ----
+   * 以前は「Δbat = c×日射量 − d」の線形回帰だったが、実測では同じ日射量でも
+   * 午前は充電・午後は放電と符号が逆になるため、回帰の傾きが0に張り付き、
+   * どの拠点でも「わずかに下がり続けるだけの直線」になっていた。                  */
+  const batProfile = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const site = d.SITE_CATALOG.cam02;
+    const s = d.siteStates.cam02;
+    const keep = s.points.slice();
+    const now = Date.now();
+    const STEP = 30 * 60 * 1000;
+    // 実測に近い日変化(朝に充電・午後に放電・夜間は微減)を3日ぶん作る
+    const perHourFor = (h) => (h >= 5 && h < 10) ? 0.15 : (h >= 10 && h < 14) ? 0.02 : (h >= 14 && h < 19) ? -0.12 : -0.02;
+    const make = (startV) => {
+      const pts = []; let v = startV;
+      for (let t = now - 72 * 3600000; t <= now; t += STEP) {
+        const h = d.jstHourOf(t);
+        v += perHourFor(h) * (STEP / 3600000);
+        pts.push({ fetchedAt: new Date(t), measureTime: null, pv: (h >= 6 && h < 18) ? 50 : 0,
+          bat: Math.round(v * 1000) / 1000, pvVoltage: null, waterLevelM: null, via: "t" });
+      }
+      return pts;
+    };
+    s.points = make(12.0);
+    d.clearPredictionCache();
+    const prof = d.batteryDiurnalProfile(s.points);
+    const series = d.predictBatterySeries(site);
+    // 各コマの変化の向きが、その時刻の傾向と一致しているか
+    let signOk = true, rising = 0, falling = 0;
+    let prevV = s.points[s.points.length - 1].bat;
+    series.forEach((p) => {
+      const want = prof.byHour[d.jstHourOf(p.t)];
+      const diff = p.value - prevV;
+      if (typeof want === "number" && Math.abs(want) > 0.03) {
+        if (want > 0 && diff < 0) signOk = false;
+        if (want < 0 && diff > 0) signOk = false;
+      }
+      if (diff > 0) rising++; else if (diff < 0) falling++;
+      prevV = p.value;
+    });
+    // 充電で14.2Vを超える拠点(旧実装は固定上限14.2Vで頭打ちだった)
+    s.points = make(14.5);
+    d.clearPredictionCache();
+    const high = d.predictBatterySeries(site);
+    const highMax = Math.max.apply(null, high.map((p) => p.value));
+    const measuredMax = Math.max.apply(null, s.points.map((p) => p.bat));
+    s.points = keep;
+    d.clearPredictionCache();
+    return {
+      morning: prof.byHour[7], afternoon: prof.byHour[16], night: prof.byHour[2],
+      samples: prof.samples, len: series.length, signOk, rising, falling,
+      highMax, measuredMax, absMax: d.BAT_PREDICT_ABS_MAX, margin: d.BAT_PREDICT_MARGIN_V
+    };
+  });
+  r.check("f6-a 朝(7時)の傾向は充電(プラス)", batProfile.morning > 0.05, batProfile);
+  r.check("f6-b 夕方(16時)の傾向は放電(マイナス)", batProfile.afternoon < -0.05, batProfile);
+  r.check("f6-c 夜間(2時)の傾向は微減", batProfile.night < 0 && batProfile.night > -0.1, batProfile);
+  r.check("f6-d プロファイルの作成に十分なサンプルが集まる", batProfile.samples >= 100, batProfile.samples);
+  r.check("f6-e 予測の増減が時刻別の傾向と一致する", batProfile.signOk, batProfile);
+  r.check("f6-f 「下がり続けるだけの直線」にならない(上昇する区間がある)",
+    batProfile.rising > 0 && batProfile.falling > 0, batProfile);
+  r.check("f6-g 実測が14.2Vを超える拠点では予測も頭打ちにならない",
+    batProfile.highMax > 14.2 && batProfile.highMax <= Math.min(batProfile.absMax, batProfile.measuredMax + batProfile.margin) + 1e-9,
+    batProfile);
+
   await page.close();
 
   /* ---- 6. 気象データが取れない場合 ---- */
