@@ -130,6 +130,33 @@ export async function run() {
     digits.flat.text.indexOf("±") === 0 && !digits.flat.cls.includes("up") && !digits.flat.cls.includes("down"), digits.flat);
   r.check("p7-i 差分の数値も小数第2位", /1\.25 W$/.test(digits.down.text) && /0\.50 W$/.test(digits.up.text), [digits.up.text, digits.down.text]);
 
+  // 中継サーバーは約5分おきに行を追加するが機器側の更新は約11分おきのため、
+  // 直前の点と同じ値になることが多い。増減が読み取れるよう、値が変わった点まで戻って比べる。
+  const prevChanged = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const s = d.siteStates.cam02;
+    const keep = s.points.slice();
+    const now = Date.now();
+    const mk = (minAgo, pv) => ({ fetchedAt: new Date(now - minAgo * 60000), measureTime: null,
+      pv: pv, bat: 12.0, pvVoltage: null, waterLevelM: null, via: "t" });
+    s.points = [mk(30, 5.0), mk(20, 6.5), mk(10, 7.25), mk(5, 7.25), mk(0, 7.25)];
+    const last = d.lastPointWith(s.points, "pv");
+    const changed = d.prevChangedPointWith(s.points, "pv", last);
+    // 同じ値しか無い場合は比較先が無い
+    s.points = [mk(10, 7.25), mk(5, 7.25), mk(0, 7.25)];
+    const flatLast = d.lastPointWith(s.points, "pv");
+    const flatPrev = d.prevChangedPointWith(s.points, "pv", flatLast);
+    // さかのぼるのは既定で3時間まで
+    s.points = [mk(400, 5.0), mk(10, 7.25), mk(0, 7.25)];
+    const oldLast = d.lastPointWith(s.points, "pv");
+    const tooOld = d.prevChangedPointWith(s.points, "pv", oldLast);
+    s.points = keep;
+    return { changed: changed ? changed.pv : null, flatPrev, tooOld, lookbackH: d.DELTA_LOOKBACK_MS / 3600000 };
+  });
+  r.check("p7-j 同じ値が続く間はさかのぼって比較する", prevChanged.changed === 6.5, prevChanged);
+  r.check("p7-k 同じ値しか無ければ比較先は無い", prevChanged.flatPrev === null, prevChanged);
+  r.check("p7-l さかのぼるのは3時間まで", prevChanged.tooOld === null && prevChanged.lookbackH === 3, prevChanged);
+
   await page.close();
 
   /* ================= 2. Rangeリクエスト(末尾のみ取得) ================= */

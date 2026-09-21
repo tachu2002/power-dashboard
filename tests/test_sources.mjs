@@ -134,10 +134,13 @@ export async function run() {
   await page4.route("**/cam.river.go.jp/cam/now/121826016.json*", (route) =>
     route.fulfill({ contentType: "image/jpeg", body: TINY_JPEG }));
   await openDashboard(page4);
+  // kc01の判定も見るため、両方が pending を抜けるまで待つ
+  // (kc03だけ待つと、kc01がまだ取得中のまま検証してしまうことがあった)
   await page4.waitForFunction(() => {
     const d = window.__dashboardDebug;
-    return d.siteData.kc03 && d.siteData.kc03.lastState !== "pending";
-  }, { timeout: 20000 });
+    return d.siteData.kc03 && d.siteData.kc03.lastState !== "pending" &&
+      d.siteData.kc01 && d.siteData.kc01.lastState !== "pending";
+  }, { timeout: 60000 });
   const cam = await page4.evaluate(() => {
     const d = window.__dashboardDebug;
     return {
