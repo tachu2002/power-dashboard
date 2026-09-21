@@ -93,7 +93,7 @@ jobs:
             fi
 
             # history.csv は全期間分(6MB超)のため毎回はコミットしない(既定1時間ごと)
-            git add data/recent.csv data/recent_water.csv data/latest.json data/images/manifest.json || true
+            git add data/recent.csv data/recent_water.csv data/latest.json data/rainfall.json data/images/manifest.json || true
             if [ $(( (i - 1) % HISTORY_EVERY_N )) -eq 0 ]; then
               git add data/history.csv || true
             fi
