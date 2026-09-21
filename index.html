@@ -2390,6 +2390,24 @@
     }
     return null;
   }
+  // 差分表示用に「直前の“値が変わった”取得点」を探す。
+  // 中継サーバーは約5分おきに行を追加するが、機器側の更新は約11分おきのため、
+  // 直前の点とまったく同じ値になることが多い。単純な直前比だと、ほとんどの拠点で
+  // 常に「± 0.00」となり増減が読み取れないので、同じ値が続く間はさかのぼる。
+  // ただし古い値と比べても意味がないため、さかのぼるのはDELTA_LOOKBACK_MSまで。
+  var DELTA_LOOKBACK_MS = 3 * 60 * 60 * 1000;
+  function prevChangedPointWith(points, key, last) {
+    if (!last) return null;
+    var limit = last.fetchedAt.getTime() - DELTA_LOOKBACK_MS;
+    for (var i = points.length - 1; i >= 0; i--) {
+      var p = points[i];
+      if (p === last || typeof p[key] !== "number") continue;
+      if (p.fetchedAt.getTime() > last.fetchedAt.getTime()) continue;
+      if (p.fetchedAt.getTime() < limit) break;
+      if (p[key] !== last[key]) return p;
+    }
+    return null;
+  }
   // 実測の系列に未来予測(点線用)を継ぎ足したチャート用データを作る。
   function buildSeriesWithForecast(points, key, forecastSeries) {
     var data = points.map(function (p) {
@@ -2435,13 +2453,15 @@
     if (!lastPv && !lastBat) return;
     if (lastPv) {
       s.pvValueEl.innerHTML = lastPv.pv.toFixed(2) + '<span class="unit">W</span>';
-      var prevPv = prevPointWith(s.points, "pv", lastPv);
+      var prevPv = prevChangedPointWith(s.points, "pv", lastPv);
       if (prevPv) setStatDelta(s.pvDeltaEl, lastPv.pv - prevPv.pv, "W");
+      else setStatDelta(s.pvDeltaEl, 0, "W");
     }
     if (lastBat) {
       s.batValueEl.innerHTML = lastBat.bat.toFixed(2) + '<span class="unit">V</span>';
-      var prevBat = prevPointWith(s.points, "bat", lastBat);
+      var prevBat = prevChangedPointWith(s.points, "bat", lastBat);
       if (prevBat) setStatDelta(s.batDeltaEl, lastBat.bat - prevBat.bat, "V");
+      else setStatDelta(s.batDeltaEl, 0, "V");
       updateBatAlertState(site, lastBat.bat);
     }
     updateBatteryGauge(site, lastBat ? lastBat.bat : null);
@@ -5145,7 +5165,8 @@
     BAT_PREDICT_MARGIN_V: BAT_PREDICT_MARGIN_V, BAT_MAX_STEP_V: BAT_MAX_STEP_V,
     BAT_PROFILE_MIN_SAMPLES: BAT_PROFILE_MIN_SAMPLES,
     FIXED_BASELINE_OVERRIDE: FIXED_BASELINE_OVERRIDE,
-    lastPointWith: lastPointWith,
+    lastPointWith: lastPointWith, prevChangedPointWith: prevChangedPointWith,
+    DELTA_LOOKBACK_MS: DELTA_LOOKBACK_MS,
     siteStates: siteStates, siteData: siteData,
     pollAll: pollAll, computeForecast: computeForecast, amedasState: amedasState,
     updateRainfallSignal: updateRainfallSignal, refreshAllForecasts: refreshAllForecasts,
