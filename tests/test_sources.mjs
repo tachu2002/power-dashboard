@@ -276,6 +276,24 @@ export async function run() {
   });
   r.check("x6-j サーバー保存の雨量が無ければエラーになる(=プロキシへ退避する)", !!rainProxy.serverErr, rainProxy);
   r.check("x6-k 国交省JSONの10分雨量を解釈できる", rainProxy.parsed === 2 && rainProxy.last === 4, rainProxy);
+
+  // 未来の観測時刻(取得元の時刻解釈の取り違えで混ざった場合)は取り込まない
+  const futureRain = await page7.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const st = d.getRainfallState();
+    const keep = st.points.slice();
+    st.points = [];
+    const now = Date.now();
+    d.mergeRainPoints([
+      { time: new Date(now - 10 * 60000), rn10m: 1 },
+      { time: new Date(now + 9 * 3600000), rn10m: 99 }   // 9時間先(時刻解釈の取り違え)
+    ]);
+    const after = st.points.map((p) => p.rn10m);
+    st.points = keep;
+    return { after, tolerance: d.RAIN_FUTURE_TOLERANCE_MS };
+  });
+  r.check("x6-l 未来の観測時刻は取り込まない",
+    futureRain.after.length === 1 && futureRain.after[0] === 1, futureRain);
   await page7.close();
 
   return r.finish();
