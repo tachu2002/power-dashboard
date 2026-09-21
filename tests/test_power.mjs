@@ -109,13 +109,13 @@ export async function run() {
       const cs = getComputedStyle(s.pvDeltaEl);
       return { text: s.pvDeltaEl.textContent, cls: s.pvDeltaEl.className, color: cs.color, weight: cs.fontWeight };
     };
-    const up = read(0.5), down = read(-1.25), flat = read(0);
+    const up = read(0.5), down = read(-1.25), flat = read(0), tiny = read(-0.004);
     const svgTexts = Array.from(document.querySelectorAll("#pchart-bat-cam02 svg text")).map((t) => t.textContent);
     const tableRow = (document.querySelector("#tableBody tr") || { textContent: "" }).textContent;
     return {
       pv: s.pvValueEl.textContent, bat: s.batValueEl.textContent,
       gauge: s.batteryGaugeEl.querySelector(".battery-pct-text").textContent,
-      up, down, flat, svgTexts, tableRow
+      up, down, flat, tiny, svgTexts, tableRow
     };
   });
   r.check("p7-a 発電(W)が小数第2位まで", /^\d+\.\d{2}W$/.test(digits.pv.replace(/\s/g, "")), digits.pv);
@@ -153,6 +153,9 @@ export async function run() {
     s.points = keep;
     return { changed: changed ? changed.pv : null, flatPrev, tooOld, lookbackH: d.DELTA_LOOKBACK_MS / 3600000 };
   });
+  r.check("p7-m 小数第2位で0.00になる差は「変化なし」扱い",
+    digits.tiny.text.indexOf("±") === 0 && !digits.tiny.cls.includes("down"), digits.tiny);
+
   r.check("p7-j 同じ値が続く間はさかのぼって比較する", prevChanged.changed === 6.5, prevChanged);
   r.check("p7-k 同じ値しか無ければ比較先は無い", prevChanged.flatPrev === null, prevChanged);
   r.check("p7-l さかのぼるのは3時間まで", prevChanged.tooOld === null && prevChanged.lookbackH === 3, prevChanged);
