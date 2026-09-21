@@ -59,6 +59,14 @@ async function runPoll(sandbox, handler, cacheBust) {
   }
 }
 
+// 実データと同じ「オフセット無しの日本時間」表記("2026/09/21 11:50")にする
+function jstStamp(ms) {
+  const d = new Date(ms + 9 * 3600000);
+  const p2 = (n) => String(n).padStart(2, "0");
+  return d.getUTCFullYear() + "/" + p2(d.getUTCMonth() + 1) + "/" + p2(d.getUTCDate()) +
+    " " + p2(d.getUTCHours()) + ":" + p2(d.getUTCMinutes());
+}
+
 function readCsv(sandbox, name) {
   const p = path.join(sandbox, "data", name);
   if (!fs.existsSync(p)) return null;
@@ -89,12 +97,14 @@ export async function run() {
     }
     if (u.includes("www.river.go.jp") && u.includes("/tmlist/rn/")) {
       // 雨量計(10分雨量)。min10Valuesに過去の並び、obsValueに最新が入る実データの形に合わせる。
+      // 観測時刻は実データと同じく「オフセット無しの日本時間」で返す(UTCで動く実行環境で
+      // そのまま new Date() すると9時間ずれるため、そこも含めて検証する)。
       return { json: async () => ({
         min10Values: [
-          { obsTime: new Date(now - 30 * 60000).toISOString(), rn10m: 0 },
-          { obsTime: new Date(now - 20 * 60000).toISOString(), rn10m: 1.5 }
+          { obsTime: jstStamp(now - 30 * 60000), rn10m: 0 },
+          { obsTime: jstStamp(now - 20 * 60000), rn10m: 1.5 }
         ],
-        obsValue: { obsTime: new Date(now - 10 * 60000).toISOString(), rn10m: 2.5 }
+        obsValue: { obsTime: jstStamp(now - 10 * 60000), rn10m: 2.5 }
       }) };
     }
     if (u.includes("www.river.go.jp") && u.includes("swstg")) {
@@ -390,6 +400,15 @@ export async function run() {
   r.check("s17-c 時刻の昇順で並ぶ",
     rain1 && rain1.values.every((v, i) => i === 0 || new Date(v.obsTime) > new Date(rain1.values[i - 1].obsTime)), rain1 && rain1.values);
   r.check("s17-d 観測所は「三島」", rain1 && rain1.stationName === "三島" && rain1.obsCd13 === "0563300100034", rain1);
+  // オフセット無しの日本時間を9時間ずれずに解釈できていること(UTCで動く実行環境での取り違え防止)
+  const expectedNewest = new Date(Math.floor((now - 10 * 60000) / 60000) * 60000);
+  expectedNewest.setUTCSeconds(0, 0);
+  r.check("s17-e2 日本時間(オフセット無し)を正しく解釈する",
+    rain1 && Math.abs(new Date(rain1.values[rain1.values.length - 1].obsTime) - expectedNewest) < 61000,
+    { stored: rain1 && rain1.values[rain1.values.length - 1].obsTime, expected: expectedNewest.toISOString() });
+  r.check("s17-e3 未来の時刻にならない",
+    rain1 && rain1.values.every((v) => new Date(v.obsTime).getTime() <= Date.now() + 60000),
+    rain1 && rain1.values.map((v) => v.obsTime));
   r.check("s17-e 雨量のURLは10分区切り",
     calls1.some((u) => /\/tmlist\/rn\/\d{8}\/\d{2}[0-5]0\/0563300100034\.json$/.test(u)),
     calls1.filter((u) => u.includes("/tmlist/rn/")).slice(0, 3));
