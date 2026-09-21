@@ -28,6 +28,9 @@ const HISTORY_CSV_PATH = path.join(DATA_DIR, "history.csv");
 const RECENT_CSV_PATH = path.join(DATA_DIR, "recent.csv");
 const WATER_RECENT_CSV_PATH = path.join(DATA_DIR, "recent_water.csv");
 const LATEST_JSON_PATH = path.join(DATA_DIR, "latest.json");
+// 雨量計(国交省「川の防災情報」)の10分雨量。ブラウザからは直接もプロキシ経由でも取得できなくなったため
+// (2026-09-21: r.jina.ai が www.river.go.jp への匿名アクセスを403で遮断)、サーバー側で取得して配る。
+const RAINFALL_JSON_PATH = path.join(DATA_DIR, "rainfall.json");
 const IMAGES_DIR = path.join(DATA_DIR, "images");
 const IMAGE_MANIFEST_PATH = path.join(IMAGES_DIR, "manifest.json");
 // 画像は直近2日分のみ保持する(タイムラプス再生の対象が直近2日間のため)。
@@ -384,6 +387,71 @@ async function fetchKawabouWaterReading(site) {
 
 function fetchReading(site) {
   return site.sourceType === "kawabou-water" ? fetchKawabouWaterReading(site) : fetchMatsuhisaReading(site);
+}
+
+// ---- 雨量計(「三島」観測所)の10分雨量 ----
+// ダッシュボードは水位グラフに雨量を重ねて表示するが、その取得元(river.go.jp の /tmlist/rn/)は
+// CORS非対応で、退避先にしていた r.jina.ai も 2026-09-21 に www.river.go.jp を遮断した
+// (403 AbuseAlleviationError)。サーバー側には制約が無いため、ここで取得して data/rainfall.json に
+// 書き出し、ダッシュボードは同一オリジンのそのファイルを読む。
+const MISHIMA_RAIN_OBS_CD13 = "0563300100034";
+const RAINFALL_WINDOW_MS = 3 * 24 * 60 * 60 * 1000; // 保持する期間(3日)
+const RAINFALL_MAX_POINTS = 500;
+function rainfallJsonUrl(d) {
+  const p = toJstParts(d);
+  const p2 = function (n) { return String(n).padStart(2, "0"); };
+  const flooredMin = Math.floor(p.mi / 10) * 10;
+  const datePart = p.y + p2(p.mo + 1) + p2(p.day);
+  const timePart = p2(p.h) + p2(flooredMin);
+  return "https://www.river.go.jp/kawabou/file/files/tmlist/rn/" + datePart + "/" + timePart + "/" + MISHIMA_RAIN_OBS_CD13 + ".json";
+}
+function parseRainfallJson(json) {
+  const out = [];
+  const push = function (v) {
+    if (v && v.obsTime && typeof v.rn10m === "number") {
+      const t = new Date(v.obsTime);
+      if (!isNaN(t.getTime())) out.push({ obsTime: t.toISOString(), rn10m: v.rn10m });
+    }
+  };
+  if (json && Array.isArray(json.min10Values)) json.min10Values.forEach(push);
+  if (json && json.obsValue) push(json.obsValue);
+  return out;
+}
+// 10分区切りのファイルも公開に少し遅れがあるため、現在・10分前・20分前の順に試す。
+const RAINFALL_BUCKET_FALLBACK_MIN = [0, 10, 20];
+async function fetchRainfallPoints() {
+  const nowMs = Date.now();
+  let firstError = null;
+  for (const backMin of RAINFALL_BUCKET_FALLBACK_MIN) {
+    try {
+      const res = await fetchWithTimeout(rainfallJsonUrl(new Date(nowMs - backMin * 60000)), { "Accept": "application/json" });
+      const points = parseRainfallJson(await res.json());
+      if (points.length) return points;
+      if (!firstError) firstError = new Error("雨量データなし");
+    } catch (err) {
+      if (!firstError) firstError = err;
+    }
+  }
+  throw firstError || new Error("雨量データなし");
+}
+// 前回までの値と併合し、保持期間を過ぎた古い点を落として書き出す。
+async function updateRainfallFile() {
+  const prev = await readJsonSafe(RAINFALL_JSON_PATH, { values: [] });
+  const byTime = {};
+  (Array.isArray(prev.values) ? prev.values : []).forEach(function (v) {
+    if (v && v.obsTime && typeof v.rn10m === "number") byTime[v.obsTime] = v;
+  });
+  const fetched = await fetchRainfallPoints();
+  fetched.forEach(function (v) { byTime[v.obsTime] = v; });
+  const cutoff = Date.now() - RAINFALL_WINDOW_MS;
+  let values = Object.keys(byTime).map(function (k) { return byTime[k]; })
+    .filter(function (v) { return new Date(v.obsTime).getTime() >= cutoff; })
+    .sort(function (a, b) { return new Date(a.obsTime) - new Date(b.obsTime); });
+  if (values.length > RAINFALL_MAX_POINTS) values = values.slice(values.length - RAINFALL_MAX_POINTS);
+  await writeFile(RAINFALL_JSON_PATH, JSON.stringify({
+    generatedAt: new Date().toISOString(), obsCd13: MISHIMA_RAIN_OBS_CD13, stationName: "三島", values: values
+  }, null, 2) + "\n", "utf8");
+  return { total: values.length, fetched: fetched.length };
 }
 
 // ---- 画像アーカイブ(全46拠点、直近IMAGE_RETENTION_DAYS日分のみ保持) ----
@@ -787,6 +855,14 @@ async function main() {
   const okCount = Object.values(latest.sites).filter(function (s) { return s.lastFetchOk; }).length;
   console.log(okCount + "/" + targetSites.length + " 拠点の取得に成功しました。");
 
+  // 雨量(ダッシュボードが水位グラフに重ねる)。失敗してもデータ取得全体は継続する。
+  try {
+    const rain = await updateRainfallFile();
+    console.log("[OK] 雨量計(三島): " + rain.fetched + "件取得 / 保持 " + rain.total + "件");
+  } catch (err) {
+    console.warn("[NG] 雨量計(三島)の取得に失敗しました: " + (err && err.message ? err.message : String(err)));
+  }
+
   // 画像アーカイブはデータ取得(上記)とは独立したベストエフォート処理とし、
   // ここで失敗してもデータ取得自体の成功/終了コードには影響させない。
   if (SKIP_IMAGES) {
@@ -811,5 +887,6 @@ export {
   runPromise, SITES, main, KAWABOU_CAMERA_SITES, KAWABOU_WATER_SITES, IMAGE_RETENTION_DAYS, IMAGES_DIR, IMAGE_MANIFEST_PATH,
   fetchKawabouWaterReading, kawabouWaterJsonUrl, kawabouSwstgJsonUrl,
   WATER_RECENT_CSV_PATH, WATER_RECENT_WINDOW_MS,
-  parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID, POWER_CSV_BASE_URL
+  parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID, POWER_CSV_BASE_URL,
+  RAINFALL_JSON_PATH, rainfallJsonUrl, parseRainfallJson, MISHIMA_RAIN_OBS_CD13
 };
