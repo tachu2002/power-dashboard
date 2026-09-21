@@ -1211,6 +1211,17 @@
   // ページを開いた直後にrecent.csvと並行して読み込み、水位グラフの元データに1か月分反映する
   // (グラフの表示範囲自体はCHART_WINDOW_MS=1日のまま変更しない)。
   var SERVER_WATER_HISTORY_URL = "data/recent_water.csv";
+  // サーバー側が10分ごとに保存している各拠点の最新値と雨量(いずれも同一オリジン=CORSの制約を受けない)。
+  // ブラウザから取得できない取得元の「最後の頼み綱」として使う。
+  //   2026-09-21: 危機管理型水位計(/tmlist/swstg/)はCORS非対応で、退避先の r.jina.ai も
+  //   www.river.go.jp を遮断(403 AbuseAlleviationError)したため、ブラウザからは一切取得できなくなった。
+  //   サーバー側(GitHub Actions)は従来どおり取得できているので、その保存値を表示に使う。
+  var SERVER_LATEST_URL = "data/latest.json";
+  var SERVER_RAINFALL_URL = "data/rainfall.json";
+  var SERVER_LATEST_REFRESH_MS = 5 * 60 * 1000;
+  // サーバー保存値をどこまで「現在値」として使うか(これより古ければ取得失敗として扱う)。
+  var SERVER_LATEST_MAX_AGE_MS = 60 * 60 * 1000;
+  var VIA_LABEL_SERVER_FALLBACK = "サーバー保存値（国交省 川の防災情報）";
   var IMAGE_MANIFEST_URL = "data/images/manifest.json";
   // タイムラプス再生の対象期間(直近2日分)。サーバー側の画像保持期間(poll.mjsのIMAGE_RETENTION_DAYS)も2日。
   var TIMELAPSE_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
@@ -1490,6 +1501,34 @@
     if (!v || typeof v.stg !== "number") return null;
     return { waterLevelM: v.stg, measureTime: v.obsTime || null, pv: null, bat: null, imageUrl: null };
   }
+  // サーバー側(GitHub Actions)が保存した最新値。取得できていて十分に新しい場合だけ返す。
+  var serverLatestState = { sites: {}, generatedAt: null, fetchedAt: null, lastError: null };
+  function loadServerLatest() {
+    return fetch(SERVER_LATEST_URL + "?_ts=" + Date.now(), { cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function (json) {
+        serverLatestState.sites = (json && json.sites) || {};
+        serverLatestState.generatedAt = json && json.generatedAt ? new Date(json.generatedAt) : null;
+        serverLatestState.fetchedAt = new Date();
+        serverLatestState.lastError = null;
+        return Object.keys(serverLatestState.sites).length;
+      })
+      .catch(function (err) {
+        serverLatestState.lastError = err && err.message ? err.message : String(err);
+        console.warn("サーバー保存の最新値を読み込めませんでした:", serverLatestState.lastError);
+        return 0;
+      });
+  }
+  function serverLatestWaterReading(site) {
+    var entry = serverLatestState.sites[site.id];
+    if (!entry || typeof entry.waterLevelM !== "number") return null;
+    var at = entry.lastSuccessAt ? new Date(entry.lastSuccessAt).getTime() : NaN;
+    if (!isFinite(at) || Date.now() - at > SERVER_LATEST_MAX_AGE_MS) return null;
+    return {
+      waterLevelM: entry.waterLevelM, measureTime: entry.measureTime || null,
+      pv: null, bat: null, imageUrl: null, via: VIA_LABEL_SERVER_FALLBACK
+    };
+  }
   function fetchKawabouWaterReading(site) {
     var isSwstg = site.kind === "swstg";
     var nowMs = Date.now();
@@ -1507,7 +1546,13 @@
         });
       });
     });
-    return attempt;
+    // ブラウザから直接取得できない場合(危機管理型水位計のCORS非対応など)は、
+    // サーバー側が保存した最新値を使う。表示は最大10分ほど遅れるが、取得失敗にはしない。
+    return attempt.catch(function (err) {
+      var fromServer = serverLatestWaterReading(site);
+      if (fromServer) return fromServer;
+      throw err;
+    });
   }
   // 国交省カメラ。撮影時刻のJSONが取得できない場合でも、画像そのものは表示できることがあるため
   // 「JSONが読めない=拠点全体が失敗」とはしない。国交省側でカメラが停止していると、.json のURLが
@@ -3827,7 +3872,8 @@
     return readingPromise
       .then(function (reading) {
         hideError();
-        addPoint(site, reading, viaLabel);
+        // 取得経路が退避先に切り替わった場合(reading.via)は、そちらを表示に使う。
+        addPoint(site, reading, reading.via || viaLabel);
         setSiteDots(site, reading.cameraUnavailable ? "unavailable" : "ok");
       })
       .catch(function (err) {
@@ -5023,29 +5069,59 @@
     var jsonPart = idx >= 0 ? text.slice(idx + marker.length) : text;
     return JSON.parse(jsonPart.trim());
   }
-  function pollRainfallGauge() {
-    var now = new Date();
-    var parts = rainTimeUrlParts(now);
-    var targetUrl = "https://www.river.go.jp/kawabou/file/files/tmlist/rn/" + parts.ymd + "/" + parts.hhmm + "/" + MISHIMA_RAIN_OBS_CD13 + ".json";
-    var proxyUrl = "https://r.jina.ai/" + targetUrl;
-    return fetchWithTimeout(proxyUrl, RAIN_FETCH_TIMEOUT_MS)
-      .then(function (res) { return res.text(); })
-      .then(function (text) { return extractJsonFromJinaProxyText(text); })
+  // 雨量の取得は「サーバー保存値(同一オリジン) → プロキシ経由(従来)」の順に試す。
+  // 2026-09-21から r.jina.ai が www.river.go.jp への匿名アクセスを403で遮断したため、
+  // プロキシ経由は現在使えない。サーバー側(scripts/poll.mjs)が10分ごとに取得して
+  // data/rainfall.json へ保存しているので、そちらを正とする。
+  // (プロキシ側は将来また使えるようになったときのために残してある。)
+  function rainPointsFromKawabouJson(json) {
+    var points = [];
+    if (json && Array.isArray(json.min10Values)) {
+      json.min10Values.forEach(function (v) {
+        if (v && v.obsTime && typeof v.rn10m === "number") points.push({ time: new Date(v.obsTime), rn10m: v.rn10m });
+      });
+    }
+    if (json && json.obsValue && json.obsValue.obsTime && typeof json.obsValue.rn10m === "number") {
+      points.push({ time: new Date(json.obsValue.obsTime), rn10m: json.obsValue.rn10m });
+    }
+    return points;
+  }
+  function fetchRainfallFromServer() {
+    return fetchWithTimeout(SERVER_RAINFALL_URL + "?_ts=" + Date.now(), RAIN_FETCH_TIMEOUT_MS)
+      .then(function (res) { return res.json(); })
       .then(function (json) {
-        var newPoints = [];
-        if (json && Array.isArray(json.min10Values)) {
-          json.min10Values.forEach(function (v) {
-            if (v && v.obsTime && typeof v.rn10m === "number") newPoints.push({ time: new Date(v.obsTime), rn10m: v.rn10m });
+        var points = [];
+        if (json && Array.isArray(json.values)) {
+          json.values.forEach(function (v) {
+            if (v && v.obsTime && typeof v.rn10m === "number") points.push({ time: new Date(v.obsTime), rn10m: v.rn10m });
           });
         }
-        if (json && json.obsValue && json.obsValue.obsTime && typeof json.obsValue.rn10m === "number") {
-          newPoints.push({ time: new Date(json.obsValue.obsTime), rn10m: json.obsValue.rn10m });
-        }
-        mergeRainPoints(newPoints);
+        if (!points.length) throw new Error("サーバー保存の雨量データが空です");
+        return points;
+      });
+  }
+  function fetchRainfallFromProxy() {
+    var parts = rainTimeUrlParts(new Date());
+    var targetUrl = "https://www.river.go.jp/kawabou/file/files/tmlist/rn/" + parts.ymd + "/" + parts.hhmm + "/" + MISHIMA_RAIN_OBS_CD13 + ".json";
+    return fetchWithTimeout("https://r.jina.ai/" + targetUrl, RAIN_FETCH_TIMEOUT_MS)
+      .then(function (res) { return res.text(); })
+      .then(function (text) { return rainPointsFromKawabouJson(extractJsonFromJinaProxyText(text)); })
+      .then(function (points) {
+        if (!points.length) throw new Error("雨量データなし");
+        return points;
+      });
+  }
+  function pollRainfallGauge() {
+    return fetchRainfallFromServer()
+      .catch(function (serverErr) {
+        return fetchRainfallFromProxy().catch(function () { throw serverErr; });
+      })
+      .then(function (points) {
+        mergeRainPoints(points);
         refreshAllGraphsForRainfall();
       })
       .catch(function (err) {
-        console.warn("国交省 雨量計データの取得に失敗しました(雨量オーバーレイなしで継続します):", err && err.message);
+        console.warn("雨量計データの取得に失敗しました(雨量オーバーレイなしで継続します):", err && err.message);
       });
   }
 
@@ -5077,8 +5153,10 @@
   // 未来予測に使う1時間ごとの気象データ(実績+予報)を読み込む。
   loadForecastHourly();
   setInterval(loadForecastHourly, FORECAST_REFRESH_MS);
-  pollAll();
-  pollFastSites();
+  // サーバー保存の最新値(ブラウザから取得できない拠点の退避先)を先に読み込んでから取得を始める。
+  // 失敗してもそのまま取得へ進む(loadServerLatestは失敗時も解決する)。
+  loadServerLatest().then(function () { pollAll(); pollFastSites(); });
+  setInterval(loadServerLatest, SERVER_LATEST_REFRESH_MS);
   setInterval(pollAll, FETCH_INTERVAL_MS);
   setInterval(pollFastSites, FAST_POLL_INTERVAL_MS);
   updateRainfallSignal().then(refreshAllForecasts);
@@ -5191,6 +5269,13 @@
     fetchKawabouWaterReading: fetchKawabouWaterReading,
     kawabouWaterJsonUrl: kawabouWaterJsonUrl, kawabouSwstgJsonUrl: kawabouSwstgJsonUrl,
     updateErrorTicker: updateErrorTicker, updateFetchAlertFrame: updateFetchAlertFrame,
+    // --- Request W (2026-09-21): プロキシ遮断への対応(サーバー保存値への退避) ---
+    loadServerLatest: loadServerLatest, serverLatestWaterReading: serverLatestWaterReading,
+    getServerLatestState: function () { return serverLatestState; },
+    SERVER_LATEST_URL: SERVER_LATEST_URL, SERVER_RAINFALL_URL: SERVER_RAINFALL_URL,
+    SERVER_LATEST_MAX_AGE_MS: SERVER_LATEST_MAX_AGE_MS, VIA_LABEL_SERVER_FALLBACK: VIA_LABEL_SERVER_FALLBACK,
+    fetchRainfallFromServer: fetchRainfallFromServer, fetchRainfallFromProxy: fetchRainfallFromProxy,
+    rainPointsFromKawabouJson: rainPointsFromKawabouJson, pollRainfallGauge: pollRainfallGauge,
     setSiteDots: setSiteDots, riverGroupOf: riverGroupOf, riverGroups: riverGroups,
     addPoint: addPoint, MAP_SITES: MAP_SITES, RIVER_ORDER_SITES: RIVER_ORDER_SITES,
     POWER_SITES: POWER_SITES, POWER_SITES_DISPLAY_ORDER: POWER_SITES_DISPLAY_ORDER,
