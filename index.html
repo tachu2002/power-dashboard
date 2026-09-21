@@ -2437,6 +2437,9 @@
   // 電源監視カードの差分表示。上昇=青(▲) / 下降=赤(▼) / 変化なし=淡色(±)。
   function setStatDelta(target, diff, unit) {
     if (!target) return;
+    // 表示は小数第2位までなので、そこで0.00になる差は「変化なし(±)」として扱う
+    // (「▼ 0.00 V」のような、向きだけ付いて数値が0の表示を避ける)。
+    if (Math.abs(diff) < 0.005) diff = 0;
     var mark = diff > 0 ? "▲ " : (diff < 0 ? "▼ " : "± ");
     target.textContent = mark + Math.abs(diff).toFixed(2) + " " + unit;
     target.classList.remove("up", "down");
