@@ -412,6 +412,14 @@
   /* 差分は色だけに頼らず▲▼±の記号でも判別できるようにしている(上昇=青・下降=赤)。 */
   .mini-stats .stat-delta.up { color: var(--delta-up); font-weight: 600; }
   .mini-stats .stat-delta.down { color: var(--delta-down); font-weight: 600; }
+  /* バッテリー劣化の指標(電池マークと拠点画像の間に置く)。色だけに頼らず符号と数値でも判別できる。 */
+  .battery-health { min-width: 74px; }
+  .battery-health .health-value { font-size: 16px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .battery-health .health-value.ok { color: var(--ok-border); }
+  .battery-health .health-value.warn { color: var(--warn-border); }
+  .battery-health .health-value.critical { color: var(--critical-border); }
+  .battery-health .health-value.muted { color: var(--text-muted); font-weight: 600; }
+  .battery-health .health-sub { font-size: 10px; color: var(--text-secondary); margin-top: 1px; }
   /* バッテリー残量ゲージ(スマートフォンの電池表示のイメージ)。
      数値(パーセンテージ)は必ず文字として表示するため、色だけに意味を持たせていない。 */
   .battery-gauge { display: flex; flex-direction: column; gap: 2px; }
@@ -1158,20 +1166,21 @@
   // 残量に応じたステータス色(良好/注意/危険)。数値も併記するため色だけに依存しない。
   // スマートフォンの電池表示のような横向きの電池マーク。中央に残量(%)を大きく表示する。
   // pctがnullの場合は「–」を表示する(データ未取得)。
+  // 電池マークは、右隣に劣化の指標を置くぶん少し小さくしている(旧: 104×40)。
   function batteryGaugeSvg(pct) {
-    var W = 104, H = 40;
-    var bodyX = 2, bodyY = 4, bodyW = 88, bodyH = 32, r = 7;
-    var padding = 4;
+    var W = 84, H = 32;
+    var bodyX = 2, bodyY = 3, bodyW = 70, bodyH = 26, r = 6;
+    var padding = 3;
     var innerW = bodyW - padding * 2;
     var fillW = pct === null ? 0 : Math.max(pct > 0 ? 3 : 0, (innerW * pct) / 100);
     var color = batteryLevelColorVar(pct);
     var label = pct === null ? "–" : fmtBatteryPercent(pct);
     // 「100.00%」まで枠内に収まるよう、桁数に応じて文字サイズを落とす。
-    var labelFontSize = label.length >= 7 ? 13 : (label.length >= 5 ? 15 : 18);
+    var labelFontSize = label.length >= 7 ? 11 : (label.length >= 5 ? 12 : 15);
     return '<svg width="' + W + '" height="' + H + '" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="バッテリー残量 ' + label + '">' +
       '<rect class="battery-fill" x="' + (bodyX + padding) + '" y="' + (bodyY + padding) + '" width="' + fillW.toFixed(1) + '" height="' + (bodyH - padding * 2) + '" rx="4" fill="' + color + '"></rect>' +
       '<rect class="battery-body" x="' + bodyX + '" y="' + bodyY + '" width="' + bodyW + '" height="' + bodyH + '" rx="' + r + '"></rect>' +
-      '<rect class="battery-cap" x="' + (bodyX + bodyW + 2) + '" y="' + (bodyY + 9) + '" width="6" height="14" rx="2"></rect>' +
+      '<rect class="battery-cap" x="' + (bodyX + bodyW + 2) + '" y="' + (bodyY + 7) + '" width="5" height="12" rx="2"></rect>' +
       '<text class="battery-pct-text" x="' + (bodyX + bodyW / 2) + '" y="' + (bodyY + bodyH / 2 + 1) + '" text-anchor="middle" dominant-baseline="middle" font-size="' + labelFontSize + '" font-family="system-ui, -apple-system, sans-serif">' + label + '</text>' +
       '</svg>';
   }
@@ -1222,6 +1231,9 @@
   // サーバー保存値をどこまで「現在値」として使うか(これより古ければ取得失敗として扱う)。
   var SERVER_LATEST_MAX_AGE_MS = 60 * 60 * 1000;
   var VIA_LABEL_SERVER_FALLBACK = "サーバー保存値（国交省 川の防災情報）";
+  // バッテリーの劣化指標(サーバー側で算出。scripts/poll.mjs の updateBatteryHealthFile を参照)。
+  var SERVER_BATTERY_HEALTH_URL = "data/battery_health.json";
+  var BATTERY_HEALTH_REFRESH_MS = 60 * 60 * 1000;
   var IMAGE_MANIFEST_URL = "data/images/manifest.json";
   // タイムラプス再生の対象期間(直近2日分)。サーバー側の画像保持期間(poll.mjsのIMAGE_RETENTION_DAYS)も2日。
   var TIMELAPSE_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
@@ -1518,6 +1530,82 @@
         console.warn("サーバー保存の最新値を読み込めませんでした:", serverLatestState.lastError);
         return 0;
       });
+  }
+  /* ---------------------------------------------------------------------
+   * バッテリーの劣化指標
+   * -----------------------------------------------------------------------
+   * 日射の無い夜間(22:00〜翌4:00 JST)の電圧の下がり方を、拠点ごとの消費電力[W]で割って
+   * そろえ、基準拠点(祇園大橋)との差を割合で示す。算出はサーバー側(scripts/poll.mjs)で
+   * 直近14日の中央値から行い、ここでは結果を読んで表示するだけ。
+   *   プラス = 基準より速く電圧が落ちる(劣化が進んでいる)
+   *   マイナス = 基準より持ちが良い
+   * --------------------------------------------------------------------- */
+  var batteryHealthState = { sites: {}, generatedAt: null, referenceSiteId: null, nights: null, lastError: null };
+  function loadBatteryHealth() {
+    return fetch(SERVER_BATTERY_HEALTH_URL + "?_ts=" + Date.now(), { cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function (json) {
+        batteryHealthState.sites = (json && json.sites) || {};
+        batteryHealthState.generatedAt = json && json.generatedAt ? new Date(json.generatedAt) : null;
+        batteryHealthState.referenceSiteId = json && json.referenceSiteId || null;
+        batteryHealthState.nights = json && json.nights || null;
+        batteryHealthState.lastError = null;
+        refreshAllBatteryHealth();
+        return Object.keys(batteryHealthState.sites).length;
+      })
+      .catch(function (err) {
+        batteryHealthState.lastError = err && err.message ? err.message : String(err);
+        console.warn("バッテリー劣化指標を読み込めませんでした:", batteryHealthState.lastError);
+        return 0;
+      });
+  }
+  // 差の割合の表示文字列。基準拠点そのものは「±0%（基準）」と分かるようにする。
+  function fmtBatteryHealth(diffPct) {
+    if (typeof diffPct !== "number" || !isFinite(diffPct)) return "—";
+    if (diffPct > 0) return "+" + diffPct + "%";
+    if (diffPct < 0) return "−" + Math.abs(diffPct) + "%";
+    return "±0%";
+  }
+  // 色分け: 基準より大きく劣化=危険色 / やや劣化=注意色 / 基準並み=既定 / 基準より良い=良好色。
+  // 消費が極端に小さい拠点(lowLoad)は電圧降下が消費に比例しないため、参考値として淡色にする。
+  function batteryHealthClass(diffPct, isReference, lowLoad) {
+    if (typeof diffPct !== "number" || !isFinite(diffPct)) return "muted";
+    if (lowLoad) return "muted";
+    if (isReference) return "";
+    if (diffPct >= 40) return "critical";
+    if (diffPct >= 15) return "warn";
+    if (diffPct <= -10) return "ok";
+    return "";
+  }
+  function updateBatteryHealth(site) {
+    var s = siteStates[site.id];
+    if (!s || !s.healthValueEl) return;
+    var entry = batteryHealthState.sites[site.id];
+    var isReference = batteryHealthState.referenceSiteId === site.id;
+    var diffPct = entry && typeof entry.diffPct === "number" ? entry.diffPct : null;
+    var lowLoad = !!(entry && entry.lowLoad);
+    s.healthValueEl.textContent = fmtBatteryHealth(diffPct);
+    s.healthValueEl.className = "health-value " + batteryHealthClass(diffPct, isReference, lowLoad);
+    if (s.healthSubEl) {
+      s.healthSubEl.textContent = diffPct === null ? "データ不足"
+        : (isReference ? "基準拠点"
+          : (lowLoad ? "参考（消費 " + entry.loadW.toFixed(1) + "W）" : (entry.nights || "?") + "夜の中央値"));
+    }
+    var holder = s.healthValueEl.parentElement;
+    if (!holder) return;
+    if (diffPct === null) {
+      holder.title = "バッテリー劣化の指標: まだ算出できていません（夜間の実測が足りないか、消費電力が取得できていません）";
+      return;
+    }
+    holder.title = "夜間(" + (batteryHealthState.nights || 14) + "日分の中央値)の電圧降下 " +
+      (typeof entry.dropV === "number" ? entry.dropV.toFixed(3) + "V" : "–") +
+      " ÷ 消費 " + (typeof entry.loadW === "number" ? entry.loadW.toFixed(2) + "W" : "–") +
+      " を、基準拠点と比べた差です" + (isReference ? "（この拠点が基準）" : "") +
+      "。プラスは基準より速く電圧が落ちる＝劣化が進んでいることを示します。" +
+      (lowLoad ? "\nこの拠点は消費が小さく、電圧の下がり方が消費に比例しないため、参考値として扱ってください。" : "");
+  }
+  function refreshAllBatteryHealth() {
+    POWER_SITES.forEach(function (site) { updateBatteryHealth(site); });
   }
   function serverLatestWaterReading(site) {
     var entry = serverLatestState.sites[site.id];
@@ -2325,6 +2413,11 @@
     var batteryStat = el2("div", { class: "battery-gauge" },
       '<div class="stat-label">バッテリー残量</div>' + batteryGaugeSvg(null));
     mini.appendChild(batteryStat);
+    // バッテリーの劣化指標。電池マークと拠点画像の間に置く(電池マークは少し小さくしてある)。
+    var healthStat = el2("div", { class: "battery-health" },
+      '<div class="stat-label">劣化（祇園大橋比）</div>' +
+      '<div class="health-value muted">—</div><div class="health-sub">算出中…</div>');
+    mini.appendChild(healthStat);
     card.appendChild(mini);
 
     var batAlertLine = el2("div", { class: "bat-alert-line" });
@@ -2356,6 +2449,8 @@
     s.pvValueEl = pvStat.querySelector(".pv-value");
     s.batValueEl = batStat.querySelector(".bat-value");
     s.batteryGaugeEl = batteryStat;
+    s.healthValueEl = healthStat.querySelector(".health-value");
+    s.healthSubEl = healthStat.querySelector(".health-sub");
     s.pvDeltaEl = pvStat.querySelector(".pv-delta");
     s.batDeltaEl = batStat.querySelector(".bat-delta");
     s.batAlertLineEl = batAlertLine;
@@ -5163,6 +5258,9 @@
   // 失敗してもそのまま取得へ進む(loadServerLatestは失敗時も解決する)。
   loadServerLatest().then(function () { pollAll(); pollFastSites(); });
   setInterval(loadServerLatest, SERVER_LATEST_REFRESH_MS);
+  // バッテリーの劣化指標(サーバー側で1時間ごとに算出)
+  loadBatteryHealth();
+  setInterval(loadBatteryHealth, BATTERY_HEALTH_REFRESH_MS);
   setInterval(pollAll, FETCH_INTERVAL_MS);
   setInterval(pollFastSites, FAST_POLL_INTERVAL_MS);
   updateRainfallSignal().then(refreshAllForecasts);
@@ -5277,6 +5375,12 @@
     updateErrorTicker: updateErrorTicker, updateFetchAlertFrame: updateFetchAlertFrame,
     // --- Request W (2026-09-21): プロキシ遮断への対応(サーバー保存値への退避) ---
     loadServerLatest: loadServerLatest, serverLatestWaterReading: serverLatestWaterReading,
+    // --- Request X (2026-09-26): バッテリー劣化の指標(祇園大橋比) ---
+    loadBatteryHealth: loadBatteryHealth, fmtBatteryHealth: fmtBatteryHealth,
+    batteryHealthClass: batteryHealthClass, updateBatteryHealth: updateBatteryHealth,
+    refreshAllBatteryHealth: refreshAllBatteryHealth,
+    getBatteryHealthState: function () { return batteryHealthState; },
+    SERVER_BATTERY_HEALTH_URL: SERVER_BATTERY_HEALTH_URL,
     getServerLatestState: function () { return serverLatestState; },
     SERVER_LATEST_URL: SERVER_LATEST_URL, SERVER_RAINFALL_URL: SERVER_RAINFALL_URL,
     SERVER_LATEST_MAX_AGE_MS: SERVER_LATEST_MAX_AGE_MS, VIA_LABEL_SERVER_FALLBACK: VIA_LABEL_SERVER_FALLBACK,
