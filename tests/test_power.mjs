@@ -201,7 +201,7 @@ export async function run() {
   r.check("p8-b 電池マークと拠点画像の間に置かれる",
     health.gaugeIdx >= 0 && health.healthIdx === health.gaugeIdx + 1 && health.thumbIdx === health.healthIdx + 1, health.kids);
   r.check("p8-c 電池マークを小さくしてある(幅84)", health.gaugeW === 84, health.gaugeW);
-  r.check("p8-d 見出しは「劣化（祇園大橋比）」", health.label === "劣化（祇園大橋比）", health.label);
+  r.check("p8-d 見出しは「劣化」", health.label === "劣化", health.label);
   r.check("p8-e 基準拠点は「±0%」と「基準拠点」表記", health.ref.text === "±0%" && health.ref.sub === "基準拠点", health.ref);
   r.check("p8-f 基準より劣化はプラス表記", health.up.text === "+35%", health.up);
   r.check("p8-g 基準より持ちが良い場合はマイナス表記", health.down.text === "−20%", health.down);
@@ -209,7 +209,7 @@ export async function run() {
   r.check("p8-i 軽い劣化は注意色", health.up.cls === "warn", health.up);
   r.check("p8-j 基準より良い場合は良好色", health.down.cls === "ok", health.down);
   r.check("p8-k データが無い拠点は「—」", health.none.text === "—" && health.none.cls === "muted", health.none);
-  r.check("p8-l 何夜ぶんの中央値かを併記", health.up.sub === "14夜の中央値", health.up.sub);
+  r.check("p8-l 何との比較かを併記", health.up.sub === "祇園大橋比", health.up.sub);
   r.check("p8-m 算出根拠をtitleに出す", health.up.title.indexOf("夜間") === 0, health.up.title);
   r.check("p8-m2 消費が小さい拠点は参考値として淡色にする",
     health.low.cls === "muted" && health.low.text === "+300%", health.low);
