@@ -489,10 +489,20 @@ async function updateRainfallFile() {
  * 消費電力が異なるため、そのままでは比べられない。中継サーバー(mini.lhlab-vps.net)の
  * 「消費(負荷)」の瞬時電力[W]で割って、"1Wあたりの電圧降下" にそろえてから比較する。
  *
- *   降下量[V/夜] ÷ 消費[W]  …… 1Wの負荷で一晩にどれだけ電圧が落ちるか
- *   これが大きいほど容量が小さい(=劣化している)。
- *   基準拠点(祇園大橋)を±0%とし、その差の割合 = 100 × (その拠点の値 ÷ 基準の値 − 1) を出す。
- *   プラスなら基準より速く落ちる(劣化が進んでいる)、マイナスなら基準より持ちが良い。
+ * ただし「降下量 ÷ 消費W」で単純に割ると、消費が小さい拠点で破綻する。電圧降下には消費に
+ * 比例しない下駄(気温・自己放電・測定の丸め)があり、消費が小さいほどその影響が相対的に
+ * 大きくなるためである(2026-09-27実測: こも池0.6Wで+1729%という非現実的な値になった)。
+ *
+ * そこで、全拠点の実測から次の直線を最小二乗で当てはめ、その予測からのズレで比べる。
+ *
+ *   夜間降下[V] = a + b × 消費[W]      (2026-09-27実測: a=0.0625V, b=0.00190V/W, r=0.50)
+ *     a …… 消費に依存しない下駄   b …… 負荷1Wあたりの降下
+ *
+ *   ズレ = 実測降下 ÷ (a + b × その拠点の消費W)
+ *
+ * 最後に基準拠点(祇園大橋)のズレが±0%になるよう据え直す。
+ *   差の割合 = 100 × (その拠点のズレ ÷ 基準拠点のズレ − 1)
+ *   プラスなら同じ消費の拠点より速く落ちる(劣化が進んでいる)、マイナスなら持ちが良い。
  *
  * 夜ごとのばらつき(気温・その日の充電状態)を抑えるため、直近BATTERY_HEALTH_NIGHTS日の
  * **中央値**を使う。消費電力も同様に、夜間帯の実測の中央値を日ごとに記録して中央値を取る。
@@ -510,9 +520,29 @@ const BATTERY_HEALTH_MIN_LOAD_W = 0.05;                // これ未満の消費�
 // 相対的に大きくなる)ため、そのまま割り算すると実態より大幅に劣化して見える。
 // 実測(2026-09-27): 祇園大橋12.1Wに対し、こも池0.6W・竹倉用水路4.2W・ほたるの里3.0W。
 const BATTERY_HEALTH_LOW_LOAD_W = 5;
+// 傾向線(降下 = a + b×消費W)を当てはめるのに最低限必要な拠点数。
+const BATTERY_HEALTH_MIN_FIT_SITES = 8;
 const BATTERY_HEALTH_REFRESH_MS = 60 * 60 * 1000;      // 再計算の間隔(1時間)
 const BATTERY_HEALTH_RANGE = [-90, 300];               // 表示する差の割合の範囲(%)
 
+// 最小二乗で y = a + b x を当てはめる。相関係数(r)と使った点数も返す。
+function fitLine(points) {
+  const pts = points.filter(function (p) { return isFinite(p.x) && isFinite(p.y); });
+  if (pts.length < BATTERY_HEALTH_MIN_FIT_SITES) return null;
+  const n = pts.length;
+  const mx = pts.reduce(function (a, p) { return a + p.x; }, 0) / n;
+  const my = pts.reduce(function (a, p) { return a + p.y; }, 0) / n;
+  let sxy = 0, sxx = 0, syy = 0;
+  pts.forEach(function (p) { sxy += (p.x - mx) * (p.y - my); sxx += (p.x - mx) * (p.x - mx); syy += (p.y - my) * (p.y - my); });
+  if (!sxx || !syy) return null;
+  const b = sxy / sxx;
+  return {
+    a: Math.round((my - b * mx) * 100000) / 100000,
+    b: Math.round(b * 1000000) / 1000000,
+    r: Math.round((sxy / Math.sqrt(sxx * syy)) * 1000) / 1000,
+    sites: n
+  };
+}
 function medianOf(list) {
   if (!list.length) return null;
   const s = list.slice().sort(function (a, b) { return a - b; });
@@ -625,16 +655,23 @@ async function updateBatteryHealthFile(powerRows) {
       dropV: Math.round(dropV * 10000) / 10000,
       loadW: typeof w === "number" ? Math.round(w * 1000) / 1000 : null,
       lowLoad: typeof w === "number" && w < BATTERY_HEALTH_LOW_LOAD_W,
-      dropPerW: (typeof w === "number" && w >= BATTERY_HEALTH_MIN_LOAD_W && dropV >= BATTERY_HEALTH_MIN_DROP_V)
-        ? dropV / w : null
+      usable: typeof w === "number" && w >= BATTERY_HEALTH_MIN_LOAD_W && dropV >= BATTERY_HEALTH_MIN_DROP_V
     };
   });
-  const ref = stats[BATTERY_HEALTH_REFERENCE_ID];
-  const refPerW = ref && ref.dropPerW;
+  // 全拠点で「降下 = a + b×消費W」を当てはめる
+  const fitIds = Object.keys(stats).filter(function (id) { return stats[id].usable; });
+  const fit = fitLine(fitIds.map(function (id) { return { x: stats[id].loadW, y: stats[id].dropV }; }));
   Object.keys(stats).forEach(function (id) {
     const s = stats[id];
-    if (!refPerW || !s.dropPerW) { s.diffPct = null; s.ratio = null; return; }
-    const ratio = s.dropPerW / refPerW;
+    s.expectedV = (fit && s.usable) ? Math.round((fit.a + fit.b * s.loadW) * 10000) / 10000 : null;
+    s.deviation = (s.expectedV && s.expectedV > 0) ? s.dropV / s.expectedV : null;
+  });
+  const ref = stats[BATTERY_HEALTH_REFERENCE_ID];
+  const refDev = ref && ref.deviation;
+  Object.keys(stats).forEach(function (id) {
+    const s = stats[id];
+    if (!refDev || !s.deviation) { s.diffPct = null; s.ratio = null; return; }
+    const ratio = s.deviation / refDev;
     s.ratio = Math.round(ratio * 1000) / 1000;
     const pct = 100 * (ratio - 1);
     s.diffPct = Math.round(Math.min(BATTERY_HEALTH_RANGE[1], Math.max(BATTERY_HEALTH_RANGE[0], pct)));
@@ -642,6 +679,8 @@ async function updateBatteryHealthFile(powerRows) {
   await writeFile(BATTERY_HEALTH_JSON_PATH, JSON.stringify({
     generatedAt: new Date(nowMs).toISOString(),
     referenceSiteId: BATTERY_HEALTH_REFERENCE_ID,
+    // 散布図に引く傾向線(降下 = a + b×消費W)と、当てはめの手応え(相関係数 r)
+    fit: fit,
     nights: BATTERY_HEALTH_NIGHTS,
     nightStartHourJst: BATTERY_HEALTH_NIGHT_START_H,
     nightHours: BATTERY_HEALTH_NIGHT_HOURS,
@@ -1099,5 +1138,5 @@ export {
   parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID, POWER_CSV_BASE_URL,
   RAINFALL_JSON_PATH, rainfallJsonUrl, parseRainfallJson, parseJstTime, MISHIMA_RAIN_OBS_CD13,
   BATTERY_HEALTH_JSON_PATH, BATTERY_HEALTH_REFERENCE_ID, BATTERY_HEALTH_NIGHTS,
-  nightlyVoltageDrops, nightLoadWBySite, updateBatteryHealthFile, medianOf, BATTERY_HEALTH_LOW_LOAD_W
+  nightlyVoltageDrops, nightLoadWBySite, updateBatteryHealthFile, medianOf, fitLine, BATTERY_HEALTH_LOW_LOAD_W
 };
