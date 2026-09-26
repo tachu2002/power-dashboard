@@ -446,8 +446,9 @@ export async function run() {
   fs.rmSync(sandbox2, { recursive: true, force: true });
   fs.rmSync(sandbox3, { recursive: true, force: true });
   /* ============ バッテリー劣化の指標(data/battery_health.json) ============ */
-  // 夜間(22:00〜翌4:00 JST)の電圧降下を、全拠点の傾向線「降下 = a + b×消費W」と比べる。
+  // 前夜(22:00〜翌4:00 JST)の電圧降下を、全拠点の傾向線「降下 = a + b×消費W」と比べる。
   // 消費で単純に割ると消費が小さい拠点で破綻するため、この方式にしている。
+  // バッテリーは随時交換するため、平均ではなく前夜1晩ぶんだけを使う。
   const healthSandbox = makeSandbox("health");
   fs.mkdirSync(path.join(healthSandbox, "data"), { recursive: true });
   const HOUR = 3600000;
@@ -458,7 +459,7 @@ export async function run() {
   Object.keys(siteLoad).forEach((id) => { siteDrop[id] = onLine(siteLoad[id]); });
   siteDrop.cam14 = onLine(siteLoad.cam14) * 1.5;   // 劣化している拠点
   const histLines = ["拠点,取得時刻,機器の計測時刻,PV(W),BAT(V),水位(m),取得方法"];
-  for (let back = 1; back <= 14; back++) {
+  for (let back = 1; back <= 3; back++) {   // 直前の3晩ぶん作る(使われるのは前夜のみ)
     const jstMid = new Date(now + 9 * HOUR - back * 24 * HOUR);
     const start = Date.UTC(jstMid.getUTCFullYear(), jstMid.getUTCMonth(), jstMid.getUTCDate(), 13, 0, 0);
     for (const id of Object.keys(siteDrop)) {
@@ -491,10 +492,10 @@ export async function run() {
   const health = fs.existsSync(healthPath) ? JSON.parse(fs.readFileSync(healthPath, "utf8")) : null;
   r.check("s18-a data/battery_health.jsonが作られる", !!health, health && Object.keys(health.sites || {}).length);
   r.check("s18-b 基準拠点は祇園大橋(cam11)", health && health.referenceSiteId === "cam11", health && health.referenceSiteId);
-  r.check("s18-c 集計は直近14日", health && health.nights === 14, health && health.nights);
+  r.check("s18-c 集計は前夜1晩のみ", health && health.nights === 1, health && health.nights);
   r.check("s18-d 夜間帯は22時から6時間", health && health.nightStartHourJst === 22 && health.nightHours === 6, health);
   const hc11 = health && health.sites.cam11, hc02 = health && health.sites.cam02, hc14 = health && health.sites.cam14;
-  r.check("s18-e 14夜ぶんを集計する", hc11 && hc11.nights === 14, hc11);
+  r.check("s18-e 前夜1晩ぶんを使う", hc11 && hc11.nights === 1, hc11);
   r.check("s18-f 夜間の降下量を拾える", hc11 && Math.abs(hc11.dropV - 0.1) < 0.005, hc11);
   r.check("s18-g 消費電力(load_w)を拠点ごとに拾う",
     hc11 && hc11.loadW === 10 && hc02 && hc02.loadW === 2, { cam11: hc11 && hc11.loadW, cam02: hc02 && hc02.loadW });

@@ -149,14 +149,15 @@ export async function run() {
   r.check("f4-b 予測部分が点線(stroke-dasharray)で描かれる", svg && svg.dashed >= 1, svg);
   r.check("f4-c 実測部分は実線で描かれる", svg && svg.solid >= 1, svg);
 
+  // 発電(PV)のグラフは表示しない方針に変更したため、枠自体が無いことを確認する
+  // (予測の計算そのものは残っており、バッテリーのグラフで使っている)。
   const pvSvg = await page.evaluate(() => {
-    const box = document.getElementById("pchart-pv-cam02");
-    const el = box ? box.querySelector("svg") : null;
-    if (!el) return null;
-    const paths = Array.from(el.querySelectorAll("path"));
-    return { dashed: paths.filter((p) => p.getAttribute("stroke-dasharray")).length, total: paths.length };
+    const d = window.__dashboardDebug;
+    return { box: !!document.getElementById("pchart-pv-cam02"),
+      pvForecast: d.cachedPrediction(d.SITE_CATALOG.cam02, "pv").length };
   });
-  r.check("f4-d 発電のグラフにも予測の点線が入る", pvSvg && pvSvg.dashed >= 1, pvSvg);
+  r.check("f4-d 発電のグラフは表示しない", pvSvg.box === false, pvSvg);
+  r.check("f4-d2 発電の予測計算そのものは残っている", pvSvg.pvForecast > 0, pvSvg);
 
   // グラフの時刻ラベルに秒が含まれないこと(Phase M)
   const labels = await page.evaluate(() => {

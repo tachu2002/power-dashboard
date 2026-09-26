@@ -32,7 +32,7 @@ export async function run() {
   });
   r.check("p1-a カードが23枚描画される", cards.count === 23, cards.count);
   r.check("p1-b すべてのカードに電池マークがある", cards.gauges === 23, cards.gauges);
-  r.check("p1-c 発電・BATのグラフが各23枚", cards.pvCharts === 23 && cards.batCharts === 23, cards);
+  r.check("p1-c 発電のグラフは表示せず、BATのグラフのみ23枚", cards.pvCharts === 0 && cards.batCharts === 23, cards);
   r.check("p1-d Phase Qの3拠点がカードとして並ぶ",
     ["こも池", "竹倉用水路", "ほたるの里"].every((n) => cards.titles.some((t) => t.indexOf(n) === 0)), cards.titles);
 
@@ -210,7 +210,7 @@ export async function run() {
   r.check("p8-j 基準より良い場合は良好色", health.down.cls === "ok", health.down);
   r.check("p8-k データが無い拠点は「—」", health.none.text === "—" && health.none.cls === "muted", health.none);
   r.check("p8-l 何との比較かを併記", health.up.sub === "祇園大橋比", health.up.sub);
-  r.check("p8-m 算出根拠をtitleに出す", health.up.title.indexOf("夜間") === 0, health.up.title);
+  r.check("p8-m 算出根拠をtitleに出す", health.up.title.indexOf("前夜") === 0, health.up.title);
   r.check("p8-m2 消費が小さい拠点は参考値として淡色にする",
     health.low.cls === "muted" && health.low.text === "+300%", health.low);
   r.check("p8-m3 参考値には消費電力を併記する", health.low.sub === "参考（消費 0.6W）", health.low.sub);
@@ -237,8 +237,8 @@ export async function run() {
     return {
       dots: svg.querySelectorAll("circle").length,
       dashed: svg.querySelectorAll('line[stroke-dasharray]').length,
-      axisX: texts.includes("夜間の消費電力（W）"),
-      axisY: texts.includes("夜間の電圧降下（V）"),
+      axisX: texts.includes("前夜の消費電力（W）"),
+      axisY: texts.includes("前夜の電圧降下（V）"),
       fitLabel: texts.includes("全拠点の傾向"),
       note: document.getElementById("healthScatterNote").textContent
     };
@@ -246,7 +246,8 @@ export async function run() {
   r.check("p8-s 散布図に拠点の点が描かれる(指標のある6拠点)", scatter.dots === 6, scatter.dots);
   r.check("p8-t 傾向線を破線で引く", scatter.dashed >= 1 && scatter.fitLabel, scatter);
   r.check("p8-u 軸の意味を明記する", scatter.axisX && scatter.axisY, scatter);
-  r.check("p8-v 読み方の説明を出す", scatter.note.indexOf("線より上") >= 0, scatter.note.slice(0, 80));
+  r.check("p8-v 読み方と対象の夜を説明する",
+    scatter.note.indexOf("線より上") >= 0 && scatter.note.indexOf("前夜") >= 0, scatter.note.slice(0, 90));
   r.check("p8-w 傾向線の式を併記する", scatter.note.indexOf("降下 = ") >= 0, scatter.note.slice(-60));
 
   r.check("p8-p ページ例外にはならない", pageH.errMsgs().length === 0, pageH.errMsgs());
