@@ -504,15 +504,16 @@ async function updateRainfallFile() {
  *   差の割合 = 100 × (その拠点のズレ ÷ 基準拠点のズレ − 1)
  *   プラスなら同じ消費の拠点より速く落ちる(劣化が進んでいる)、マイナスなら持ちが良い。
  *
- * 夜ごとのばらつき(気温・その日の充電状態)を抑えるため、直近BATTERY_HEALTH_NIGHTS日の
- * **中央値**を使う。消費電力も同様に、夜間帯の実測の中央値を日ごとに記録して中央値を取る。
+ * バッテリーは随時交換するため、過去数日の平均では交換直後の状態が見えない。
+ * そこで**前夜1晩ぶんの実測だけ**を使い、毎日その日の朝以降に入れ替わるようにしている
+ * (消費電力も同じ前夜の実測の中央値を使う)。
  * ===================================================================== */
 const BATTERY_HEALTH_REFERENCE_ID = "cam11";          // 祇園大橋(この拠点を100%とする)
-const BATTERY_HEALTH_NIGHTS = 14;                      // 集計に使う日数
+const BATTERY_HEALTH_NIGHTS = 1;                       // 集計に使う夜数(前夜のみ)
 const BATTERY_HEALTH_NIGHT_START_H = 22;               // 夜間帯の開始(JST)
 const BATTERY_HEALTH_NIGHT_HOURS = 6;                  // 夜間帯の長さ(22:00→翌4:00)
 const BATTERY_HEALTH_MIN_SAMPLES = 20;                 // 1夜あたりに必要な実測点数
-const BATTERY_HEALTH_MIN_NIGHTS = 3;                   // 指標を出すのに必要な夜数
+const BATTERY_HEALTH_MIN_NIGHTS = 1;                   // 指標を出すのに必要な夜数
 const BATTERY_HEALTH_MIN_DROP_V = 0.005;               // これ未満の降下は0扱い(ゼロ除算回避)
 const BATTERY_HEALTH_MIN_LOAD_W = 0.05;                // これ未満の消費は信用しない
 // 消費がこれより小さい拠点は「参考値」として区別する。
@@ -615,14 +616,6 @@ function nightLoadWBySite(powerRows, nowMs) {
   });
   return out;
 }
-// 日ごとの消費電力[W]を前回分と併合し、直近BATTERY_HEALTH_NIGHTS日ぶんだけ残す。
-function mergeLoadWHistory(prevByDate, todayByDate, dateKey) {
-  const merged = Object.assign({}, prevByDate || {});
-  if (Object.keys(todayByDate).length) merged[dateKey] = todayByDate;
-  const keys = Object.keys(merged).sort();
-  while (keys.length > BATTERY_HEALTH_NIGHTS) delete merged[keys.shift()];
-  return merged;
-}
 async function updateBatteryHealthFile(powerRows) {
   const prev = await readJsonSafe(BATTERY_HEALTH_JSON_PATH, null);
   const nowMs = Date.now();
@@ -631,18 +624,14 @@ async function updateBatteryHealthFile(powerRows) {
   }
   const jstNow = toJstParts(new Date(nowMs));
   const p2 = function (n) { return String(n).padStart(2, "0"); };
-  const dateKey = jstNow.y + "-" + p2(jstNow.mo + 1) + "-" + p2(jstNow.day);
-  const loadWByDate = mergeLoadWHistory(prev && prev.loadWByDate, nightLoadWBySite(powerRows || [], nowMs), dateKey);
-  // 日ごとの値をさらに中央値でまとめる
-  const loadW = {};
-  Object.keys(loadWByDate).forEach(function (d) {
-    const perSite = loadWByDate[d] || {};
-    Object.keys(perSite).forEach(function (id) { (loadW[id] = loadW[id] || []).push(perSite[id]); });
-  });
-  const loadWMedian = {};
-  Object.keys(loadW).forEach(function (id) { loadWMedian[id] = medianOf(loadW[id]); });
+  const dateKey = jstNow.y + "-" + p2(jstNow.mo + 1) + "-" + p2(jstNow.day);  // 「今日の朝までの夜」の日付
+  // 消費電力も前夜ぶんのみ。まだ今夜ぶんが取れていない時間帯のために、前回値を控えとして残す。
+  const todayLoadW = nightLoadWBySite(powerRows || [], nowMs);
+  const loadWMedian = Object.assign({}, (prev && prev.loadWByDate && prev.loadWByDate[dateKey]) || {}, todayLoadW);
+  const loadWByDate = {};
+  loadWByDate[dateKey] = loadWMedian;
 
-  const since = nowMs - (BATTERY_HEALTH_NIGHTS + 1) * 24 * 3600000;
+  const since = nowMs - (BATTERY_HEALTH_NIGHTS + 1) * 24 * 3600000;  // 前夜ぶんが確実に入る範囲だけ読む
   const history = await readBatteryHistory(since);
   const stats = {};
   Object.keys(history).forEach(function (id) {
