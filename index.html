@@ -420,6 +420,11 @@
   .battery-health .health-value.critical { color: var(--critical-border); }
   .battery-health .health-value.muted { color: var(--text-muted); font-weight: 600; }
   .battery-health .health-sub { font-size: 10px; color: var(--text-secondary); margin-top: 1px; }
+  /* 劣化の比較(散布図)。横軸=夜間の消費電力、縦軸=夜間の電圧降下。 */
+  .health-scatter-card { margin-bottom: 10px; }
+  .health-scatter-card .chart-box { height: 280px; }
+  .health-scatter-card h2 { font-size: 14px; margin: 0; }
+  .health-scatter-card .subtitle { font-size: 11px; margin: 2px 0 0; }
   /* バッテリー残量ゲージ(スマートフォンの電池表示のイメージ)。
      数値(パーセンテージ)は必ず文字として表示するため、色だけに意味を持たせていない。 */
   .battery-gauge { display: flex; flex-direction: column; gap: 2px; }
@@ -689,6 +694,15 @@
           </div>
         </div>
 
+        <div class="card health-scatter-card" id="healthScatterCard">
+          <div class="site-card-header">
+            <div class="site-title-wrap">
+              <h2>バッテリー劣化の比較（夜間の電圧降下 × 消費電力）</h2>
+              <p class="subtitle" id="healthScatterNote">算出中…</p>
+            </div>
+          </div>
+          <div class="chart-box" id="healthScatter"></div>
+        </div>
         <div class="grid-power" id="sitesGrid"></div>
 
         <div class="table-section" id="tableSection">
@@ -1540,7 +1554,7 @@
    *   プラス = 基準より速く電圧が落ちる(劣化が進んでいる)
    *   マイナス = 基準より持ちが良い
    * --------------------------------------------------------------------- */
-  var batteryHealthState = { sites: {}, generatedAt: null, referenceSiteId: null, nights: null, lastError: null };
+  var batteryHealthState = { sites: {}, generatedAt: null, referenceSiteId: null, nights: null, fit: null, lastError: null };
   function loadBatteryHealth() {
     return fetch(SERVER_BATTERY_HEALTH_URL + "?_ts=" + Date.now(), { cache: "no-store" })
       .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
@@ -1549,6 +1563,7 @@
         batteryHealthState.generatedAt = json && json.generatedAt ? new Date(json.generatedAt) : null;
         batteryHealthState.referenceSiteId = json && json.referenceSiteId || null;
         batteryHealthState.nights = json && json.nights || null;
+        batteryHealthState.fit = json && json.fit || null;
         batteryHealthState.lastError = null;
         refreshAllBatteryHealth();
         return Object.keys(batteryHealthState.sites).length;
@@ -1604,8 +1619,165 @@
       "。プラスは基準より速く電圧が落ちる＝劣化が進んでいることを示します。" +
       (lowLoad ? "\nこの拠点は消費が小さく、電圧の下がり方が消費に比例しないため、参考値として扱ってください。" : "");
   }
+  /* ---------------------------------------------------------------------
+   * 劣化の比較(散布図)
+   * -----------------------------------------------------------------------
+   * 横軸=夜間の消費電力[W]、縦軸=夜間の電圧降下[V]。点は拠点、破線は全拠点の傾向線。
+   * 「同じ消費電力の拠点と比べて、どれだけ速く電圧が落ちているか」を、線からの上下で読む。
+   * 線より上=劣化が進んでいる / 線より下=持ちが良い。基準拠点(祇園大橋)は輪で強調する。
+   * 系列は1つなので凡例は置かず、両端の拠点と基準拠点だけ名前を直接添える(全点に名前を出すと
+   * 重なって読めなくなるため)。ほかの点はホバーで拠点名と数値を出す。
+   * --------------------------------------------------------------------- */
+  function createHealthScatter(containerId) {
+    var container = document.getElementById(containerId);
+    if (!container) return { render: function () {} };
+    var svgNS = "http://www.w3.org/2000/svg";
+    var FONT = "system-ui, -apple-system, sans-serif";
+    function el(tag, attrs) { var e = document.createElementNS(svgNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
+    // 目盛りの刻み(他のグラフと同じ考え方。ここは値が小さいので桁を多めに残す)
+    function niceScale(lo, hi) {
+      if (lo === hi) { lo -= 0.01; hi += 0.01; }
+      var rawStep = (hi - lo) / 4;
+      var mag = Math.pow(10, Math.floor(Math.log(rawStep) / Math.LN10));
+      var norm = rawStep / mag;
+      var step = (norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10) * mag;
+      var ticks = [];
+      for (var v = Math.floor(lo / step) * step; v <= hi + step / 1000; v += step) ticks.push(Math.round(v * 100000) / 100000);
+      return { ticks: ticks };
+    }
+    var svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("width", "100%"); svg.setAttribute("height", "100%"); svg.style.display = "block";
+    container.appendChild(svg);
+    var tooltip = document.createElement("div");
+    tooltip.style.cssText = "position:absolute;pointer-events:none;opacity:0;transition:opacity .1s;" +
+      "background:var(--surface-1);border:1px solid var(--gridline);border-radius:8px;padding:6px 10px;" +
+      "font-size:12px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.12);z-index:2;";
+    container.appendChild(tooltip);
+
+    function render() {
+      var W = Math.max(320, container.clientWidth || 640), H = container.clientHeight || 280;
+      var marginLeft = 54, marginRight = 16, marginTop = 14, marginBottom = 34;
+      var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
+      while (svg.firstChild) svg.removeChild(svg.firstChild);
+      svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+      svg.setAttribute("preserveAspectRatio", "none");
+      tooltip.style.opacity = 0;
+      var pal = palette();
+      var state = batteryHealthState;
+      var points = [];
+      POWER_SITES.forEach(function (site) {
+        var e = state.sites[site.id];
+        if (!e || typeof e.loadW !== "number" || typeof e.dropV !== "number") return;
+        points.push({ id: site.id, name: site.name.replace(/（.*$/, ""), x: e.loadW, y: e.dropV,
+          diffPct: typeof e.diffPct === "number" ? e.diffPct : null });
+      });
+      if (points.length < 2) return;
+      var xs = points.map(function (p) { return p.x; }), ys = points.map(function (p) { return p.y; });
+      var xMax = Math.max.apply(null, xs) * 1.08, yMax = Math.max.apply(null, ys) * 1.12;
+      var yMin = Math.max(0, Math.min.apply(null, ys) - (yMax - Math.min.apply(null, ys)) * 0.12);
+      function xAt(v) { return marginLeft + (v / (xMax || 1)) * plotW; }
+      function yAt(v) { return marginTop + plotH - ((v - yMin) / ((yMax - yMin) || 1)) * plotH; }
+
+      // 目盛り(控えめに)
+      var yScale = niceScale(yMin, yMax);
+      yScale.ticks.forEach(function (t) {
+        if (t < yMin || t > yMax) return;
+        var y = yAt(t);
+        svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: y, y2: y, stroke: pal.gridline, "stroke-width": 1 }));
+        var lbl = el("text", { x: marginLeft - 8, y: y, "text-anchor": "end", "dominant-baseline": "middle",
+          fill: pal.textMuted, "font-size": 10, "font-family": FONT });
+        lbl.textContent = t.toFixed(3); svg.appendChild(lbl);
+      });
+      var xStep = xMax > 20 ? 5 : (xMax > 8 ? 2 : 1);
+      for (var xv = 0; xv <= xMax; xv += xStep) {
+        var x = xAt(xv);
+        svg.appendChild(el("line", { x1: x, x2: x, y1: marginTop, y2: marginTop + plotH, stroke: pal.gridline, "stroke-width": 1, opacity: 0.6 }));
+        var xl = el("text", { x: x, y: H - 12, "text-anchor": "middle", fill: pal.textMuted, "font-size": 10, "font-family": FONT });
+        xl.textContent = String(xv); svg.appendChild(xl);
+      }
+      var xTitle = el("text", { x: marginLeft + plotW / 2, y: H - 1, "text-anchor": "middle", fill: pal.textSecondary, "font-size": 10, "font-family": FONT });
+      xTitle.textContent = "夜間の消費電力（W）"; svg.appendChild(xTitle);
+      var yTitle = el("text", { x: 12, y: marginTop + plotH / 2, "text-anchor": "middle", fill: pal.textSecondary,
+        "font-size": 10, "font-family": FONT, transform: "rotate(-90 12 " + (marginTop + plotH / 2) + ")" });
+      yTitle.textContent = "夜間の電圧降下（V）"; svg.appendChild(yTitle);
+
+      // 傾向線(全拠点の当てはめ)
+      var fit = state.fit;
+      if (fit && typeof fit.a === "number" && typeof fit.b === "number") {
+        var x0 = 0, x1 = xMax;
+        svg.appendChild(el("line", {
+          x1: xAt(x0), y1: yAt(fit.a + fit.b * x0), x2: xAt(x1), y2: yAt(fit.a + fit.b * x1),
+          stroke: pal.baseline, "stroke-width": 2, "stroke-dasharray": "6 4"
+        }));
+        var fitLabel = el("text", { x: xAt(x1) - 4, y: yAt(fit.a + fit.b * x1) - 8, "text-anchor": "end",
+          fill: pal.textMuted, "font-size": 10, "font-family": FONT });
+        fitLabel.textContent = "全拠点の傾向"; svg.appendChild(fitLabel);
+      }
+
+      // 点。線から離れている上下3拠点と基準拠点だけ名前を添える。
+      var sorted = points.slice().sort(function (a, b) { return (b.diffPct || 0) - (a.diffPct || 0); });
+      var labelled = {};
+      sorted.slice(0, 3).forEach(function (p) { labelled[p.id] = 1; });
+      sorted.slice(-3).forEach(function (p) { labelled[p.id] = 1; });
+      if (state.referenceSiteId) labelled[state.referenceSiteId] = 1;
+      points.forEach(function (p) {
+        var cx = xAt(p.x), cy = yAt(p.y);
+        var isRef = p.id === state.referenceSiteId;
+        var dot = el("circle", { cx: cx, cy: cy, r: isRef ? 7 : 5,
+          fill: isRef ? pal.surface : pal.bat, stroke: isRef ? pal.bat : pal.surface, "stroke-width": 2 });
+        dot.style.cursor = "pointer";
+        svg.appendChild(dot);
+        if (labelled[p.id]) {
+          var t = el("text", { x: cx + (cx > marginLeft + plotW * 0.75 ? -10 : 10), y: cy + 4,
+            "text-anchor": cx > marginLeft + plotW * 0.75 ? "end" : "start",
+            fill: pal.textSecondary, "font-size": 10, "font-family": FONT });
+          t.textContent = p.name; svg.appendChild(t);
+        }
+        function show() {
+          while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
+          var l0 = document.createElement("div");
+          l0.style.cssText = "color:var(--text-primary);font-weight:600;"; l0.textContent = p.name;
+          var l1 = document.createElement("div");
+          l1.style.cssText = "color:var(--text-secondary);";
+          l1.textContent = "消費 " + p.x.toFixed(1) + "W / 降下 " + p.y.toFixed(3) + "V";
+          tooltip.appendChild(l0); tooltip.appendChild(l1);
+          if (p.diffPct !== null) {
+            var l2 = document.createElement("div");
+            l2.style.cssText = "color:var(--text-primary);";
+            l2.textContent = "劣化 " + fmtBatteryHealth(p.diffPct);
+            tooltip.appendChild(l2);
+          }
+          var rect = container.getBoundingClientRect();
+          tooltip.style.left = Math.max(4, Math.min((cx / W) * rect.width + 12, rect.width - 130)) + "px";
+          tooltip.style.top = Math.max(4, (cy / H) * rect.height - 52) + "px";
+          tooltip.style.opacity = 1;
+        }
+        dot.addEventListener("pointerenter", show);
+        dot.addEventListener("pointermove", show);
+        dot.addEventListener("pointerleave", function () { tooltip.style.opacity = 0; });
+      });
+    }
+    return { render: render };
+  }
+
+  var healthScatter = null;
   function refreshAllBatteryHealth() {
     POWER_SITES.forEach(function (site) { updateBatteryHealth(site); });
+    if (!healthScatter) healthScatter = createHealthScatter("healthScatter");
+    healthScatter.render();
+    var note = document.getElementById("healthScatterNote");
+    if (!note) return;
+    var fit = batteryHealthState.fit;
+    var rated = Object.keys(batteryHealthState.sites).filter(function (id) {
+      return typeof batteryHealthState.sites[id].diffPct === "number";
+    }).length;
+    if (!rated) {
+      note.textContent = "夜間（22:00〜翌4:00）の実測がまだ足りないため算出できていません。";
+      return;
+    }
+    note.textContent = "点が拠点、破線は全拠点の傾向です。線より上ほど「同じ消費電力の拠点より速く電圧が落ちている」" +
+      "＝劣化が進んでいることを示します（直近" + (batteryHealthState.nights || 14) + "日の中央値・" + rated + "拠点）" +
+      (fit ? "。傾向線: 降下 = " + fit.a.toFixed(4) + " + " + fit.b.toFixed(5) + " × 消費W" : "");
   }
   function serverLatestWaterReading(site) {
     var entry = serverLatestState.sites[site.id];
@@ -2358,6 +2530,7 @@
       // 表示切り替え時に再描画して実際のコンテナ幅に合わせる。
       ALL_SITES.forEach(function (site) {
         var s = siteStates[site.id];
+        if (name === "power" && healthScatter) healthScatter.render();
         if (name === "power" && s.pvChart) s.pvChart.redraw();
         if (name === "power" && s.batChart) s.batChart.redraw();
         if (name === "graphlist" && s.graphChart) s.graphChart.redraw();
@@ -5236,6 +5409,7 @@
         if (s.riverCardRefs) s.riverCardRefs.chart.redraw();
       });
       detailChart.redraw();
+      if (healthScatter) healthScatter.render();
     });
   }
 
@@ -5379,6 +5553,8 @@
     loadBatteryHealth: loadBatteryHealth, fmtBatteryHealth: fmtBatteryHealth,
     batteryHealthClass: batteryHealthClass, updateBatteryHealth: updateBatteryHealth,
     refreshAllBatteryHealth: refreshAllBatteryHealth,
+    createHealthScatter: createHealthScatter,
+    getHealthScatter: function () { return healthScatter; },
     getBatteryHealthState: function () { return batteryHealthState; },
     SERVER_BATTERY_HEALTH_URL: SERVER_BATTERY_HEALTH_URL,
     getServerLatestState: function () { return serverLatestState; },
