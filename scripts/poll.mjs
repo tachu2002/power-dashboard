@@ -31,6 +31,9 @@ const LATEST_JSON_PATH = path.join(DATA_DIR, "latest.json");
 // 雨量計(国交省「川の防災情報」)の10分雨量。ブラウザからは直接もプロキシ経由でも取得できなくなったため
 // (2026-09-21: r.jina.ai が www.river.go.jp への匿名アクセスを403で遮断)、サーバー側で取得して配る。
 const RAINFALL_JSON_PATH = path.join(DATA_DIR, "rainfall.json");
+// バッテリーの劣化指標(祇園大橋を100%とした相対的な残存容量比)。
+// 夜間(日射が無い時間帯)の電圧の下がり方を、拠点ごとの消費電力で割って比べる。
+const BATTERY_HEALTH_JSON_PATH = path.join(DATA_DIR, "battery_health.json");
 const IMAGES_DIR = path.join(DATA_DIR, "images");
 const IMAGE_MANIFEST_PATH = path.join(IMAGES_DIR, "manifest.json");
 // 画像は直近2日分のみ保持する(タイムラプス再生の対象が直近2日間のため)。
@@ -311,12 +314,15 @@ function parsePowerCsv(text) {
     if (!isFinite(ts.getTime())) continue;
     const pvW = parseFloat(cols[idx["pv_w"]]);
     const batMv = parseFloat(cols[idx["bat_mv"]]);
+    const loadW = parseFloat(cols[idx["load_w"]]);
     if (!isFinite(pvW) && !isFinite(batMv)) continue;
     out.push({
       siteId: siteId,
       fetchedAt: ts,
       pv: isFinite(pvW) ? pvW : null,
-      bat: isFinite(batMv) ? batMv / 1000 : null
+      bat: isFinite(batMv) ? batMv / 1000 : null,
+      // 消費(負荷)の瞬時電力[W]。バッテリー劣化の指標を出すのに使う(拠点ごとに機器構成が違うため)。
+      loadW: isFinite(loadW) ? loadW : null
     });
   }
   out.sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
@@ -473,6 +479,177 @@ async function updateRainfallFile() {
     generatedAt: new Date().toISOString(), obsCd13: MISHIMA_RAIN_OBS_CD13, stationName: "三島", values: values
   }, null, 2) + "\n", "utf8");
   return { total: values.length, fetched: fetched.length };
+}
+
+/* =====================================================================
+ * バッテリーの劣化指標(残存容量比)
+ * ---------------------------------------------------------------------
+ * 考え方: 日射が無い夜間(既定 22:00〜翌4:00 JST)はバッテリーが放電するだけなので、
+ * その間の電圧の下がり方が「容量の減り具合」を表す。ただし拠点ごとに機器構成が違い
+ * 消費電力が異なるため、そのままでは比べられない。中継サーバー(mini.lhlab-vps.net)の
+ * 「消費(負荷)」の瞬時電力[W]で割って、"1Wあたりの電圧降下" にそろえてから比較する。
+ *
+ *   降下量[V/夜] ÷ 消費[W]  …… 1Wの負荷で一晩にどれだけ電圧が落ちるか
+ *   これが大きいほど容量が小さい(=劣化している)。
+ *   基準拠点(祇園大橋)を±0%とし、その差の割合 = 100 × (その拠点の値 ÷ 基準の値 − 1) を出す。
+ *   プラスなら基準より速く落ちる(劣化が進んでいる)、マイナスなら基準より持ちが良い。
+ *
+ * 夜ごとのばらつき(気温・その日の充電状態)を抑えるため、直近BATTERY_HEALTH_NIGHTS日の
+ * **中央値**を使う。消費電力も同様に、夜間帯の実測の中央値を日ごとに記録して中央値を取る。
+ * ===================================================================== */
+const BATTERY_HEALTH_REFERENCE_ID = "cam11";          // 祇園大橋(この拠点を100%とする)
+const BATTERY_HEALTH_NIGHTS = 14;                      // 集計に使う日数
+const BATTERY_HEALTH_NIGHT_START_H = 22;               // 夜間帯の開始(JST)
+const BATTERY_HEALTH_NIGHT_HOURS = 6;                  // 夜間帯の長さ(22:00→翌4:00)
+const BATTERY_HEALTH_MIN_SAMPLES = 20;                 // 1夜あたりに必要な実測点数
+const BATTERY_HEALTH_MIN_NIGHTS = 3;                   // 指標を出すのに必要な夜数
+const BATTERY_HEALTH_MIN_DROP_V = 0.005;               // これ未満の降下は0扱い(ゼロ除算回避)
+const BATTERY_HEALTH_MIN_LOAD_W = 0.05;                // これ未満の消費は信用しない
+// 消費がこれより小さい拠点は「参考値」として区別する。
+// 消費が極端に小さいと、電圧降下が消費に比例しなくなる(気温・自己放電・バッテリー容量差の影響が
+// 相対的に大きくなる)ため、そのまま割り算すると実態より大幅に劣化して見える。
+// 実測(2026-09-27): 祇園大橋12.1Wに対し、こも池0.6W・竹倉用水路4.2W・ほたるの里3.0W。
+const BATTERY_HEALTH_LOW_LOAD_W = 5;
+const BATTERY_HEALTH_REFRESH_MS = 60 * 60 * 1000;      // 再計算の間隔(1時間)
+const BATTERY_HEALTH_RANGE = [-90, 300];               // 表示する差の割合の範囲(%)
+
+function medianOf(list) {
+  if (!list.length) return null;
+  const s = list.slice().sort(function (a, b) { return a - b; });
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+// history.csv から、指定時刻以降のBAT(V)の時系列を拠点ごとに取り出す。
+async function readBatteryHistory(sinceMs) {
+  let text = "";
+  try {
+    text = await readFile(HISTORY_CSV_PATH, "utf8");
+  } catch (err) {
+    return {};
+  }
+  const out = {};
+  const lines = text.split(/\r?\n/);
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line) continue;
+    const cols = line.split(",");
+    if (cols.length < CSV_COLUMNS) continue;
+    const bat = parseFloat(cols[4]);
+    if (!isFinite(bat)) continue;
+    const t = Date.parse(cols[1]);
+    if (!isFinite(t) || t < sinceMs) continue;
+    (out[cols[0]] = out[cols[0]] || []).push({ t: t, v: bat });
+  }
+  Object.keys(out).forEach(function (id) { out[id].sort(function (a, b) { return a.t - b.t; }); });
+  return out;
+}
+// 夜間帯ごとの電圧降下量[V]。最小二乗で傾きを出し、夜間帯の長さぶんに換算する
+// (端点2点だけで引き算すると、その1点のノイズがそのまま出てしまうため)。
+function nightlyVoltageDrops(points, nowMs) {
+  const drops = [];
+  if (!points.length) return drops;
+  const windowMs = BATTERY_HEALTH_NIGHT_HOURS * 3600000;
+  for (let back = 1; back <= BATTERY_HEALTH_NIGHTS; back++) {
+    // back日前の夜(JSTのBATTERY_HEALTH_NIGHT_START_H時)の開始時刻をUTCで求める
+    const jst = new Date(nowMs + 9 * 3600000 - back * 24 * 3600000);
+    const startUtc = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate(),
+      BATTERY_HEALTH_NIGHT_START_H - 9, 0, 0);
+    const seg = points.filter(function (p) { return p.t >= startUtc && p.t <= startUtc + windowMs; });
+    if (seg.length < BATTERY_HEALTH_MIN_SAMPLES) continue;
+    const n = seg.length;
+    const mx = seg.reduce(function (a, p) { return a + p.t; }, 0) / n;
+    const my = seg.reduce(function (a, p) { return a + p.v; }, 0) / n;
+    let num = 0, den = 0;
+    seg.forEach(function (p) { num += (p.t - mx) * (p.v - my); den += (p.t - mx) * (p.t - mx); });
+    if (!den) continue;
+    const drop = -(num / den) * windowMs; // 下がっていればプラスになる
+    if (!isFinite(drop)) continue;
+    drops.push(Math.max(0, drop));
+  }
+  return drops;
+}
+// 中継サーバーの当日CSVから、夜間帯(0:00〜4:00 JST)の消費電力[W]の中央値を拠点ごとに出す。
+function nightLoadWBySite(powerRows, nowMs) {
+  const byId = {};
+  powerRows.forEach(function (r) {
+    if (typeof r.loadW !== "number") return;
+    const h = toJstParts(r.fetchedAt).h;
+    if (h >= BATTERY_HEALTH_NIGHT_START_H || h < BATTERY_HEALTH_NIGHT_START_H + BATTERY_HEALTH_NIGHT_HOURS - 24) {
+      (byId[r.siteId] = byId[r.siteId] || []).push(r.loadW);
+    }
+  });
+  const out = {};
+  Object.keys(byId).forEach(function (id) {
+    const m = medianOf(byId[id]);
+    if (typeof m === "number" && m >= BATTERY_HEALTH_MIN_LOAD_W) out[id] = Math.round(m * 1000) / 1000;
+  });
+  return out;
+}
+// 日ごとの消費電力[W]を前回分と併合し、直近BATTERY_HEALTH_NIGHTS日ぶんだけ残す。
+function mergeLoadWHistory(prevByDate, todayByDate, dateKey) {
+  const merged = Object.assign({}, prevByDate || {});
+  if (Object.keys(todayByDate).length) merged[dateKey] = todayByDate;
+  const keys = Object.keys(merged).sort();
+  while (keys.length > BATTERY_HEALTH_NIGHTS) delete merged[keys.shift()];
+  return merged;
+}
+async function updateBatteryHealthFile(powerRows) {
+  const prev = await readJsonSafe(BATTERY_HEALTH_JSON_PATH, null);
+  const nowMs = Date.now();
+  if (prev && prev.generatedAt && nowMs - Date.parse(prev.generatedAt) < BATTERY_HEALTH_REFRESH_MS) {
+    return { skipped: true, sites: prev.sites ? Object.keys(prev.sites).length : 0 };
+  }
+  const jstNow = toJstParts(new Date(nowMs));
+  const p2 = function (n) { return String(n).padStart(2, "0"); };
+  const dateKey = jstNow.y + "-" + p2(jstNow.mo + 1) + "-" + p2(jstNow.day);
+  const loadWByDate = mergeLoadWHistory(prev && prev.loadWByDate, nightLoadWBySite(powerRows || [], nowMs), dateKey);
+  // 日ごとの値をさらに中央値でまとめる
+  const loadW = {};
+  Object.keys(loadWByDate).forEach(function (d) {
+    const perSite = loadWByDate[d] || {};
+    Object.keys(perSite).forEach(function (id) { (loadW[id] = loadW[id] || []).push(perSite[id]); });
+  });
+  const loadWMedian = {};
+  Object.keys(loadW).forEach(function (id) { loadWMedian[id] = medianOf(loadW[id]); });
+
+  const since = nowMs - (BATTERY_HEALTH_NIGHTS + 1) * 24 * 3600000;
+  const history = await readBatteryHistory(since);
+  const stats = {};
+  Object.keys(history).forEach(function (id) {
+    const drops = nightlyVoltageDrops(history[id], nowMs);
+    if (drops.length < BATTERY_HEALTH_MIN_NIGHTS) return;
+    const dropV = medianOf(drops);
+    const w = loadWMedian[id];
+    stats[id] = {
+      nights: drops.length,
+      dropV: Math.round(dropV * 10000) / 10000,
+      loadW: typeof w === "number" ? Math.round(w * 1000) / 1000 : null,
+      lowLoad: typeof w === "number" && w < BATTERY_HEALTH_LOW_LOAD_W,
+      dropPerW: (typeof w === "number" && w >= BATTERY_HEALTH_MIN_LOAD_W && dropV >= BATTERY_HEALTH_MIN_DROP_V)
+        ? dropV / w : null
+    };
+  });
+  const ref = stats[BATTERY_HEALTH_REFERENCE_ID];
+  const refPerW = ref && ref.dropPerW;
+  Object.keys(stats).forEach(function (id) {
+    const s = stats[id];
+    if (!refPerW || !s.dropPerW) { s.diffPct = null; s.ratio = null; return; }
+    const ratio = s.dropPerW / refPerW;
+    s.ratio = Math.round(ratio * 1000) / 1000;
+    const pct = 100 * (ratio - 1);
+    s.diffPct = Math.round(Math.min(BATTERY_HEALTH_RANGE[1], Math.max(BATTERY_HEALTH_RANGE[0], pct)));
+  });
+  await writeFile(BATTERY_HEALTH_JSON_PATH, JSON.stringify({
+    generatedAt: new Date(nowMs).toISOString(),
+    referenceSiteId: BATTERY_HEALTH_REFERENCE_ID,
+    nights: BATTERY_HEALTH_NIGHTS,
+    nightStartHourJst: BATTERY_HEALTH_NIGHT_START_H,
+    nightHours: BATTERY_HEALTH_NIGHT_HOURS,
+    loadWByDate: loadWByDate,
+    sites: stats
+  }, null, 2) + "\n", "utf8");
+  const rated = Object.keys(stats).filter(function (id) { return typeof stats[id].diffPct === "number"; }).length;
+  return { skipped: false, sites: Object.keys(stats).length, rated: rated };
 }
 
 // ---- 画像アーカイブ(全46拠点、直近IMAGE_RETENTION_DAYS日分のみ保持) ----
@@ -831,8 +1008,10 @@ async function main() {
   const prevPowerTs = previousLatest.powerRelay && previousLatest.powerRelay.lastTs
     ? new Date(previousLatest.powerRelay.lastTs).getTime() : 0;
   let newestPowerTs = prevPowerTs;
+  let relayRows = [];   // バッテリー劣化指標(消費電力)の算出にも使う
   try {
     const powerRows = await fetchPowerRelayRows();
+    relayRows = powerRows;
     const freshRows = powerRows.filter(function (r) { return r.fetchedAt.getTime() > prevPowerTs; });
     freshRows.forEach(function (r) {
       if (r.fetchedAt.getTime() > newestPowerTs) newestPowerTs = r.fetchedAt.getTime();
@@ -884,6 +1063,15 @@ async function main() {
     console.warn("[NG] 雨量計(三島)の取得に失敗しました: " + (err && err.message ? err.message : String(err)));
   }
 
+  // バッテリーの劣化指標(夜間の電圧降下 ÷ 消費電力)。1時間に1回だけ計算し直す。
+  try {
+    const health = await updateBatteryHealthFile(relayRows);
+    if (health.skipped) console.log("バッテリー劣化指標は前回計算から1時間未満のためスキップしました。");
+    else console.log("[OK] バッテリー劣化指標: " + health.rated + "/" + health.sites + "拠点を算出しました。");
+  } catch (err) {
+    console.warn("[NG] バッテリー劣化指標の算出に失敗しました: " + (err && err.message ? err.message : String(err)));
+  }
+
   // 画像アーカイブはデータ取得(上記)とは独立したベストエフォート処理とし、
   // ここで失敗してもデータ取得自体の成功/終了コードには影響させない。
   if (SKIP_IMAGES) {
@@ -909,5 +1097,7 @@ export {
   fetchKawabouWaterReading, kawabouWaterJsonUrl, kawabouSwstgJsonUrl,
   WATER_RECENT_CSV_PATH, WATER_RECENT_WINDOW_MS,
   parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID, POWER_CSV_BASE_URL,
-  RAINFALL_JSON_PATH, rainfallJsonUrl, parseRainfallJson, parseJstTime, MISHIMA_RAIN_OBS_CD13
+  RAINFALL_JSON_PATH, rainfallJsonUrl, parseRainfallJson, parseJstTime, MISHIMA_RAIN_OBS_CD13,
+  BATTERY_HEALTH_JSON_PATH, BATTERY_HEALTH_REFERENCE_ID, BATTERY_HEALTH_NIGHTS,
+  nightlyVoltageDrops, nightLoadWBySite, updateBatteryHealthFile, medianOf, BATTERY_HEALTH_LOW_LOAD_W
 };
