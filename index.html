@@ -385,7 +385,7 @@
   .power-chart-row { display: flex; gap: 10px; min-width: 0; }
   .power-chart-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
   .power-chart-col .chart-legend { justify-content: center; }
-  .power-chart-col .chart-box { height: 150px; }
+  .power-chart-col .chart-box { height: 170px; }
 
   /* 発電・BAT・電池マーク・劣化・拠点画像を1行に収める。カード幅が狭いと画像が押し出されて
      切れてしまうため、間隔は詰めめにし、画像だけ縮められるようにしている。 */
@@ -393,7 +393,7 @@
   .mini-stats > div { flex: 0 0 auto; }
   .mini-stats .site-thumb {
     margin-left: auto; flex: 0 1 auto; min-width: 0;
-    max-width: 100px; max-height: 84px; width: auto; height: auto;
+    max-width: 116px; max-height: 92px; width: auto; height: auto;
     object-fit: contain; border-radius: 6px; border: 1px solid var(--border);
     box-shadow: 0 2px 6px rgba(0,0,0,0.18); cursor: pointer; opacity: 0.96;
   }
@@ -702,7 +702,7 @@
         <div class="card health-scatter-card" id="healthScatterCard">
           <div class="site-card-header">
             <div class="site-title-wrap">
-              <h2>バッテリー劣化の比較（夜間の電圧降下 × 消費電力）</h2>
+              <h2>バッテリー劣化の比較（前夜の電圧降下 × 消費電力）</h2>
               <p class="subtitle" id="healthScatterNote">算出中…</p>
             </div>
           </div>
@@ -1553,9 +1553,10 @@
   /* ---------------------------------------------------------------------
    * バッテリーの劣化指標
    * -----------------------------------------------------------------------
-   * 日射の無い夜間(22:00〜翌4:00 JST)の電圧の下がり方を、拠点ごとの消費電力[W]で割って
-   * そろえ、基準拠点(祇園大橋)との差を割合で示す。算出はサーバー側(scripts/poll.mjs)で
-   * 直近14日の中央値から行い、ここでは結果を読んで表示するだけ。
+   * 日射の無い夜間(22:00〜翌4:00 JST)の電圧の下がり方を、全拠点の傾向線と比べ、
+   * 基準拠点(祇園大橋)との差を割合で示す。バッテリーは随時交換するため、
+   * **前夜1晩ぶんの実測だけ**で毎日出し直す。算出はサーバー側(scripts/poll.mjs)で行い、
+   * ここでは結果を読んで表示するだけ。
    *   プラス = 基準より速く電圧が落ちる(劣化が進んでいる)
    *   マイナス = 基準より持ちが良い
    * --------------------------------------------------------------------- */
@@ -1617,10 +1618,11 @@
       holder.title = "バッテリー劣化の指標: まだ算出できていません（夜間の実測が足りないか、消費電力が取得できていません）";
       return;
     }
-    holder.title = "夜間(" + (batteryHealthState.nights || 14) + "日分の中央値)の電圧降下 " +
+    holder.title = "前夜(22:00〜翌4:00)の電圧降下 " +
       (typeof entry.dropV === "number" ? entry.dropV.toFixed(3) + "V" : "–") +
-      " ÷ 消費 " + (typeof entry.loadW === "number" ? entry.loadW.toFixed(2) + "W" : "–") +
-      " を、基準拠点と比べた差です" + (isReference ? "（この拠点が基準）" : "") +
+      " を、同じ消費電力(" + (typeof entry.loadW === "number" ? entry.loadW.toFixed(1) + "W" : "–") +
+      ")の拠点の傾向値" + (typeof entry.expectedV === "number" ? entry.expectedV.toFixed(3) + "V" : "–") +
+      " と比べ、さらに基準拠点との差にしたものです" + (isReference ? "（この拠点が基準）" : "") +
       "。プラスは基準より速く電圧が落ちる＝劣化が進んでいることを示します。" +
       (lowLoad ? "\nこの拠点は消費が小さく、電圧の下がり方が消費に比例しないため、参考値として扱ってください。" : "");
   }
@@ -1701,10 +1703,10 @@
         xl.textContent = String(xv); svg.appendChild(xl);
       }
       var xTitle = el("text", { x: marginLeft + plotW / 2, y: H - 1, "text-anchor": "middle", fill: pal.textSecondary, "font-size": 10, "font-family": FONT });
-      xTitle.textContent = "夜間の消費電力（W）"; svg.appendChild(xTitle);
+      xTitle.textContent = "前夜の消費電力（W）"; svg.appendChild(xTitle);
       var yTitle = el("text", { x: 12, y: marginTop + plotH / 2, "text-anchor": "middle", fill: pal.textSecondary,
         "font-size": 10, "font-family": FONT, transform: "rotate(-90 12 " + (marginTop + plotH / 2) + ")" });
-      yTitle.textContent = "夜間の電圧降下（V）"; svg.appendChild(yTitle);
+      yTitle.textContent = "前夜の電圧降下（V）"; svg.appendChild(yTitle);
 
       // 傾向線(全拠点の当てはめ)
       var fit = state.fit;
@@ -1744,7 +1746,7 @@
           l0.style.cssText = "color:var(--text-primary);font-weight:600;"; l0.textContent = p.name;
           var l1 = document.createElement("div");
           l1.style.cssText = "color:var(--text-secondary);";
-          l1.textContent = "消費 " + p.x.toFixed(1) + "W / 降下 " + p.y.toFixed(3) + "V";
+          l1.textContent = "前夜: 消費 " + p.x.toFixed(1) + "W / 降下 " + p.y.toFixed(3) + "V";
           tooltip.appendChild(l0); tooltip.appendChild(l1);
           if (p.diffPct !== null) {
             var l2 = document.createElement("div");
@@ -1777,11 +1779,11 @@
       return typeof batteryHealthState.sites[id].diffPct === "number";
     }).length;
     if (!rated) {
-      note.textContent = "夜間（22:00〜翌4:00）の実測がまだ足りないため算出できていません。";
+      note.textContent = "前夜（22:00〜翌4:00）の実測がまだ足りないため算出できていません。";
       return;
     }
     note.textContent = "点が拠点、破線は全拠点の傾向です。線より上ほど「同じ消費電力の拠点より速く電圧が落ちている」" +
-      "＝劣化が進んでいることを示します（直近" + (batteryHealthState.nights || 14) + "日の中央値・" + rated + "拠点）" +
+      "＝劣化が進んでいることを示します（前夜22:00〜翌4:00の実測・" + rated + "拠点）" +
       (fit ? "。傾向線: 降下 = " + fit.a.toFixed(4) + " + " + fit.b.toFixed(5) + " × 消費W" : "");
   }
   function serverLatestWaterReading(site) {
@@ -2536,7 +2538,6 @@
       ALL_SITES.forEach(function (site) {
         var s = siteStates[site.id];
         if (name === "power" && healthScatter) healthScatter.render();
-        if (name === "power" && s.pvChart) s.pvChart.redraw();
         if (name === "power" && s.batChart) s.batChart.redraw();
         if (name === "graphlist" && s.graphChart) s.graphChart.redraw();
       });
@@ -2601,25 +2602,20 @@
     var batAlertLine = el2("div", { class: "bat-alert-line" });
     card.appendChild(batAlertLine);
 
+    // 発電(PV)のグラフは表示しない(ご要望により削除)。空いた幅はBATのグラフへ回す。
+    // 発電の数値そのものは上の mini-stats に出している。
     var chartRow = el2("div", { class: "power-chart-row" });
-    var pvCol = el2("div", { class: "power-chart-col" });
-    var pvLegend = el2("div", { class: "chart-legend" },
-      '<span class="legend-item"><span class="legend-line" style="background:var(--series-pv)"></span>発電（PV・電力）</span>');
-    var pvChartBox = el2("div", { class: "chart-box", id: "pchart-pv-" + site.id });
-    pvCol.appendChild(pvLegend); pvCol.appendChild(pvChartBox);
-
     var batCol = el2("div", { class: "power-chart-col" });
     var batLegend = el2("div", { class: "chart-legend" },
       '<span class="legend-item"><span class="legend-line" style="background:var(--series-bat)"></span>BAT（バッテリー電圧）</span>');
     var batChartBox = el2("div", { class: "chart-box", id: "pchart-bat-" + site.id });
     batCol.appendChild(batLegend); batCol.appendChild(batChartBox);
 
-    chartRow.appendChild(pvCol); chartRow.appendChild(batCol);
+    chartRow.appendChild(batCol);
     card.appendChild(chartRow);
     sitesGrid.appendChild(card);
 
     var s = siteStates[site.id];
-    s.pvChart = createPowerSeriesChart("pchart-pv-" + site.id, "pv", null, null, "W");
     s.batChart = createPowerSeriesChart("pchart-bat-" + site.id, "bat", RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(2) + "V", "V");
     s.powerCardEl = card;
     s.powerStatusDotEl = statusEl.querySelector(".dot");
@@ -2787,13 +2783,9 @@
     }
     updateBatteryGauge(site, lastBat ? lastBat.bat : null);
     var batForecast = cachedPrediction(site, "bat");
-    var pvForecast = cachedPrediction(site, "pv");
     // 予測を表示する場合は、現在時刻がグラフ中央に来るよう過去側も12時間に揃える。
-    var pvWindow = pvForecast.length ? CHART_PAST_WINDOW_WITH_FORECAST_MS : undefined;
     var batWindow = batForecast.length ? CHART_PAST_WINDOW_WITH_FORECAST_MS : undefined;
-    var pvSel = selectRecentForChart(s.points, function (p) { return typeof p.pv === "number"; }, pvWindow);
     var batSel = selectRecentForChart(s.points, function (p) { return typeof p.bat === "number"; }, batWindow);
-    s.pvChart.setData(buildSeriesWithForecast(pvSel.points, "pv", pvForecast));
     s.batChart.setData(buildSeriesWithForecast(batSel.points, "bat", batForecast));
   }
 
@@ -5408,7 +5400,6 @@
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
       ALL_SITES.forEach(function (site) {
         var s = siteStates[site.id];
-        if (s.pvChart) s.pvChart.redraw();
         if (s.batChart) s.batChart.redraw();
         if (s.graphChart) s.graphChart.redraw();
         if (s.riverCardRefs) s.riverCardRefs.chart.redraw();
