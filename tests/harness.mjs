@@ -283,12 +283,14 @@ export function buildBatteryHealth(opts = {}) {
     const loadW = (opts.loadW && opts.loadW[id] !== undefined) ? opts.loadW[id] : 12;
     sites[id] = {
       nights: opts.nights || 14, dropV: 0.09, loadW: loadW, lowLoad: loadW < 5,
-      dropPerW: 0.09 / loadW, ratio: 1 + diffPct / 100, diffPct
+      expectedV: 0.0625 + 0.0019 * loadW, deviation: 1 + diffPct / 100,
+      ratio: 1 + diffPct / 100, diffPct
     };
   });
   return {
     generatedAt: new Date(opts.nowMs || Date.now()).toISOString(),
     referenceSiteId: "cam11", nights: opts.nights || 14,
+    fit: opts.fit || { a: 0.0625, b: 0.0019, r: 0.5, sites: Object.keys(sites).length },
     nightStartHourJst: 22, nightHours: 6, loadWByDate: {}, sites
   };
 }

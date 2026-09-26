@@ -229,6 +229,26 @@ export async function run() {
     JSON.stringify(fmt.f) === JSON.stringify(["±0%", "+12%", "−8%", "—"]), fmt.f);
   r.check("p8-o 色分けの境目(15%で注意・40%で危険・-10%で良好・低消費は参考)",
     JSON.stringify(fmt.c) === JSON.stringify(["", "", "warn", "critical", "ok", "muted", "muted"]), fmt.c);
+  // 散布図(横軸=消費W / 縦軸=夜間降下V / 破線=全拠点の傾向)
+  const scatter = await pageH.evaluate(() => {
+    const box = document.getElementById("healthScatter");
+    const svg = box.querySelector("svg");
+    const texts = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent);
+    return {
+      dots: svg.querySelectorAll("circle").length,
+      dashed: svg.querySelectorAll('line[stroke-dasharray]').length,
+      axisX: texts.includes("夜間の消費電力（W）"),
+      axisY: texts.includes("夜間の電圧降下（V）"),
+      fitLabel: texts.includes("全拠点の傾向"),
+      note: document.getElementById("healthScatterNote").textContent
+    };
+  });
+  r.check("p8-s 散布図に拠点の点が描かれる(指標のある6拠点)", scatter.dots === 6, scatter.dots);
+  r.check("p8-t 傾向線を破線で引く", scatter.dashed >= 1 && scatter.fitLabel, scatter);
+  r.check("p8-u 軸の意味を明記する", scatter.axisX && scatter.axisY, scatter);
+  r.check("p8-v 読み方の説明を出す", scatter.note.indexOf("線より上") >= 0, scatter.note.slice(0, 80));
+  r.check("p8-w 傾向線の式を併記する", scatter.note.indexOf("降下 = ") >= 0, scatter.note.slice(-60));
+
   r.check("p8-p ページ例外にはならない", pageH.errMsgs().length === 0, pageH.errMsgs());
   await pageH.close();
 

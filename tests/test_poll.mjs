@@ -446,34 +446,40 @@ export async function run() {
   fs.rmSync(sandbox2, { recursive: true, force: true });
   fs.rmSync(sandbox3, { recursive: true, force: true });
   /* ============ バッテリー劣化の指標(data/battery_health.json) ============ */
-  // 夜間(22:00〜翌4:00 JST)の電圧降下を、拠点ごとの消費電力[W]で割って基準拠点と比べる。
+  // 夜間(22:00〜翌4:00 JST)の電圧降下を、全拠点の傾向線「降下 = a + b×消費W」と比べる。
+  // 消費で単純に割ると消費が小さい拠点で破綻するため、この方式にしている。
   const healthSandbox = makeSandbox("health");
   fs.mkdirSync(path.join(healthSandbox, "data"), { recursive: true });
-  // 14夜ぶんの履歴を作る。祇園大橋(cam11)は1晩0.06V、中郷第１樋管(cam02)は0.12V下がる。
-  // 消費電力は cam11=1.0W / cam02=1.0W にするので、cam02 は「基準の2倍速く落ちる」= +100%。
   const HOUR = 3600000;
+  // 8拠点を傾向線どおり(降下 = 0.05 + 0.005×消費W)に置き、多呂樋管だけ予測の1.5倍にする。
+  const siteLoad = { cam02: 2, cam03: 4, cam04: 6, cam08: 8, cam11: 10, cam09: 12, cam12: 14, cam13: 16, cam14: 10 };
+  const onLine = (w) => 0.05 + 0.005 * w;
+  const siteDrop = {};
+  Object.keys(siteLoad).forEach((id) => { siteDrop[id] = onLine(siteLoad[id]); });
+  siteDrop.cam14 = onLine(siteLoad.cam14) * 1.5;   // 劣化している拠点
   const histLines = ["拠点,取得時刻,機器の計測時刻,PV(W),BAT(V),水位(m),取得方法"];
-  const dropFor = { cam11: 0.06, cam02: 0.12, cam03: 0.06 };
   for (let back = 1; back <= 14; back++) {
-    // JSTの22:00をUTCに直すと 13:00
     const jstMid = new Date(now + 9 * HOUR - back * 24 * HOUR);
     const start = Date.UTC(jstMid.getUTCFullYear(), jstMid.getUTCMonth(), jstMid.getUTCDate(), 13, 0, 0);
-    for (const id of Object.keys(dropFor)) {
+    for (const id of Object.keys(siteDrop)) {
       for (let k = 0; k <= 36; k++) {          // 10分間隔で6時間ぶん(37点)
         const t = start + k * 10 * 60000;
-        const v = 12.5 - dropFor[id] * (k / 36);
-        histLines.push([id, new Date(t).toISOString(), "", "0.000", v.toFixed(3), "", "サーバー(mini.lhlab-vps.net 電源CSV)"].join(","));
+        const v = 12.5 - siteDrop[id] * (k / 36);
+        histLines.push([id, new Date(t).toISOString(), "", "0.000", v.toFixed(4), "", "サーバー(mini.lhlab-vps.net 電源CSV)"].join(","));
       }
     }
   }
   fs.writeFileSync(path.join(healthSandbox, "data", "history.csv"), histLines.join("\n") + "\n", "utf8");
-  // 中継サーバーのCSVは「今夜の0〜4時台」の行を返し、消費電力(load_w)を拠点ごとに変える
+  // 中継サーバーのCSVは今夜の0〜4時台を返し、消費電力(load_w)を拠点ごとに変える
+  const relayName = { cam02: "中郷第１樋管", cam03: "北沢アンダー", cam04: "中郷第２樋管", cam08: "宮川橋",
+    cam11: "祇園大橋", cam09: "梅名樋管2号", cam12: "安間樋管", cam13: "上町樋管", cam14: "多呂樋管" };
   const jstNow = new Date(now + 9 * HOUR);
   const todayStart = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate(), 0, 0, 0) - 9 * HOUR;
   const nightRows = [];
-  [["中郷第１樋管", "1.0"], ["祇園大橋", "1.0"], ["北沢アンダー", "2.0"]].forEach(([name, loadW]) => {
+  Object.keys(siteLoad).forEach((id) => {
     for (let h = 0; h < 4; h++) {
-      nightRows.push({ ts: new Date(todayStart + h * HOUR).toISOString(), name, pvW: "0.000", batMv: 12400, loadW });
+      nightRows.push({ ts: new Date(todayStart + h * HOUR).toISOString(), name: relayName[id],
+        pvW: "0.000", batMv: 12400, loadW: String(siteLoad[id]) });
     }
   });
   const healthHandler = (u) => {
@@ -487,18 +493,23 @@ export async function run() {
   r.check("s18-b 基準拠点は祇園大橋(cam11)", health && health.referenceSiteId === "cam11", health && health.referenceSiteId);
   r.check("s18-c 集計は直近14日", health && health.nights === 14, health && health.nights);
   r.check("s18-d 夜間帯は22時から6時間", health && health.nightStartHourJst === 22 && health.nightHours === 6, health);
-  const hc11 = health && health.sites.cam11, hc02 = health && health.sites.cam02, hc03 = health && health.sites.cam03;
+  const hc11 = health && health.sites.cam11, hc02 = health && health.sites.cam02, hc14 = health && health.sites.cam14;
   r.check("s18-e 14夜ぶんを集計する", hc11 && hc11.nights === 14, hc11);
-  r.check("s18-f 夜間の降下量を拾える(0.06V)", hc11 && Math.abs(hc11.dropV - 0.06) < 0.005, hc11);
+  r.check("s18-f 夜間の降下量を拾える", hc11 && Math.abs(hc11.dropV - 0.1) < 0.005, hc11);
   r.check("s18-g 消費電力(load_w)を拠点ごとに拾う",
-    hc11 && hc11.loadW === 1 && hc03 && hc03.loadW === 2, { cam11: hc11 && hc11.loadW, cam03: hc03 && hc03.loadW });
-  r.check("s18-h 基準拠点は±0%", hc11 && hc11.diffPct === 0, hc11);
-  r.check("s18-i 同じ消費で2倍落ちる拠点は+100%", hc02 && hc02.diffPct === 100, hc02);
-  r.check("s18-j 消費が2倍なら同じ降下でも−50%(持ちが良い)", hc03 && hc03.diffPct === -50, hc03);
+    hc11 && hc11.loadW === 10 && hc02 && hc02.loadW === 2, { cam11: hc11 && hc11.loadW, cam02: hc02 && hc02.loadW });
+  r.check("s18-h 傾向線(降下 = a + b×消費W)を当てはめる",
+    health && health.fit && Math.abs(health.fit.b - 0.005) < 0.002 && health.fit.sites === 9, health && health.fit);
+  r.check("s18-i 傾向線どおりの拠点は基準とほぼ同じ(±5%以内)",
+    hc11 && hc11.diffPct === 0 && hc02 && Math.abs(hc02.diffPct) <= 5, { cam11: hc11 && hc11.diffPct, cam02: hc02 && hc02.diffPct });
+  r.check("s18-j 傾向線より大きく落ちる拠点はプラスになる", hc14 && hc14.diffPct >= 30, hc14);
   r.check("s18-k2 消費5W未満は参考値の印を付ける",
-    hc11 && hc11.lowLoad === true && hc03 && hc03.lowLoad === true, { cam11: hc11 && hc11.lowLoad, cam03: hc03 && hc03.lowLoad });
+    hc02 && hc02.lowLoad === true && hc11 && hc11.lowLoad === false,
+    { cam02: hc02 && hc02.lowLoad, cam11: hc11 && hc11.lowLoad });
   r.check("s18-k 夜間の実測が無い拠点は算出しない",
-    health && !health.sites.cam08, health && Object.keys(health.sites));
+    health && !health.sites.cam55, health && Object.keys(health.sites));
+  r.check("s18-m 散布図用に消費Wと降下Vを持たせる",
+    hc14 && typeof hc14.loadW === "number" && typeof hc14.dropV === "number" && typeof hc14.expectedV === "number", hc14);
 
   // 2回目はすぐには計算し直さない(1時間に1回)
   const firstGeneratedAt = health.generatedAt;
@@ -507,6 +518,10 @@ export async function run() {
   r.check("s18-l 1時間以内は再計算しない", health2.generatedAt === firstGeneratedAt, health2.generatedAt);
   fs.rmSync(healthSandbox, { recursive: true, force: true });
 
+  /* ---- 後片付け ---- */
+  fs.rmSync(sandbox, { recursive: true, force: true });
+  fs.rmSync(sandbox2, { recursive: true, force: true });
+  fs.rmSync(sandbox3, { recursive: true, force: true });
   r.check("s10-a リポジトリのdata/を汚さない", !fs.existsSync(path.join(REPO_ROOT, "data")), "repo/data");
 
   return r.finish();
