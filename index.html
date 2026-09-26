@@ -387,9 +387,13 @@
   .power-chart-col .chart-legend { justify-content: center; }
   .power-chart-col .chart-box { height: 150px; }
 
-  .mini-stats { display: flex; align-items: center; gap: 16px; margin-top: 4px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--gridline); }
+  /* 発電・BAT・電池マーク・劣化・拠点画像を1行に収める。カード幅が狭いと画像が押し出されて
+     切れてしまうため、間隔は詰めめにし、画像だけ縮められるようにしている。 */
+  .mini-stats { display: flex; align-items: center; gap: 10px; margin-top: 4px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--gridline); min-width: 0; }
+  .mini-stats > div { flex: 0 0 auto; }
   .mini-stats .site-thumb {
-    margin-left: auto; max-width: 100px; max-height: 100px; width: auto; height: auto;
+    margin-left: auto; flex: 0 1 auto; min-width: 0;
+    max-width: 100px; max-height: 84px; width: auto; height: auto;
     object-fit: contain; border-radius: 6px; border: 1px solid var(--border);
     box-shadow: 0 2px 6px rgba(0,0,0,0.18); cursor: pointer; opacity: 0.96;
   }
@@ -413,8 +417,9 @@
   .mini-stats .stat-delta.up { color: var(--delta-up); font-weight: 600; }
   .mini-stats .stat-delta.down { color: var(--delta-down); font-weight: 600; }
   /* バッテリー劣化の指標(電池マークと拠点画像の間に置く)。色だけに頼らず符号と数値でも判別できる。 */
-  .battery-health { min-width: 74px; }
-  .battery-health .health-value { font-size: 16px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .battery-health { min-width: 62px; }
+  .battery-health .health-value { font-size: 15px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
+  .battery-health .stat-label { white-space: nowrap; }
   .battery-health .health-value.ok { color: var(--ok-border); }
   .battery-health .health-value.warn { color: var(--warn-border); }
   .battery-health .health-value.critical { color: var(--critical-border); }
@@ -1604,7 +1609,7 @@
     if (s.healthSubEl) {
       s.healthSubEl.textContent = diffPct === null ? "データ不足"
         : (isReference ? "基準拠点"
-          : (lowLoad ? "参考（消費 " + entry.loadW.toFixed(1) + "W）" : (entry.nights || "?") + "夜の中央値"));
+          : (lowLoad ? "参考（消費 " + entry.loadW.toFixed(1) + "W）" : "祇園大橋比"));
     }
     var holder = s.healthValueEl.parentElement;
     if (!holder) return;
@@ -2588,7 +2593,7 @@
     mini.appendChild(batteryStat);
     // バッテリーの劣化指標。電池マークと拠点画像の間に置く(電池マークは少し小さくしてある)。
     var healthStat = el2("div", { class: "battery-health" },
-      '<div class="stat-label">劣化（祇園大橋比）</div>' +
+      '<div class="stat-label">劣化</div>' +
       '<div class="health-value muted">—</div><div class="health-sub">算出中…</div>');
     mini.appendChild(healthStat);
     card.appendChild(mini);
