@@ -1,6 +1,6 @@
 // 電源監視ビューのテスト: 中継サーバーCSVの取り込み、カードの数値表示、
 // 電池マーク(残量%)の描画位置、発電(W)の単位、取得失敗時の挙動。
-import { setup, teardown, newPage, openDashboard, createReporter, buildPowerCsv, POWER_CSV_HEADER } from "./harness.mjs";
+import { setup, teardown, newPage, openDashboard, createReporter, buildPowerCsv, buildBatteryHealth, POWER_CSV_HEADER } from "./harness.mjs";
 
 const NOW = Date.now();
 // 中継サーバー由来のBATが拠点ごとに正しく振り分けられることを確かめたいので、
@@ -161,6 +161,91 @@ export async function run() {
   r.check("p7-l さかのぼるのは3時間まで", prevChanged.tooOld === null && prevChanged.lookbackH === 3, prevChanged);
 
   await page.close();
+
+  /* ========== Request X: バッテリー劣化の指標(祇園大橋比の差の割合) ========== */
+  const pageH = await newPage(null, {
+    nowMs: NOW, matsuhisaBody: NO_BAT_BODY,
+    batteryHealth: buildBatteryHealth({ nowMs: NOW, diff: { cam11: 0, cam02: 35, cam03: -20, cam04: 60, cam08: 20, cam41: 300 },
+      loadW: { cam41: 0.6 } })
+  });
+  await openDashboard(pageH, () => {
+    const d = window.__dashboardDebug;
+    const st = d.getBatteryHealthState();
+    return st && Object.keys(st.sites || {}).length > 0;
+  });
+  await pageH.evaluate(() => window.__dashboardDebug.showView("power"));
+  await pageH.waitForTimeout(400);
+  const health = await pageH.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const read = (id) => {
+      const s = d.siteStates[id];
+      return { text: s.healthValueEl.textContent, cls: s.healthValueEl.className.replace("health-value", "").trim(),
+        sub: s.healthSubEl.textContent, title: s.healthValueEl.parentElement.title.slice(0, 40) };
+    };
+    const mini = d.siteStates.cam02.thumbSlot;
+    const kids = Array.from(mini.children).map((c) => c.className || "");
+    const gaugeIdx = kids.findIndex((c) => String(c).indexOf("battery-gauge") >= 0);
+    const healthIdx = kids.findIndex((c) => String(c).indexOf("battery-health") >= 0);
+    const thumbIdx = kids.findIndex((c) => String(c).indexOf("site-thumb") >= 0);
+    const svg = d.siteStates.cam02.batteryGaugeEl.querySelector("svg");
+    return {
+      ref: read("cam11"), up: read("cam02"), down: read("cam03"), bad: read("cam04"), none: read("cam09"),
+      low: read("cam41"),
+      kids, gaugeIdx, healthIdx, thumbIdx,
+      gaugeW: svg ? Number(svg.getAttribute("width")) : null,
+      count: document.querySelectorAll("#sitesGrid .battery-health").length,
+      label: document.querySelector("#sitesGrid .battery-health .stat-label").textContent
+    };
+  });
+  r.check("p8-a 全23拠点に劣化の表示がある", health.count === 23, health.count);
+  r.check("p8-b 電池マークと拠点画像の間に置かれる",
+    health.gaugeIdx >= 0 && health.healthIdx === health.gaugeIdx + 1 && health.thumbIdx === health.healthIdx + 1, health.kids);
+  r.check("p8-c 電池マークを小さくしてある(幅84)", health.gaugeW === 84, health.gaugeW);
+  r.check("p8-d 見出しは「劣化（祇園大橋比）」", health.label === "劣化（祇園大橋比）", health.label);
+  r.check("p8-e 基準拠点は「±0%」と「基準拠点」表記", health.ref.text === "±0%" && health.ref.sub === "基準拠点", health.ref);
+  r.check("p8-f 基準より劣化はプラス表記", health.up.text === "+35%", health.up);
+  r.check("p8-g 基準より持ちが良い場合はマイナス表記", health.down.text === "−20%", health.down);
+  r.check("p8-h 大きく劣化は危険色", health.bad.cls === "critical", health.bad);
+  r.check("p8-i 軽い劣化は注意色", health.up.cls === "warn", health.up);
+  r.check("p8-j 基準より良い場合は良好色", health.down.cls === "ok", health.down);
+  r.check("p8-k データが無い拠点は「—」", health.none.text === "—" && health.none.cls === "muted", health.none);
+  r.check("p8-l 何夜ぶんの中央値かを併記", health.up.sub === "14夜の中央値", health.up.sub);
+  r.check("p8-m 算出根拠をtitleに出す", health.up.title.indexOf("夜間") === 0, health.up.title);
+  r.check("p8-m2 消費が小さい拠点は参考値として淡色にする",
+    health.low.cls === "muted" && health.low.text === "+300%", health.low);
+  r.check("p8-m3 参考値には消費電力を併記する", health.low.sub === "参考（消費 0.6W）", health.low.sub);
+
+  // 書式と色分けの単体確認
+  const fmt = await pageH.evaluate(() => {
+    const d = window.__dashboardDebug;
+    return {
+      f: [d.fmtBatteryHealth(0), d.fmtBatteryHealth(12), d.fmtBatteryHealth(-8), d.fmtBatteryHealth(null)],
+      c: [d.batteryHealthClass(0, true), d.batteryHealthClass(5, false), d.batteryHealthClass(15, false),
+        d.batteryHealthClass(40, false), d.batteryHealthClass(-10, false), d.batteryHealthClass(null, false),
+        d.batteryHealthClass(300, false, true)]
+    };
+  });
+  r.check("p8-n 書式: ±0% / +12% / −8% / —",
+    JSON.stringify(fmt.f) === JSON.stringify(["±0%", "+12%", "−8%", "—"]), fmt.f);
+  r.check("p8-o 色分けの境目(15%で注意・40%で危険・-10%で良好・低消費は参考)",
+    JSON.stringify(fmt.c) === JSON.stringify(["", "", "warn", "critical", "ok", "muted", "muted"]), fmt.c);
+  r.check("p8-p ページ例外にはならない", pageH.errMsgs().length === 0, pageH.errMsgs());
+  await pageH.close();
+
+  // 指標のファイルが無くても電源監視は表示できる
+  const pageH2 = await newPage(null, { nowMs: NOW, matsuhisaBody: NO_BAT_BODY });
+  await openDashboard(pageH2);
+  await pageH2.evaluate(() => window.__dashboardDebug.showView("power"));
+  await pageH2.waitForTimeout(600);
+  const noHealth = await pageH2.evaluate(() => {
+    const d = window.__dashboardDebug;
+    return { text: d.siteStates.cam02.healthValueEl.textContent,
+      err: !!d.getBatteryHealthState().lastError,
+      cards: document.querySelectorAll("#sitesGrid .card").length };
+  });
+  r.check("p8-q 指標が無い場合も画面は出る", noHealth.cards === 23 && noHealth.text === "—", noHealth);
+  r.check("p8-r 読み込み失敗は記録される", noHealth.err, noHealth);
+  await pageH2.close();
 
   /* ================= 2. Rangeリクエスト(末尾のみ取得) ================= */
   const seen = { head: 0, ranged: 0, full: 0, ranges: [] };

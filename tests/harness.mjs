@@ -234,6 +234,9 @@ export async function newPage(viewport, opts) {
   await page.route("**/data/rainfall.json*", (r) => opts.serverRainfall
     ? r.fulfill({ contentType: "application/json", body: JSON.stringify(opts.serverRainfall) })
     : r.fulfill({ status: 404, body: "not found" }));
+  await page.route("**/data/battery_health.json*", (r) => opts.batteryHealth
+    ? r.fulfill({ contentType: "application/json", body: JSON.stringify(opts.batteryHealth) })
+    : r.fulfill({ status: 404, body: "not found" }));
 
   // r.jina.ai プロキシ。URLの中に本来の取得先(例: mini.lhlab-vps.net/power/logs/...)を含むため、
   // 他のルートより後に登録して最優先にする(Playwrightのルートは後勝ち)。
@@ -271,6 +274,23 @@ export function buildServerRainfall(opts = {}) {
     values.push({ obsTime: new Date(nowMs - i * 10 * 60 * 1000).toISOString(), rn10m: opts.rn10m != null ? opts.rn10m : 1.5 });
   }
   return { generatedAt: new Date(nowMs).toISOString(), obsCd13: "0563300100034", stationName: "三島", values };
+}
+
+// data/battery_health.json 相当(バッテリー劣化の指標。祇園大橋=cam11 を基準に差の割合で持つ)
+export function buildBatteryHealth(opts = {}) {
+  const sites = {};
+  Object.entries(opts.diff || { cam11: 0, cam02: 35, cam03: -20, cam04: 60 }).forEach(([id, diffPct]) => {
+    const loadW = (opts.loadW && opts.loadW[id] !== undefined) ? opts.loadW[id] : 12;
+    sites[id] = {
+      nights: opts.nights || 14, dropV: 0.09, loadW: loadW, lowLoad: loadW < 5,
+      dropPerW: 0.09 / loadW, ratio: 1 + diffPct / 100, diffPct
+    };
+  });
+  return {
+    generatedAt: new Date(opts.nowMs || Date.now()).toISOString(),
+    referenceSiteId: "cam11", nights: opts.nights || 14,
+    nightStartHourJst: 22, nightHours: 6, loadWByDate: {}, sites
+  };
 }
 
 // ダッシュボードの初期化完了(デバッグフックの公開)を待つ

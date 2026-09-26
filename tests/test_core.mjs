@@ -89,9 +89,11 @@ export async function run() {
   r.check("c2-o 電池マークSVGに残量%が小数第2位まで入る", gauge.p50.includes(">50.00%<"), gauge.p50.slice(0, 120));
   r.check("c2-p データ無しは「–」表示", gauge.pNull.includes(">–<"), gauge.pNull.slice(0, 120));
   r.check("c2-q 0%のとき塗りつぶし幅が0", /battery-fill[^>]*width="0\.0"/.test(gauge.p0), gauge.p0.slice(0, 160));
-  r.check("c2-r 100%の塗りつぶし幅が80(=88-4*2)", /battery-fill[^>]*width="80\.0"/.test(gauge.p100), gauge.p100.slice(0, 160));
-  r.check("c2-s 桁数に応じて文字サイズを調整する(50.00%は15px / 100.00%は13px)",
-    gauge.p50.includes('font-size="15"') && gauge.p100.includes('font-size="13"'), [gauge.p50.slice(0, 200), gauge.p100.slice(0, 200)]);
+  r.check("c2-r 100%の塗りつぶし幅が64(=70-3*2)", /battery-fill[^>]*width="64\.0"/.test(gauge.p100), gauge.p100.slice(0, 160));
+  r.check("c2-s 桁数に応じて文字サイズを調整する(50.00%は12px / 100.00%は11px)",
+    gauge.p50.includes('font-size="12"') && gauge.p100.includes('font-size="11"'), [gauge.p50.slice(0, 200), gauge.p100.slice(0, 200)]);
+  r.check("c2-s2 電池マークは劣化表示のぶん小さくしてある(84×32)",
+    gauge.p50.indexOf('<svg width="84" height="32"') === 0, gauge.p50.slice(0, 60));
 
   /* ---- 2.5 Request V: 基準(最低)水位の固定値 ---- */
   const fixedBase = await page.evaluate(() => {

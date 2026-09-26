@@ -24,7 +24,7 @@ const POWER_CSV_HEADER =
 function powerCsv(rows) {
   return [POWER_CSV_HEADER].concat(rows.map((x) =>
     [x.ts, 0, x.name, "solar", "ok", "", 120, 18500, 600, x.pvW, x.batMv,
-      700, 100, 600, 90, 5, 500, "10.4", "0.0", "0.0"].join(","))).join("\n") + "\n";
+      700, 100, 600, 90, 5, 500, x.loadW === undefined ? "10.4" : x.loadW, "0.0", "0.0"].join(","))).join("\n") + "\n";
 }
 
 // 一時ディレクトリへ scripts/poll.mjs を複製する(data/ はその隣に作られる)
@@ -445,6 +445,68 @@ export async function run() {
   fs.rmSync(sandbox, { recursive: true, force: true });
   fs.rmSync(sandbox2, { recursive: true, force: true });
   fs.rmSync(sandbox3, { recursive: true, force: true });
+  /* ============ バッテリー劣化の指標(data/battery_health.json) ============ */
+  // 夜間(22:00〜翌4:00 JST)の電圧降下を、拠点ごとの消費電力[W]で割って基準拠点と比べる。
+  const healthSandbox = makeSandbox("health");
+  fs.mkdirSync(path.join(healthSandbox, "data"), { recursive: true });
+  // 14夜ぶんの履歴を作る。祇園大橋(cam11)は1晩0.06V、中郷第１樋管(cam02)は0.12V下がる。
+  // 消費電力は cam11=1.0W / cam02=1.0W にするので、cam02 は「基準の2倍速く落ちる」= +100%。
+  const HOUR = 3600000;
+  const histLines = ["拠点,取得時刻,機器の計測時刻,PV(W),BAT(V),水位(m),取得方法"];
+  const dropFor = { cam11: 0.06, cam02: 0.12, cam03: 0.06 };
+  for (let back = 1; back <= 14; back++) {
+    // JSTの22:00をUTCに直すと 13:00
+    const jstMid = new Date(now + 9 * HOUR - back * 24 * HOUR);
+    const start = Date.UTC(jstMid.getUTCFullYear(), jstMid.getUTCMonth(), jstMid.getUTCDate(), 13, 0, 0);
+    for (const id of Object.keys(dropFor)) {
+      for (let k = 0; k <= 36; k++) {          // 10分間隔で6時間ぶん(37点)
+        const t = start + k * 10 * 60000;
+        const v = 12.5 - dropFor[id] * (k / 36);
+        histLines.push([id, new Date(t).toISOString(), "", "0.000", v.toFixed(3), "", "サーバー(mini.lhlab-vps.net 電源CSV)"].join(","));
+      }
+    }
+  }
+  fs.writeFileSync(path.join(healthSandbox, "data", "history.csv"), histLines.join("\n") + "\n", "utf8");
+  // 中継サーバーのCSVは「今夜の0〜4時台」の行を返し、消費電力(load_w)を拠点ごとに変える
+  const jstNow = new Date(now + 9 * HOUR);
+  const todayStart = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate(), 0, 0, 0) - 9 * HOUR;
+  const nightRows = [];
+  [["中郷第１樋管", "1.0"], ["祇園大橋", "1.0"], ["北沢アンダー", "2.0"]].forEach(([name, loadW]) => {
+    for (let h = 0; h < 4; h++) {
+      nightRows.push({ ts: new Date(todayStart + h * HOUR).toISOString(), name, pvW: "0.000", batMv: 12400, loadW });
+    }
+  });
+  const healthHandler = (u) => {
+    if (u.includes("mini.lhlab-vps.net/power/logs/")) return { text: async () => powerCsv(nightRows) };
+    return handler(u);
+  };
+  await runPoll(healthSandbox, healthHandler, "health1");
+  const healthPath = path.join(healthSandbox, "data", "battery_health.json");
+  const health = fs.existsSync(healthPath) ? JSON.parse(fs.readFileSync(healthPath, "utf8")) : null;
+  r.check("s18-a data/battery_health.jsonが作られる", !!health, health && Object.keys(health.sites || {}).length);
+  r.check("s18-b 基準拠点は祇園大橋(cam11)", health && health.referenceSiteId === "cam11", health && health.referenceSiteId);
+  r.check("s18-c 集計は直近14日", health && health.nights === 14, health && health.nights);
+  r.check("s18-d 夜間帯は22時から6時間", health && health.nightStartHourJst === 22 && health.nightHours === 6, health);
+  const hc11 = health && health.sites.cam11, hc02 = health && health.sites.cam02, hc03 = health && health.sites.cam03;
+  r.check("s18-e 14夜ぶんを集計する", hc11 && hc11.nights === 14, hc11);
+  r.check("s18-f 夜間の降下量を拾える(0.06V)", hc11 && Math.abs(hc11.dropV - 0.06) < 0.005, hc11);
+  r.check("s18-g 消費電力(load_w)を拠点ごとに拾う",
+    hc11 && hc11.loadW === 1 && hc03 && hc03.loadW === 2, { cam11: hc11 && hc11.loadW, cam03: hc03 && hc03.loadW });
+  r.check("s18-h 基準拠点は±0%", hc11 && hc11.diffPct === 0, hc11);
+  r.check("s18-i 同じ消費で2倍落ちる拠点は+100%", hc02 && hc02.diffPct === 100, hc02);
+  r.check("s18-j 消費が2倍なら同じ降下でも−50%(持ちが良い)", hc03 && hc03.diffPct === -50, hc03);
+  r.check("s18-k2 消費5W未満は参考値の印を付ける",
+    hc11 && hc11.lowLoad === true && hc03 && hc03.lowLoad === true, { cam11: hc11 && hc11.lowLoad, cam03: hc03 && hc03.lowLoad });
+  r.check("s18-k 夜間の実測が無い拠点は算出しない",
+    health && !health.sites.cam08, health && Object.keys(health.sites));
+
+  // 2回目はすぐには計算し直さない(1時間に1回)
+  const firstGeneratedAt = health.generatedAt;
+  await runPoll(healthSandbox, healthHandler, "health2");
+  const health2 = JSON.parse(fs.readFileSync(healthPath, "utf8"));
+  r.check("s18-l 1時間以内は再計算しない", health2.generatedAt === firstGeneratedAt, health2.generatedAt);
+  fs.rmSync(healthSandbox, { recursive: true, force: true });
+
   r.check("s10-a リポジトリのdata/を汚さない", !fs.existsSync(path.join(REPO_ROOT, "data")), "repo/data");
 
   return r.finish();
