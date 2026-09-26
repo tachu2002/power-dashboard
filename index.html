@@ -389,7 +389,8 @@
 
   /* 発電・BAT・電池マーク・劣化・拠点画像を1行に収める。カード幅が狭いと画像が押し出されて
      切れてしまうため、間隔は詰めめにし、画像だけ縮められるようにしている。 */
-  .mini-stats { display: flex; align-items: center; gap: 10px; margin-top: 4px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--gridline); min-width: 0; }
+  .mini-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; row-gap: 6px;
+    margin-top: 4px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--gridline); min-width: 0; }
   .mini-stats > div { flex: 0 0 auto; }
   .mini-stats .site-thumb {
     margin-left: auto; flex: 0 1 auto; min-width: 0;
