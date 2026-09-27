@@ -491,7 +491,10 @@ export async function run() {
   const healthPath = path.join(healthSandbox, "data", "battery_health.json");
   const health = fs.existsSync(healthPath) ? JSON.parse(fs.readFileSync(healthPath, "utf8")) : null;
   r.check("s18-a data/battery_health.jsonが作られる", !!health, health && Object.keys(health.sites || {}).length);
-  r.check("s18-b 基準拠点は北沢アンダーパス(cam03)", health && health.referenceSiteId === "cam03", health && health.referenceSiteId);
+  r.check("s18-b 基準は自動で選ばれ、消費が小さい参考値の拠点は基準にしない",
+    health && !!health.referenceSiteId && health.referenceSiteId !== "cam02"
+      && health.sites[health.referenceSiteId] && health.sites[health.referenceSiteId].lowLoad === false,
+    health && health.referenceSiteId);
   r.check("s18-c 集計は前夜1晩のみ", health && health.nights === 1, health && health.nights);
   r.check("s18-d 夜間帯は22時から6時間", health && health.nightStartHourJst === 22 && health.nightHours === 6, health);
   const hc11 = health && health.sites.cam11, hc02 = health && health.sites.cam02,
@@ -502,10 +505,16 @@ export async function run() {
     hc11 && hc11.loadW === 10 && hc02 && hc02.loadW === 2, { cam11: hc11 && hc11.loadW, cam02: hc02 && hc02.loadW });
   r.check("s18-h 傾向線(降下 = a + b×消費W)を当てはめる",
     health && health.fit && Math.abs(health.fit.b - 0.005) < 0.002 && health.fit.sites === 9, health && health.fit);
-  r.check("s18-i 基準拠点は±0%、傾向線どおりの拠点もほぼ同じ(±5%以内)",
-    hc03 && hc03.diffPct === 0 && hc11 && Math.abs(hc11.diffPct) <= 5 && hc02 && Math.abs(hc02.diffPct) <= 5,
-    { cam03: hc03 && hc03.diffPct, cam11: hc11 && hc11.diffPct, cam02: hc02 && hc02.diffPct });
-  r.check("s18-j 傾向線より大きく落ちる拠点はプラスになる", hc14 && hc14.diffPct >= 30, hc14);
+  const refEntry = health && health.sites[health.referenceSiteId];
+  r.check("s18-i 基準拠点は必ず100%", refEntry && refEntry.healthPct === 100, refEntry);
+  r.check("s18-i2 どの拠点も100%を超えない",
+    health && Object.values(health.sites).every(function (s) { return s.healthPct === null || s.healthPct <= 100; }),
+    health && Object.entries(health.sites).map(function (e) { return e[0] + ":" + e[1].healthPct; }).join(" "));
+  r.check("s18-i3 傾向線どおりの拠点は基準に近い(90%以上)",
+    hc03 && hc03.healthPct >= 90 && hc11 && hc11.healthPct >= 90,
+    { cam03: hc03 && hc03.healthPct, cam11: hc11 && hc11.healthPct });
+  r.check("s18-j 傾向線より大きく落ちる拠点は100%を大きく下回る",
+    hc14 && hc14.healthPct <= 80, hc14);
   r.check("s18-k2 消費5W未満は参考値の印を付ける",
     hc02 && hc02.lowLoad === true && hc11 && hc11.lowLoad === false,
     { cam02: hc02 && hc02.lowLoad, cam11: hc11 && hc11.lowLoad });

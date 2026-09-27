@@ -162,10 +162,11 @@ export async function run() {
 
   await page.close();
 
-  /* ========== Request X: バッテリー劣化の指標(祇園大橋比の差の割合) ========== */
+  /* ===== Request X: バッテリー劣化の指標(いちばん持ちが良い拠点=100%の持ち率) ===== */
   const pageH = await newPage(null, {
     nowMs: NOW, matsuhisaBody: NO_BAT_BODY,
-    batteryHealth: buildBatteryHealth({ nowMs: NOW, diff: { cam03: 0, cam02: 35, cam11: -20, cam04: 60, cam08: 20, cam41: 300 },
+    batteryHealth: buildBatteryHealth({ nowMs: NOW,
+      health: { cam03: 100, cam02: 62, cam11: 95, cam04: 40, cam08: 75, cam41: 25 },
       loadW: { cam41: 0.6 } })
   });
   await openDashboard(pageH, () => {
@@ -197,39 +198,40 @@ export async function run() {
       label: document.querySelector("#sitesGrid .battery-health .stat-label").textContent
     };
   });
-  r.check("p8-a 全23拠点に劣化の表示がある", health.count === 23, health.count);
+  r.check("p8-a 全23拠点に持ちの表示がある", health.count === 23, health.count);
   r.check("p8-b 電池マークと拠点画像の間に置かれる",
     health.gaugeIdx >= 0 && health.healthIdx === health.gaugeIdx + 1 && health.thumbIdx === health.healthIdx + 1, health.kids);
   r.check("p8-c 電池マークを小さくしてある(幅84)", health.gaugeW === 84, health.gaugeW);
-  r.check("p8-d 見出しは「劣化」", health.label === "劣化", health.label);
-  r.check("p8-e 基準拠点(北沢アンダーパス)は「±0%」と「基準拠点」表記",
-    health.ref.text === "±0%" && health.ref.sub === "基準拠点", health.ref);
-  r.check("p8-f 基準より劣化はプラス表記", health.up.text === "+35%", health.up);
-  r.check("p8-g 基準より持ちが良い場合はマイナス表記", health.down.text === "−20%", health.down);
-  r.check("p8-h 大きく劣化は危険色", health.bad.cls === "critical", health.bad);
-  r.check("p8-i 軽い劣化は注意色", health.up.cls === "warn", health.up);
-  r.check("p8-j 基準より良い場合は良好色", health.down.cls === "ok", health.down);
+  r.check("p8-d 見出しは「持ち」", health.label === "持ち", health.label);
+  r.check("p8-e いちばん持ちが良い拠点は「100%」と「最良＝基準」表記",
+    health.ref.text === "100%" && health.ref.sub === "最良＝基準", health.ref);
+  r.check("p8-f 劣化している拠点は100%未満の持ち率", health.up.text === "62%", health.up);
+  r.check("p8-g 基準に近い拠点は100%近くの持ち率", health.down.text === "95%", health.down);
+  r.check("p8-h 大きく劣化(50%未満)は危険色", health.bad.cls === "critical", health.bad);
+  r.check("p8-i 中程度の劣化(50〜70%未満)は注意色", health.up.cls === "warn", health.up);
+  r.check("p8-j 基準並み(90%以上)は良好色", health.down.cls === "ok", health.down);
+  r.check("p8-j2 基準拠点も良好色", health.ref.cls === "ok", health.ref);
   r.check("p8-k データが無い拠点は「—」", health.none.text === "—" && health.none.cls === "muted", health.none);
-  r.check("p8-l 何との比較かを併記", health.up.sub === "基準比", health.up.sub);
+  r.check("p8-l 何との比較かを併記", health.up.sub === "最良比", health.up.sub);
   r.check("p8-m 算出根拠をtitleに出す", health.up.title.indexOf("前夜") === 0, health.up.title);
   r.check("p8-m2 消費が小さい拠点は参考値として淡色にする",
-    health.low.cls === "muted" && health.low.text === "+300%", health.low);
+    health.low.cls === "muted" && health.low.text === "25%", health.low);
   r.check("p8-m3 参考値には消費電力を併記する", health.low.sub === "参考 0.6W", health.low.sub);
 
   // 書式と色分けの単体確認
   const fmt = await pageH.evaluate(() => {
     const d = window.__dashboardDebug;
     return {
-      f: [d.fmtBatteryHealth(0), d.fmtBatteryHealth(12), d.fmtBatteryHealth(-8), d.fmtBatteryHealth(null)],
-      c: [d.batteryHealthClass(0, true), d.batteryHealthClass(5, false), d.batteryHealthClass(15, false),
-        d.batteryHealthClass(40, false), d.batteryHealthClass(-10, false), d.batteryHealthClass(null, false),
-        d.batteryHealthClass(300, false, true)]
+      f: [d.fmtBatteryHealth(100), d.fmtBatteryHealth(72), d.fmtBatteryHealth(5), d.fmtBatteryHealth(null)],
+      c: [d.batteryHealthClass(100, true), d.batteryHealthClass(90, false), d.batteryHealthClass(89, false),
+        d.batteryHealthClass(70, false), d.batteryHealthClass(69, false), d.batteryHealthClass(50, false),
+        d.batteryHealthClass(49, false), d.batteryHealthClass(null, false), d.batteryHealthClass(25, false, true)]
     };
   });
-  r.check("p8-n 書式: ±0% / +12% / −8% / —",
-    JSON.stringify(fmt.f) === JSON.stringify(["±0%", "+12%", "−8%", "—"]), fmt.f);
-  r.check("p8-o 色分けの境目(15%で注意・40%で危険・-10%で良好・低消費は参考)",
-    JSON.stringify(fmt.c) === JSON.stringify(["", "", "warn", "critical", "ok", "muted", "muted"]), fmt.c);
+  r.check("p8-n 書式: 100% / 72% / 5% / —",
+    JSON.stringify(fmt.f) === JSON.stringify(["100%", "72%", "5%", "—"]), fmt.f);
+  r.check("p8-o 色分けの境目(90%以上で良好・70%未満で注意・50%未満で危険・低消費は参考)",
+    JSON.stringify(fmt.c) === JSON.stringify(["ok", "ok", "", "", "warn", "warn", "critical", "muted", "muted"]), fmt.c);
   // 散布図(横軸=消費W / 縦軸=夜間降下V / 破線=全拠点の傾向)
   const scatter = await pageH.evaluate(() => {
     const box = document.getElementById("healthScatter");
@@ -250,7 +252,8 @@ export async function run() {
   r.check("p8-v 読み方と対象の夜を説明する",
     scatter.note.indexOf("線より上") >= 0 && scatter.note.indexOf("前夜") >= 0, scatter.note.slice(0, 90));
   r.check("p8-w 傾向線の式を併記する", scatter.note.indexOf("降下 = ") >= 0, scatter.note.slice(-60));
-  r.check("p8-x 基準拠点名を説明に出す", scatter.note.indexOf("基準: 北沢アンダーパス") >= 0, scatter.note.slice(0, 120));
+  r.check("p8-x 100%の拠点名を説明に出す",
+    scatter.note.indexOf("100%＝いちばん持ちが良い 北沢アンダーパス") >= 0, scatter.note.slice(0, 140));
 
   // グラフが枠に対して引き伸ばされていないこと(発電グラフを外して幅が広がった際の不具合対策)
   const aspect = await pageH.evaluate(() => {

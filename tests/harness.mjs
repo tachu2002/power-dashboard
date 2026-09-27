@@ -276,20 +276,24 @@ export function buildServerRainfall(opts = {}) {
   return { generatedAt: new Date(nowMs).toISOString(), obsCd13: "0563300100034", stationName: "三島", values };
 }
 
-// data/battery_health.json 相当(バッテリー劣化の指標。北沢アンダーパス=cam03 を基準に差の割合で持つ)
+// data/battery_health.json 相当(バッテリー劣化の指標。いちばん持ちが良い拠点=100%で持つ)。
+// opts.health は { 拠点ID: 持ち率% }。100%の拠点が基準(referenceSiteId)になる。
 export function buildBatteryHealth(opts = {}) {
   const sites = {};
-  Object.entries(opts.diff || { cam03: 0, cam02: 35, cam11: -20, cam04: 60 }).forEach(([id, diffPct]) => {
+  const health = opts.health || { cam03: 100, cam02: 74, cam11: 92, cam04: 62 };
+  Object.entries(health).forEach(([id, healthPct]) => {
     const loadW = (opts.loadW && opts.loadW[id] !== undefined) ? opts.loadW[id] : 12;
+    const ratio = 100 / healthPct;   // 基準のズレを1.0としたときの、この拠点のズレ
     sites[id] = {
-      nights: opts.nights || 14, dropV: 0.09, loadW: loadW, lowLoad: loadW < 5,
-      expectedV: 0.0625 + 0.0019 * loadW, deviation: 1 + diffPct / 100,
-      ratio: 1 + diffPct / 100, diffPct
+      nights: opts.nights || 1, dropV: 0.09, loadW: loadW, lowLoad: loadW < 5,
+      expectedV: 0.0625 + 0.0019 * loadW, deviation: ratio,
+      ratio: Math.round(ratio * 1000) / 1000, healthPct
     };
   });
+  const best = Object.keys(health).reduce((a, b) => (health[b] > health[a] ? b : a), Object.keys(health)[0]);
   return {
     generatedAt: new Date(opts.nowMs || Date.now()).toISOString(),
-    referenceSiteId: "cam03", nights: opts.nights || 1,
+    referenceSiteId: opts.referenceSiteId || best, nights: opts.nights || 1,
     fit: opts.fit || { a: 0.0625, b: 0.0019, r: 0.5, sites: Object.keys(sites).length },
     nightStartHourJst: 22, nightHours: 6, loadWByDate: {}, sites
   };
