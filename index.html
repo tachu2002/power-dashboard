@@ -418,9 +418,10 @@
   .mini-stats .stat-delta.up { color: var(--delta-up); font-weight: 600; }
   .mini-stats .stat-delta.down { color: var(--delta-down); font-weight: 600; }
   /* バッテリー劣化の指標(電池マークと拠点画像の間に置く)。色だけに頼らず符号と数値でも判別できる。 */
-  .battery-health { min-width: 62px; }
-  .battery-health .health-value { font-size: 15px; font-weight: 700; margin-top: 2px; font-variant-numeric: tabular-nums; }
-  .battery-health .stat-label { white-space: nowrap; }
+  /* 残量(電池マーク)の右に、区切り線を挟んで置く。数値が折り返さないだけの幅を確保する。 */
+  .battery-health { min-width: 80px; padding-left: 10px; border-left: 1px solid var(--gridline); }
+  .battery-health .health-value { font-size: 16px; font-weight: 700; margin-top: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .battery-health .stat-label, .battery-health .health-sub { white-space: nowrap; }
   .battery-health .health-value.ok { color: var(--ok-border); }
   .battery-health .health-value.warn { color: var(--warn-border); }
   .battery-health .health-value.critical { color: var(--critical-border); }
@@ -1555,7 +1556,7 @@
    * バッテリーの劣化指標
    * -----------------------------------------------------------------------
    * 日射の無い夜間(22:00〜翌4:00 JST)の電圧の下がり方を、全拠点の傾向線と比べ、
-   * 基準拠点(祇園大橋)との差を割合で示す。バッテリーは随時交換するため、
+   * 基準拠点(北沢アンダーパス)との差を割合で示す。バッテリーは随時交換するため、
    * **前夜1晩ぶんの実測だけ**で毎日出し直す。算出はサーバー側(scripts/poll.mjs)で行い、
    * ここでは結果を読んで表示するだけ。
    *   プラス = 基準より速く電圧が落ちる(劣化が進んでいる)
@@ -1599,6 +1600,12 @@
     if (diffPct <= -10) return "ok";
     return "";
   }
+  // 基準拠点の表示名(先頭の拠点名だけ。括弧内の河川名は省く)
+  function referenceSiteName() {
+    var id = batteryHealthState.referenceSiteId;
+    var site = id && SITE_CATALOG[id];
+    return site ? site.name.replace(/（.*$/, "") : "基準拠点";
+  }
   function updateBatteryHealth(site) {
     var s = siteStates[site.id];
     if (!s || !s.healthValueEl) return;
@@ -1611,7 +1618,7 @@
     if (s.healthSubEl) {
       s.healthSubEl.textContent = diffPct === null ? "データ不足"
         : (isReference ? "基準拠点"
-          : (lowLoad ? "参考（消費 " + entry.loadW.toFixed(1) + "W）" : "祇園大橋比"));
+          : (lowLoad ? "参考 " + entry.loadW.toFixed(1) + "W" : "基準比"));
     }
     var holder = s.healthValueEl.parentElement;
     if (!holder) return;
@@ -1623,7 +1630,7 @@
       (typeof entry.dropV === "number" ? entry.dropV.toFixed(3) + "V" : "–") +
       " を、同じ消費電力(" + (typeof entry.loadW === "number" ? entry.loadW.toFixed(1) + "W" : "–") +
       ")の拠点の傾向値" + (typeof entry.expectedV === "number" ? entry.expectedV.toFixed(3) + "V" : "–") +
-      " と比べ、さらに基準拠点との差にしたものです" + (isReference ? "（この拠点が基準）" : "") +
+      " と比べ、さらに基準拠点（" + referenceSiteName() + "）との差にしたものです" + (isReference ? "＝この拠点が基準です" : "") +
       "。プラスは基準より速く電圧が落ちる＝劣化が進んでいることを示します。" +
       (lowLoad ? "\nこの拠点は消費が小さく、電圧の下がり方が消費に比例しないため、参考値として扱ってください。" : "");
   }
@@ -1632,7 +1639,7 @@
    * -----------------------------------------------------------------------
    * 横軸=夜間の消費電力[W]、縦軸=夜間の電圧降下[V]。点は拠点、破線は全拠点の傾向線。
    * 「同じ消費電力の拠点と比べて、どれだけ速く電圧が落ちているか」を、線からの上下で読む。
-   * 線より上=劣化が進んでいる / 線より下=持ちが良い。基準拠点(祇園大橋)は輪で強調する。
+   * 線より上=劣化が進んでいる / 線より下=持ちが良い。基準拠点(北沢アンダーパス)は輪で強調する。
    * 系列は1つなので凡例は置かず、両端の拠点と基準拠点だけ名前を直接添える(全点に名前を出すと
    * 重なって読めなくなるため)。ほかの点はホバーで拠点名と数値を出す。
    * --------------------------------------------------------------------- */
@@ -1784,7 +1791,7 @@
       return;
     }
     note.textContent = "点が拠点、破線は全拠点の傾向です。線より上ほど「同じ消費電力の拠点より速く電圧が落ちている」" +
-      "＝劣化が進んでいることを示します（前夜22:00〜翌4:00の実測・" + rated + "拠点）" +
+      "＝劣化が進んでいることを示します（基準: " + referenceSiteName() + "／前夜22:00〜翌4:00の実測・" + rated + "拠点）" +
       (fit ? "。傾向線: 降下 = " + fit.a.toFixed(4) + " + " + fit.b.toFixed(5) + " × 消費W" : "");
   }
   function serverLatestWaterReading(site) {
@@ -1987,7 +1994,16 @@
       "background:var(--surface-1);border:1px solid var(--gridline);border-radius:8px;padding:6px 10px;" +
       "font-size:13px;white-space:nowrap;box-shadow:0 2px 8px rgba(0,0,0,0.12);z-index:2;";
     container.appendChild(tooltip);
-    var W = 300, H = 220;
+    // viewBoxの縦横比を実際の枠の縦横比に合わせる。固定サイズのまま preserveAspectRatio="none" で
+    // 引き伸ばすと、枠が横長になったときにグラフも文字も横に伸びてしまう(発電グラフを外して
+    // BATを1枚で幅いっぱいにした際に発生した)。高さは固定し、幅だけ枠に合わせて計算する。
+    var H = 220;
+    function currentW() {
+      var rect = container.getBoundingClientRect();
+      if (rect.width > 0 && rect.height > 0) return Math.max(240, H * (rect.width / rect.height));
+      return 300;
+    }
+    var W = currentW();
     var marginLeft = 52, marginRight = 16, marginTop = 12, marginBottom = 26;
     var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
     var lastPoints = [];
@@ -2017,6 +2033,8 @@
     }
     function render(points) {
       lastPoints = points;
+      W = currentW();
+      plotW = W - marginLeft - marginRight;
       while (svg.firstChild) svg.removeChild(svg.firstChild);
       svg.setAttribute("viewBox", "0 0 " + W + " " + H);
       svg.setAttribute("preserveAspectRatio", "none");
@@ -5546,7 +5564,7 @@
     updateErrorTicker: updateErrorTicker, updateFetchAlertFrame: updateFetchAlertFrame,
     // --- Request W (2026-09-21): プロキシ遮断への対応(サーバー保存値への退避) ---
     loadServerLatest: loadServerLatest, serverLatestWaterReading: serverLatestWaterReading,
-    // --- Request X (2026-09-26): バッテリー劣化の指標(祇園大橋比) ---
+    // --- Request X (2026-09-26): バッテリー劣化の指標(基準拠点との比) ---
     loadBatteryHealth: loadBatteryHealth, fmtBatteryHealth: fmtBatteryHealth,
     batteryHealthClass: batteryHealthClass, updateBatteryHealth: updateBatteryHealth,
     refreshAllBatteryHealth: refreshAllBatteryHealth,
