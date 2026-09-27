@@ -1556,11 +1556,11 @@
    * バッテリーの劣化指標
    * -----------------------------------------------------------------------
    * 日射の無い夜間(22:00〜翌4:00 JST)の電圧の下がり方を、全拠点の傾向線と比べ、
-   * 基準拠点(北沢アンダーパス)との差を割合で示す。バッテリーは随時交換するため、
+   * 「いちばん持ちが良い拠点=100%」としたパーセンテージで示す。バッテリーは随時交換するため、
    * **前夜1晩ぶんの実測だけ**で毎日出し直す。算出はサーバー側(scripts/poll.mjs)で行い、
    * ここでは結果を読んで表示するだけ。
-   *   プラス = 基準より速く電圧が落ちる(劣化が進んでいる)
-   *   マイナス = 基準より持ちが良い
+   *   100% = その日いちばん持ちが良かった拠点(基準)
+   *   数字が小さいほど、同じ消費電力の拠点より速く電圧が落ちる＝劣化が進んでいる
    * --------------------------------------------------------------------- */
   var batteryHealthState = { sites: {}, generatedAt: null, referenceSiteId: null, nights: null, fit: null, lastError: null };
   function loadBatteryHealth() {
@@ -1582,22 +1582,19 @@
         return 0;
       });
   }
-  // 差の割合の表示文字列。基準拠点そのものは「±0%（基準）」と分かるようにする。
-  function fmtBatteryHealth(diffPct) {
-    if (typeof diffPct !== "number" || !isFinite(diffPct)) return "—";
-    if (diffPct > 0) return "+" + diffPct + "%";
-    if (diffPct < 0) return "−" + Math.abs(diffPct) + "%";
-    return "±0%";
+  // 持ち率の表示文字列。いちばん良い拠点が100%、悪い拠点はそれ以下になる。
+  function fmtBatteryHealth(healthPct) {
+    if (typeof healthPct !== "number" || !isFinite(healthPct)) return "—";
+    return Math.round(healthPct) + "%";
   }
-  // 色分け: 基準より大きく劣化=危険色 / やや劣化=注意色 / 基準並み=既定 / 基準より良い=良好色。
+  // 色分け: 100%に近い=良好色 / 中位=既定 / 大きく落ちている=注意色・危険色。
   // 消費が極端に小さい拠点(lowLoad)は電圧降下が消費に比例しないため、参考値として淡色にする。
-  function batteryHealthClass(diffPct, isReference, lowLoad) {
-    if (typeof diffPct !== "number" || !isFinite(diffPct)) return "muted";
+  function batteryHealthClass(healthPct, isReference, lowLoad) {
+    if (typeof healthPct !== "number" || !isFinite(healthPct)) return "muted";
     if (lowLoad) return "muted";
-    if (isReference) return "";
-    if (diffPct >= 40) return "critical";
-    if (diffPct >= 15) return "warn";
-    if (diffPct <= -10) return "ok";
+    if (isReference || healthPct >= 90) return "ok";
+    if (healthPct < 50) return "critical";
+    if (healthPct < 70) return "warn";
     return "";
   }
   // 基準拠点の表示名(先頭の拠点名だけ。括弧内の河川名は省く)
@@ -1611,27 +1608,28 @@
     if (!s || !s.healthValueEl) return;
     var entry = batteryHealthState.sites[site.id];
     var isReference = batteryHealthState.referenceSiteId === site.id;
-    var diffPct = entry && typeof entry.diffPct === "number" ? entry.diffPct : null;
+    var healthPct = entry && typeof entry.healthPct === "number" ? entry.healthPct : null;
     var lowLoad = !!(entry && entry.lowLoad);
-    s.healthValueEl.textContent = fmtBatteryHealth(diffPct);
-    s.healthValueEl.className = "health-value " + batteryHealthClass(diffPct, isReference, lowLoad);
+    s.healthValueEl.textContent = fmtBatteryHealth(healthPct);
+    s.healthValueEl.className = "health-value " + batteryHealthClass(healthPct, isReference, lowLoad);
     if (s.healthSubEl) {
-      s.healthSubEl.textContent = diffPct === null ? "データ不足"
-        : (isReference ? "基準拠点"
-          : (lowLoad ? "参考 " + entry.loadW.toFixed(1) + "W" : "基準比"));
+      s.healthSubEl.textContent = healthPct === null ? "データ不足"
+        : (isReference ? "最良＝基準"
+          : (lowLoad ? "参考 " + entry.loadW.toFixed(1) + "W" : "最良比"));
     }
     var holder = s.healthValueEl.parentElement;
     if (!holder) return;
-    if (diffPct === null) {
-      holder.title = "バッテリー劣化の指標: まだ算出できていません（夜間の実測が足りないか、消費電力が取得できていません）";
+    if (healthPct === null) {
+      holder.title = "バッテリーの持ち: まだ算出できていません（夜間の実測が足りないか、消費電力が取得できていません）";
       return;
     }
     holder.title = "前夜(22:00〜翌4:00)の電圧降下 " +
       (typeof entry.dropV === "number" ? entry.dropV.toFixed(3) + "V" : "–") +
       " を、同じ消費電力(" + (typeof entry.loadW === "number" ? entry.loadW.toFixed(1) + "W" : "–") +
       ")の拠点の傾向値" + (typeof entry.expectedV === "number" ? entry.expectedV.toFixed(3) + "V" : "–") +
-      " と比べ、さらに基準拠点（" + referenceSiteName() + "）との差にしたものです" + (isReference ? "＝この拠点が基準です" : "") +
-      "。プラスは基準より速く電圧が落ちる＝劣化が進んでいることを示します。" +
+      " と比べ、いちばん持ちが良い拠点（" + referenceSiteName() + "）の持ちを100%として表した値です" +
+      (isReference ? "＝この拠点が今回いちばん持ちが良く、基準です" : "") +
+      "。数字が小さいほど、同じ消費電力の拠点より速く電圧が落ちる＝劣化が進んでいることを示します。" +
       (lowLoad ? "\nこの拠点は消費が小さく、電圧の下がり方が消費に比例しないため、参考値として扱ってください。" : "");
   }
   /* ---------------------------------------------------------------------
@@ -1639,7 +1637,7 @@
    * -----------------------------------------------------------------------
    * 横軸=夜間の消費電力[W]、縦軸=夜間の電圧降下[V]。点は拠点、破線は全拠点の傾向線。
    * 「同じ消費電力の拠点と比べて、どれだけ速く電圧が落ちているか」を、線からの上下で読む。
-   * 線より上=劣化が進んでいる / 線より下=持ちが良い。基準拠点(北沢アンダーパス)は輪で強調する。
+   * 線より上=劣化が進んでいる / 線より下=持ちが良い。基準拠点(=持ち100%)は輪で強調する。
    * 系列は1つなので凡例は置かず、両端の拠点と基準拠点だけ名前を直接添える(全点に名前を出すと
    * 重なって読めなくなるため)。ほかの点はホバーで拠点名と数値を出す。
    * --------------------------------------------------------------------- */
@@ -1684,7 +1682,7 @@
         var e = state.sites[site.id];
         if (!e || typeof e.loadW !== "number" || typeof e.dropV !== "number") return;
         points.push({ id: site.id, name: site.name.replace(/（.*$/, ""), x: e.loadW, y: e.dropV,
-          diffPct: typeof e.diffPct === "number" ? e.diffPct : null });
+          healthPct: typeof e.healthPct === "number" ? e.healthPct : null });
       });
       if (points.length < 2) return;
       var xs = points.map(function (p) { return p.x; }), ys = points.map(function (p) { return p.y; });
@@ -1730,7 +1728,9 @@
       }
 
       // 点。線から離れている上下3拠点と基準拠点だけ名前を添える。
-      var sorted = points.slice().sort(function (a, b) { return (b.diffPct || 0) - (a.diffPct || 0); });
+      var sorted = points.slice().sort(function (a, b) {
+        return (a.healthPct === null ? 999 : a.healthPct) - (b.healthPct === null ? 999 : b.healthPct);
+      });
       var labelled = {};
       sorted.slice(0, 3).forEach(function (p) { labelled[p.id] = 1; });
       sorted.slice(-3).forEach(function (p) { labelled[p.id] = 1; });
@@ -1756,10 +1756,10 @@
           l1.style.cssText = "color:var(--text-secondary);";
           l1.textContent = "前夜: 消費 " + p.x.toFixed(1) + "W / 降下 " + p.y.toFixed(3) + "V";
           tooltip.appendChild(l0); tooltip.appendChild(l1);
-          if (p.diffPct !== null) {
+          if (p.healthPct !== null) {
             var l2 = document.createElement("div");
             l2.style.cssText = "color:var(--text-primary);";
-            l2.textContent = "劣化 " + fmtBatteryHealth(p.diffPct);
+            l2.textContent = "持ち " + fmtBatteryHealth(p.healthPct);
             tooltip.appendChild(l2);
           }
           var rect = container.getBoundingClientRect();
@@ -1784,14 +1784,15 @@
     if (!note) return;
     var fit = batteryHealthState.fit;
     var rated = Object.keys(batteryHealthState.sites).filter(function (id) {
-      return typeof batteryHealthState.sites[id].diffPct === "number";
+      return typeof batteryHealthState.sites[id].healthPct === "number";
     }).length;
     if (!rated) {
       note.textContent = "前夜（22:00〜翌4:00）の実測がまだ足りないため算出できていません。";
       return;
     }
     note.textContent = "点が拠点、破線は全拠点の傾向です。線より上ほど「同じ消費電力の拠点より速く電圧が落ちている」" +
-      "＝劣化が進んでいることを示します（基準: " + referenceSiteName() + "／前夜22:00〜翌4:00の実測・" + rated + "拠点）" +
+      "＝劣化が進んでいることを示します（100%＝いちばん持ちが良い " + referenceSiteName() +
+      "／前夜22:00〜翌4:00の実測・" + rated + "拠点）" +
       (fit ? "。傾向線: 降下 = " + fit.a.toFixed(4) + " + " + fit.b.toFixed(5) + " × 消費W" : "");
   }
   function serverLatestWaterReading(site) {
@@ -2613,7 +2614,7 @@
     mini.appendChild(batteryStat);
     // バッテリーの劣化指標。電池マークと拠点画像の間に置く(電池マークは少し小さくしてある)。
     var healthStat = el2("div", { class: "battery-health" },
-      '<div class="stat-label">劣化</div>' +
+      '<div class="stat-label">持ち</div>' +
       '<div class="health-value muted">—</div><div class="health-sub">算出中…</div>');
     mini.appendChild(healthStat);
     card.appendChild(mini);
