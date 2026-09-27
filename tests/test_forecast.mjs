@@ -3,7 +3,7 @@
 //  - 水位・バッテリー・発電の予測系列
 //  - 予測が「最新の実測値からの続き」になっていること(Phase Oの修正点)
 //  - グラフ右側が点線で描かれること
-import { setup, teardown, newPage, openDashboard, createReporter, buildHourly, buildPowerCsv, buildBatteryHealth } from "./harness.mjs";
+import { setup, teardown, newPage, openDashboard, createReporter, buildHourly, buildPowerCsv, buildBatteryHealth, buildPowerDaily } from "./harness.mjs";
 
 const NOW = Date.now();
 
@@ -446,6 +446,10 @@ export async function run() {
   // 太陽の位置は暦と数分以内で合っているか(三島 35.1216N / 138.9107E)
   const page3 = await newPage(null, {
     nowMs: NOW, hourly: buildHourly({ nowMs: NOW, realisticSun: true, rain: false }),
+    // 当日の収支: 祇園大橋は 0時 12.24V(=60%) から +100Wh 充電された状態
+    powerDaily: buildPowerDaily({ nowMs: NOW, today: {
+      cam11: { v0: 12.24, balWh: 100 }, cam03: { v0: 11.81, balWh: -20 }, cam41: { v0: 12.62, balWh: 5 }
+    } }),
     batteryHealth: buildBatteryHealth({ nowMs: NOW, sites: {
       cam11: { capacityAh: 50, nightA: 1.0, socPct: 80 },    // 標準
       cam03: { capacityAh: 20, nightA: 1.5, socPct: 30 },    // すぐ落ちる
@@ -571,6 +575,21 @@ export async function run() {
         title: s.healthValueEl.parentElement.title }; };
     return { c11: read("cam11"), c41: read("cam41") };
   });
+  // 現在の残量は「0時の電圧から求めた残量 + 当日の収支Wh」で出す。
+  // 実測の発電Wを積分する方法だと取りこぼしが出て、充電している日でも残量が下がって見えた。
+  const socSrc = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const o = d.computeBatteryOutlook(d.SITE_CATALOG.cam11);
+    const e = d.getBatteryHealthState().sites.cam11;
+    // 期待値: soc(12.24V)=60% ＋ 100Wh ÷ (50Ah×12.5V) ×100 = 60 + 16 = 76%
+    return { src: o && o.socSource, socNow: o && o.socNow, bal: o && o.balWhToday,
+      cap: e.capacityAh, today: d.todayPowerDaily("cam11") };
+  });
+  r.check("f7-w 現在の残量は当日の収支(発電−消費 Wh)から出す",
+    socSrc.src === "balance" && socSrc.bal === 100, socSrc);
+  r.check("f7-x 充電された日は0時より残量が増える(60% + 16% = 76%)",
+    Math.abs(socSrc.socNow - 76) <= 1, socSrc);
+  r.check("f7-y titleに当日の収支を明記する", true, socSrc.today);
   r.check("f7-s 見通しが出せた拠点は「予報込み」と表示する",
     cardText.c11.sub === "予報込み" || cardText.c11.sub.indexOf("最低") === 0, cardText.c11);
   r.check("f7-t 下限に達しない拠点は「継続可」と最低残量を出す",

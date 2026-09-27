@@ -244,6 +244,9 @@ export async function newPage(viewport, opts) {
   await page.route("**/data/battery_health.json*", (r) => opts.batteryHealth
     ? r.fulfill({ contentType: "application/json", body: JSON.stringify(opts.batteryHealth) })
     : r.fulfill({ status: 404, body: "not found" }));
+  await page.route("**/data/power_daily.json*", (r) => opts.powerDaily
+    ? r.fulfill({ contentType: "application/json", body: JSON.stringify(opts.powerDaily) })
+    : r.fulfill({ status: 404, body: "not found" }));
 
   // r.jina.ai プロキシ。URLの中に本来の取得先(例: mini.lhlab-vps.net/power/logs/...)を含むため、
   // 他のルートより後に登録して最優先にする(Playwrightのルートは後勝ち)。
@@ -341,4 +344,19 @@ export function createReporter(suiteName) {
     },
     get counts() { return { pass, fail }; }
   };
+}
+
+// data/power_daily.json 相当。opts.today は { 拠点ID: { v0, balWh, nightA } }。
+// 当日ぶん(0時の電圧と、そこからの収支Wh)だけあれば現在の残量が出せる。
+export function buildPowerDaily(opts = {}) {
+  const now = opts.nowMs || Date.now();
+  const d = new Date(now + 9 * 3600000);
+  const p2 = (n) => String(n).padStart(2, "0");
+  const key = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
+  const days = {};
+  days[key] = {};
+  Object.entries(opts.today || {}).forEach(([id, v]) => {
+    days[key][id] = { v0: v.v0 ?? 12.4, balWh: v.balWh ?? 0, nightA: v.nightA ?? null, vmin: v.vmin ?? 12.1 };
+  });
+  return { generatedAt: new Date(now).toISOString(), days };
 }
