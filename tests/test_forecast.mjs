@@ -142,12 +142,14 @@ export async function run() {
       total: paths.length,
       dashed: paths.filter((p) => p.getAttribute("stroke-dasharray")).length,
       solid: paths.filter((p) => !p.getAttribute("stroke-dasharray") && p.getAttribute("d")).length,
-      title: (document.querySelector("#pchart-bat-cam02") || {}).parentElement.querySelector(".chart-legend").textContent
+      // 系列が1本だけの凡例は削除した(1行15pxを全カードで食っていたため)
+      legend: !!(document.querySelector("#pchart-bat-cam02") || {}).parentElement.querySelector(".chart-legend")
     };
   });
   r.check("f4-a バッテリーのグラフが描画される", svg && svg.total > 0, svg);
   r.check("f4-b 予測部分が点線(stroke-dasharray)で描かれる", svg && svg.dashed >= 1, svg);
   r.check("f4-c 実測部分は実線で描かれる", svg && svg.solid >= 1, svg);
+  r.check("f4-c2 1系列だけの凡例行は置かない", svg && svg.legend === false, svg && svg.legend);
 
   // 発電(PV)のグラフは表示しない方針に変更したため、枠自体が無いことを確認する
   // (予測の計算そのものは残っており、バッテリーのグラフで使っている)。
@@ -373,15 +375,19 @@ export async function run() {
     // 各コマの変化の向きが、その時刻の傾向と一致しているか
     let signOk = true, rising = 0, falling = 0, expectedRising = 0, expectedFalling = 0;
     let prevV = s.points[s.points.length - 1].bat;
-    series.forEach((p) => {
+    series.forEach((p, i) => {
       const want = prof.byHour[d.jstHourOf(p.t)];
       const diff = p.value - prevV;
+      prevV = p.value;
+      // 最初のコマだけは「今から次の正時まで」の端数で、実行時刻によっては数分しかない。
+      // その場合 0.08V/h の傾向でも変化が0.005V未満になり、小数第2位に出ない。
+      // 実行時刻でテストの成否が変わってしまうため、最初のコマは集計から外す。
+      if (i === 0) return;
       if (typeof want === "number" && Math.abs(want) > 0.03) {
         if (want > 0) { expectedRising++; if (diff < 0) signOk = false; }
         if (want < 0) { expectedFalling++; if (diff > 0) signOk = false; }
       }
       if (diff > 0) rising++; else if (diff < 0) falling++;
-      prevV = p.value;
     });
     // 充電で14.2Vを超える拠点(旧実装は固定上限14.2Vで頭打ちだった)
     s.points = make(14.5);

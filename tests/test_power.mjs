@@ -265,6 +265,64 @@ export async function run() {
   });
   r.check("p8-y BATのグラフが横に伸びない(枠と同じ縦横比)", Math.abs(aspect.ratio - 1) < 0.02, aspect);
 
+  /* ===== 案B: 余白を捨てないカードレイアウト(数値2段＋画像ぶち抜き) ===== */
+  // 以前は1行のflexで、幅が足りないと画像だけが次行へ折り返し、その左に196×62pxの空白ができていた。
+  const layout = await pageH.evaluate(() => {
+    const SRC = "data:image/svg+xml;utf8," + encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="120"><rect width="160" height="120" fill="#7fa98c"/></svg>');
+    const card = document.querySelector("#sitesGrid .card");
+    const mini = card.querySelector(".mini-stats");
+    let img = mini.querySelector(".site-thumb");
+    if (!img) { img = document.createElement("img"); img.className = "site-thumb"; mini.appendChild(img); }
+    img.src = SRC;
+    return new Promise((resolve) => setTimeout(() => {
+      const mb = mini.getBoundingClientRect();
+      const rows = {};
+      Array.from(mini.children).forEach((c) => {
+        const b = c.getBoundingClientRect();
+        const key = Math.round((b.top - mb.top) / 10);
+        (rows[key] = rows[key] || []).push(String(c.className || c.tagName).split(" ")[0]);
+      });
+      const t = img.getBoundingClientRect();
+      resolve({
+        display: getComputedStyle(mini).display,
+        cols: getComputedStyle(mini).gridTemplateColumns.split(" ").length,
+        miniH: Math.round(mb.height),
+        thumb: { w: Math.round(t.width), h: Math.round(t.height), left: Math.round(t.left - mb.left) },
+        rowCount: Object.keys(rows).length,
+        cardH: Math.round(card.getBoundingClientRect().height),
+        hasUrlLine: !!card.querySelector(".site-card-header > .site-title-wrap > a.site-link"),
+        titleIsLink: !!card.querySelector(".site-card-header h2 a.site-link")
+      });
+    }, 500));
+  });
+  r.check("p8-z1 数値はgridで2段に置く", layout.display === "grid" && layout.cols === 3, layout);
+  r.check("p8-z2 画像は右に2段ぶち抜き（折り返さない）",
+    layout.thumb.w === 116 && layout.thumb.h === 88 && layout.thumb.h <= layout.miniH, layout.thumb);
+  r.check("p8-z3 数値行の高さが中身ぶんに収まる(以前は131px)", layout.miniH <= 115, layout.miniH);
+  r.check("p8-z4 カード全体が短くなる(以前は389px)", layout.cardH <= 345, layout.cardH);
+  r.check("p8-z5 URLは別行に出さず拠点名をリンクにする",
+    layout.hasUrlLine === false && layout.titleIsLink === true, layout);
+
+  // 縦軸は「実データ＋定格線」に薄く余白を足した範囲。以前はキリの良い値まで広げて上下6割が空白だった。
+  const axis = await pageH.evaluate(() => {
+    const svg = document.getElementById("pchart-bat-cam02").querySelector("svg");
+    const texts = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent);
+    const nums = texts.filter((t) => /^\d+\.\d\d$/.test(t)).map(Number);
+    const d = window.__dashboardDebug;
+    const pts = d.siteStates.cam02.points.map((p) => p.bat).filter((v) => typeof v === "number");
+    const ratedLabel = texts.find((t) => t.indexOf("定格") === 0);
+    const ratedEl = Array.from(svg.querySelectorAll("text")).find((t) => t.textContent.indexOf("定格") === 0);
+    return { ticks: nums, dataMin: Math.min.apply(null, pts), dataMax: Math.max.apply(null, pts),
+      ratedLabel: ratedLabel || null,
+      ratedAnchor: ratedEl ? ratedEl.getAttribute("text-anchor") : null,
+      ratedX: ratedEl ? Number(ratedEl.getAttribute("x")) : null,
+      vbW: Number((svg.getAttribute("viewBox") || "0 0 0 0").split(" ")[2]) };
+  });
+  r.check("p8-z6 目盛りが粗くなりすぎない(4本以上)", axis.ticks.length >= 4, axis.ticks);
+  r.check("p8-z7 定格線のラベルは右端に置く",
+    axis.ratedAnchor === "end" && axis.ratedX > axis.vbW * 0.6, axis);
+
   r.check("p8-p ページ例外にはならない", pageH.errMsgs().length === 0, pageH.errMsgs());
   await pageH.close();
 
