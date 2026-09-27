@@ -203,13 +203,13 @@ export async function run() {
     health.gaugeIdx >= 0 && health.healthIdx === health.gaugeIdx + 1 && health.thumbIdx === health.healthIdx + 1, health.kids);
   r.check("p8-c 電池マークを小さくしてある(幅84)", health.gaugeW === 84, health.gaugeW);
   r.check("p8-d 見出しは「持ち」", health.label === "持ち", health.label);
-  // 50Ah × (80-20)% ÷ 1.00A = 30h
+  // 50Ah × (80% − 下限11.5V相当の9.3%) ÷ 1.00A = 35h
   r.check("p8-e 持ち時間を時間で出す（丸一日以上は既定色）",
-    health.ok.text === "30h" && health.ok.sub === "日射ゼロ時" && health.ok.cls === "", health.ok);
-  // 50Ah × (45-20)% ÷ 0.96A = 13.0h → 24h未満は注意色
-  r.check("p8-f 丸一日もたない拠点は注意色", health.warn.text === "13h" && health.warn.cls === "warn", health.warn);
-  // 54Ah × (48-20)% ÷ 1.59A = 9.5h → 12h未満は危険色
-  r.check("p8-g 一晩もたない拠点は危険色", health.bad.text === "9.5h" && health.bad.cls === "critical", health.bad);
+    health.ok.text === "35h" && health.ok.sub === "日射ゼロ時" && health.ok.cls === "", health.ok);
+  // 北沢は下限9.5V(=残量0%)なので 50Ah × 45% ÷ 0.96A = 23h → 24h未満は注意色
+  r.check("p8-f 丸一日もたない拠点は注意色", health.warn.text === "23h" && health.warn.cls === "warn", health.warn);
+  // 梅名2号は下限10.5V(=残量0%)なので 15Ah × 50% ÷ 1.60A = 4.7h → 12h未満は危険色
+  r.check("p8-g 一晩もたない拠点は危険色", health.bad.text === "4.7h" && health.bad.cls === "critical", health.bad);
   // 14Ah × (86-20)% ÷ 0.07A = 132h → 48時間を超えたら「日」表記
   r.check("p8-h 2日以上もつ拠点は「日」表記で良好色",
     health.long.text.endsWith("日") && health.long.cls === "ok", health.long);
@@ -219,9 +219,11 @@ export async function run() {
     health.pending.text === "測定中" && health.pending.cls === "muted", health.pending);
   r.check("p8-k 指標に出ていない拠点は「—」",
     health.none.text === "—" && health.none.cls === "muted" && health.none.sub === "データなし", health.none);
-  r.check("p8-m 算出根拠(容量・夜間電流・残量)をtitleに出す",
+  r.check("p8-m 算出根拠(容量・夜間電流・残量・下限電圧)をtitleに出す",
     health.ok.title.indexOf("実効容量") >= 0 && health.ok.title.indexOf("夜間の平均消費") >= 0
-    && health.ok.title.indexOf("残量") >= 0, health.ok.title);
+    && health.ok.title.indexOf("残量") >= 0 && health.ok.title.indexOf("下限 11.50V") >= 0, health.ok.title);
+  r.check("p8-m3 下限電圧が低い拠点はその電圧をtitleに出す",
+    health.warn.title.indexOf("下限 9.50V") >= 0, health.warn.title.slice(0, 80));
   r.check("p8-m2 測定中の理由をtitleで説明する",
     health.pending.title.indexOf("日数がたまるまで") >= 0, health.pending.title);
 

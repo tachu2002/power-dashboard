@@ -291,11 +291,13 @@ export function buildServerRainfall(opts = {}) {
 // enduranceH は容量・残量・電流から自動で計算する(サーバー側と同じ式)。
 export function buildBatteryHealth(opts = {}) {
   const reserve = opts.reserveSocPct ?? 20;
+  // 下限電圧は拠点ごとに違う(北沢cam03=9.5V / 梅名2号cam09=10.5V / 既定=11.5V)。
+  // 持ち時間はその下限までで測るため、同じ容量でも拠点で変わる。
   const spec = opts.sites || {
-    cam11: { capacityAh: 50, nightA: 1.00, socPct: 80 },   // 30h ぶん(既定色)
-    cam03: { capacityAh: 50, nightA: 0.96, socPct: 45 },   // 13h ぶん(注意)
-    cam09: { capacityAh: 54, nightA: 1.59, socPct: 48 },   //  9h ぶん(危険)
-    cam41: { capacityAh: 14, nightA: 0.07, socPct: 86 },   // 5日ぶん(良好)
+    cam11: { capacityAh: 50, nightA: 1.00, socPct: 80 },   // 下限11.5V → 35h(既定色)
+    cam03: { capacityAh: 50, nightA: 0.96, socPct: 45 },   // 下限 9.5V → 23h(注意)
+    cam09: { capacityAh: 15, nightA: 1.60, socPct: 50 },   // 下限10.5V → 4.7h(危険)
+    cam41: { capacityAh: 14, nightA: 0.07, socPct: 86 },   // 下限11.5V → 6.4日(良好)
     cam12: { mains: true, v0: 13.45 },                     // 常時電源
     cam13: { fitR: 0.41 }                                  // 測定中(日数不足)
   };

@@ -550,10 +550,10 @@ export async function run() {
     const svg = document.getElementById("pchart-bat-cam11").querySelector("svg");
     const texts = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent);
     return { hasSoc: series.length > 0 && typeof series[0].soc === "number",
-      endLabel: texts.find((t) => /V ／ 残量 \d+%/.test(t)) || null };
+      endLabel: texts.find((t) => /V ／ (あと |継続可)/.test(t)) || null };
   });
   r.check("f7-n 予測の各コマが残量(%)を持つ", chart.hasSoc, chart.hasSoc);
-  r.check("f7-o グラフ右端に電圧と残量予測を並べて出す", !!chart.endLabel, chart.endLabel);
+  r.check("f7-o グラフ右端に電圧と「あと何時間もつか」を並べて出す", !!chart.endLabel, chart.endLabel);
 
   // 10分間はキャッシュし、明示的に更新すれば計算し直す
   const outlookCacheCheck = await page3.evaluate(() => {
@@ -599,6 +599,34 @@ export async function run() {
     && cardText.c11.title.indexOf("10分ごとに計算し直しています") >= 0, cardText.c11.title.slice(0, 200));
   r.check("f7-v 日射ゼロの場合の値も併記する",
     cardText.c11.title.indexOf("日射ゼロが続いた場合") >= 0, cardText.c11.title.slice(0, 200));
+  /* 拠点ごとの下限電圧を持ち時間に反映しているか。
+     北沢アンダーパス(cam03)は下限9.5V、既定は11.5V。同じ容量・同じ消費でも、
+     下限が低い拠点のほうが長くもたなければならない。 */
+  const limits = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const e = { capacityAh: 50, socPct: 60, nightA: 1.0 };
+    return {
+      既定の下限V: d.batteryEmptyVoltageFor("cam11"),
+      北沢の下限V: d.batteryEmptyVoltageFor("cam03"),
+      既定の下限SOC: Math.round(d.reserveSocFor("cam11")),
+      北沢の下限SOC: Math.round(d.reserveSocFor("cam03")),
+      多呂の下限SOC: Math.round(d.reserveSocFor("cam14")),
+      既定の持ち: d.noSunHoursFor("cam11", e),
+      北沢の持ち: d.noSunHoursFor("cam03", e),
+      見通しの下限: (() => { const o = d.computeBatteryOutlook(d.SITE_CATALOG.cam03);
+        return o && { socPct: o.reserveSocPct, v: o.reserveV }; })()
+    };
+  });
+  r.check("f7-z1 拠点ごとの下限電圧を読む(北沢9.5V / 既定11.5V)",
+    limits.北沢の下限V === 9.5 && limits.既定の下限V === 11.5, limits);
+  r.check("f7-z2 下限電圧を残量に換算する(9.5Vは0% / 11.5Vは約9%)",
+    limits.北沢の下限SOC === 0 && limits.既定の下限SOC >= 8 && limits.既定の下限SOC <= 11, limits);
+  r.check("f7-z3 下限が低い拠点ほど長くもつ（同じ容量・同じ消費でも）",
+    limits.北沢の持ち > limits.既定の持ち * 1.1, { 北沢: limits.北沢の持ち, 既定: limits.既定の持ち });
+  r.check("f7-z4 持ち時間は容量×(残量−下限)÷消費（北沢: 50×60%÷1.0=30h）",
+    Math.abs(limits.北沢の持ち - 30) < 0.5, limits.北沢の持ち);
+  r.check("f7-z5 見通しも拠点ごとの下限を使う",
+    limits.見通しの下限 && limits.見通しの下限.v === 9.5 && limits.見通しの下限.socPct === 0, limits.見通しの下限);
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();
 
