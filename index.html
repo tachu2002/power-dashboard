@@ -373,6 +373,8 @@
     white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px;
   }
   .site-card-header a.site-link:hover { text-decoration: underline; }
+  /* 電源監視カードは、URLを別行に出さず拠点名そのものをリンクにしている */
+  .site-card-header h2 a.site-link { font-size: inherit; font-weight: inherit; color: inherit; display: inline; max-width: none; }
   .site-status { font-size: 11px; color: var(--text-secondary); display: flex; align-items: center; gap: 4px; min-width: 0; flex: 0 1 auto; justify-content: flex-end; }
   .site-status .status-text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 
@@ -387,14 +389,19 @@
   .power-chart-col .chart-legend { justify-content: center; }
   .power-chart-col .chart-box { height: 170px; }
 
-  /* 発電・BAT・電池マーク・劣化・拠点画像を1行に収める。カード幅が狭いと画像が押し出されて
-     切れてしまうため、間隔は詰めめにし、画像だけ縮められるようにしている。 */
-  .mini-stats { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; row-gap: 6px;
+  /* 数値は左に2段(上=発電・BAT / 下=残量・持ち)、拠点画像は右に2段ぶち抜き。
+     以前は1行のflexで、幅が足りないと画像だけが次の行へ折り返し、その左に
+     196×62pxの空白ができていた(2026-09-27実測: 中身66pxに対し行の高さ131px)。
+     grid で画像の置き場所を固定すれば、折り返しが構造的に起きない。
+     3列目は 1fr なので、画像が無い拠点では余った幅を吸うだけで空白にならない。 */
+  .mini-stats { display: grid;
+    grid-template-columns: minmax(0, max-content) minmax(0, max-content) minmax(0, 1fr);
+    column-gap: 12px; row-gap: 6px; align-items: center;
     margin-top: 4px; margin-bottom: 6px; padding-bottom: 6px; border-bottom: 1px solid var(--gridline); min-width: 0; }
-  .mini-stats > div { flex: 0 0 auto; }
+  .mini-stats > div { min-width: 0; }
   .mini-stats .site-thumb {
-    margin-left: auto; flex: 0 1 auto; min-width: 0;
-    max-width: 116px; max-height: 92px; width: auto; height: auto;
+    grid-column: 3; grid-row: 1 / span 2; justify-self: end; align-self: center;
+    min-width: 0; max-width: 116px; max-height: 92px; width: auto; height: auto;
     object-fit: contain; border-radius: 6px; border: 1px solid var(--border);
     box-shadow: 0 2px 6px rgba(0,0,0,0.18); cursor: pointer; opacity: 0.96;
   }
@@ -417,9 +424,8 @@
   /* 差分は色だけに頼らず▲▼±の記号でも判別できるようにしている(上昇=青・下降=赤)。 */
   .mini-stats .stat-delta.up { color: var(--delta-up); font-weight: 600; }
   .mini-stats .stat-delta.down { color: var(--delta-down); font-weight: 600; }
-  /* バッテリー劣化の指標(電池マークと拠点画像の間に置く)。色だけに頼らず符号と数値でも判別できる。 */
-  /* 残量(電池マーク)の右に、区切り線を挟んで置く。数値が折り返さないだけの幅を確保する。 */
-  .battery-health { min-width: 80px; padding-left: 10px; border-left: 1px solid var(--gridline); }
+  /* バッテリー劣化の指標。下段の右(電池マークの隣)に、区切り線を挟んで置く。 */
+  .battery-health { min-width: 72px; padding-left: 12px; border-left: 1px solid var(--gridline); }
   .battery-health .health-value { font-size: 16px; font-weight: 700; margin-top: 2px; white-space: nowrap; font-variant-numeric: tabular-nums; }
   .battery-health .stat-label, .battery-health .health-sub { white-space: nowrap; }
   .battery-health .health-value.ok { color: var(--ok-border); }
@@ -2005,23 +2011,29 @@
       return 300;
     }
     var W = currentW();
-    var marginLeft = 52, marginRight = 16, marginTop = 12, marginBottom = 26;
+    var marginLeft = 42, marginRight = 14, marginTop = 12, marginBottom = 26;
     var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
     var lastPoints = [];
     var valueUnit = unit || "V";
+    // 縦軸の範囲。以前は目盛りのキリの良い値まで上下を広げていたため、
+    // 実測12.00〜12.81Vに対し軸が11.50〜13.50になり、枠の6割が空白だった(2026-09-27)。
+    // 範囲は「実データ＋定格線」に薄く余白を足したものそのままにし、
+    // 目盛りだけをキリの良い値でその中に置く。波形が枠いっぱいに大きく描かれる。
     function niceScale(dataMin, dataMax) {
-      if (dataMin === dataMax) { dataMin -= 1; dataMax += 1; }
-      var range = dataMax - dataMin, pad = range * 0.15;
+      if (dataMin === dataMax) { dataMin -= 0.5; dataMax += 0.5; }
+      var range = dataMax - dataMin, pad = range * 0.08;
       var lo = dataMin - pad, hi = dataMax + pad;
       var rawStep = (hi - lo) / 4;
       var mag = Math.pow(10, Math.floor(Math.log(rawStep) / Math.LN10));
       var norm = rawStep / mag;
-      var niceNorm = norm < 1.5 ? 1 : norm < 3 ? 2 : norm < 7 ? 5 : 10;
+      // 2.5(=0.25や2.5V刻み)も選べるようにして、目盛りが粗くなりすぎないようにする
+      var niceNorm = norm < 1.5 ? 1 : norm < 2.25 ? 2 : norm < 3.5 ? 2.5 : norm < 7.5 ? 5 : 10;
       var step = niceNorm * mag;
-      var niceLo = Math.floor(lo / step) * step, niceHi = Math.ceil(hi / step) * step;
       var ticks = [];
-      for (var v = niceLo; v <= niceHi + step / 1000; v += step) ticks.push(Math.round(v * 1000) / 1000);
-      return { min: niceLo, max: niceHi, ticks: ticks };
+      for (var v = Math.ceil(lo / step) * step; v <= hi + step / 1000; v += step) {
+        ticks.push(Math.round(v * 100000) / 100000);
+      }
+      return { min: lo, max: hi, ticks: ticks };
     }
     function el(tag, attrs) { var e = document.createElementNS(svgNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
     function drawSeriesEndLabel(svg, pal, x, y, text) {
@@ -2051,28 +2063,31 @@
       var xs = computeXPositions(points, marginLeft, plotW);
       function xAt(i) { return xs[i]; }
       function yAt(v) { return marginTop + plotH - ((v - scale.min) / (scale.max - scale.min)) * plotH; }
-      var tickStep = scale.ticks.length > 1 ? (scale.ticks[1] - scale.ticks[0]) : 1;
       scale.ticks.forEach(function (t) {
         var y = yAt(t);
         svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: y, y2: y, stroke: pal.gridline, "stroke-width": 1 }));
-        var nearRated = typeof ratedValue === "number" && Math.abs(t - ratedValue) <= tickStep * 0.9;
-        if (!nearRated) {
-          var label = el("text", { x: marginLeft - 8, y: y, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
-          label.textContent = t.toFixed(2); svg.appendChild(label);
-        }
+        // 定格線のラベルは右端へ移したので、左の目盛り値はすべて出してよい
+        var label = el("text", { x: marginLeft - 8, y: y, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
+        label.textContent = t.toFixed(2); svg.appendChild(label);
       });
       pickLabelIndices(xs, Math.min(5, n)).forEach(function (idx) {
-        var lbl = el("text", { x: xAt(idx), y: H - 6, "text-anchor": "middle", fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
+        // 端の時刻ラベルは中央揃えのままだと枠からはみ出して切れる("23:00"が"23:0"になっていた)。
+        // 右端・左端に来たものだけ、内側へ寄せて揃え方を変える。
+        var lx = xAt(idx), anchor = "middle";
+        if (lx + 16 > W) { lx = W - 1; anchor = "end"; }
+        else if (lx - 16 < 0) { lx = 1; anchor = "start"; }
+        var lbl = el("text", { x: lx, y: H - 6, "text-anchor": anchor, fill: pal.textMuted, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
         lbl.textContent = points[idx].label; svg.appendChild(lbl);
       });
       if (typeof ratedValue === "number" && ratedValue >= scale.min && ratedValue <= scale.max) {
         var ry = yAt(ratedValue);
         svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: ry, y2: ry, stroke: pal.rated, "stroke-width": 1.5, "stroke-dasharray": "4 3" }));
+        // 定格線のラベルは右端へ。左端に置くと、朝の立ち上がり(波形が左寄り)と重なって読めなかった。
         var rtext = ratedLabel || (ratedValue + "V");
         var rlabelWidth = rtext.length * 6.4 + 9;
-        var rlabelX = Math.max(2, marginLeft - rlabelWidth - 6);
-        svg.appendChild(el("rect", { x: rlabelX, y: ry - 16, width: rlabelWidth, height: 16, fill: pal.surface, opacity: 0.85 }));
-        var rlabel = el("text", { x: rlabelX + 3, y: ry - 8, "text-anchor": "start", "dominant-baseline": "middle", fill: pal.rated, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
+        var rlabelX = W - marginRight - rlabelWidth;
+        svg.appendChild(el("rect", { x: rlabelX, y: ry - 17, width: rlabelWidth, height: 16, rx: 3, fill: pal.surface, opacity: 0.85 }));
+        var rlabel = el("text", { x: rlabelX + rlabelWidth - 4, y: ry - 9, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.rated, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
         rlabel.textContent = rtext; svg.appendChild(rlabel);
       }
       var split = buildSplitPathData(points, xs, yAt);
@@ -2594,9 +2609,12 @@
     var card = el2("div", { class: "card" });
     var header = el2("div", { class: "site-card-header" });
     var titleWrap = el2("div", { class: "site-title-wrap" });
-    var h2 = document.createElement("h2"); h2.textContent = site.name; titleWrap.appendChild(h2);
-    var link = el2("a", { class: "site-link", href: site.url, target: "_blank", rel: "noopener" });
-    link.textContent = site.url; titleWrap.appendChild(link);
+    // 拠点名そのものをリンクにする。以前は名前の下にURLを丸ごと1行(13px)出していたが、
+    // 読む情報ではないうえ全カードで高さを食うため、名前のリンク＋ツールチップに畳んだ。
+    var h2 = document.createElement("h2");
+    var link = el2("a", { class: "site-link", href: site.url, target: "_blank", rel: "noopener", title: site.url });
+    link.textContent = site.name;
+    h2.appendChild(link); titleWrap.appendChild(h2);
     header.appendChild(titleWrap);
     var statusEl = el2("div", { class: "site-status" }, '<span class="dot pending"></span><span class="status-text">読み込み中…</span>');
     header.appendChild(statusEl);
@@ -2626,10 +2644,10 @@
     // 発電の数値そのものは上の mini-stats に出している。
     var chartRow = el2("div", { class: "power-chart-row" });
     var batCol = el2("div", { class: "power-chart-col" });
-    var batLegend = el2("div", { class: "chart-legend" },
-      '<span class="legend-item"><span class="legend-line" style="background:var(--series-bat)"></span>BAT（バッテリー電圧）</span>');
+    // 系列は BAT の1本だけなので凡例は置かない(1行15pxを全カードで食っていた)。
+    // 何のグラフかは mini-stats の「BAT」と、線の端に出る値ラベルで分かる。
     var batChartBox = el2("div", { class: "chart-box", id: "pchart-bat-" + site.id });
-    batCol.appendChild(batLegend); batCol.appendChild(batChartBox);
+    batCol.appendChild(batChartBox);
 
     chartRow.appendChild(batCol);
     card.appendChild(chartRow);
