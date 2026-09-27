@@ -276,10 +276,10 @@ export function buildServerRainfall(opts = {}) {
   return { generatedAt: new Date(nowMs).toISOString(), obsCd13: "0563300100034", stationName: "三島", values };
 }
 
-// data/battery_health.json 相当(バッテリー劣化の指標。祇園大橋=cam11 を基準に差の割合で持つ)
+// data/battery_health.json 相当(バッテリー劣化の指標。北沢アンダーパス=cam03 を基準に差の割合で持つ)
 export function buildBatteryHealth(opts = {}) {
   const sites = {};
-  Object.entries(opts.diff || { cam11: 0, cam02: 35, cam03: -20, cam04: 60 }).forEach(([id, diffPct]) => {
+  Object.entries(opts.diff || { cam03: 0, cam02: 35, cam11: -20, cam04: 60 }).forEach(([id, diffPct]) => {
     const loadW = (opts.loadW && opts.loadW[id] !== undefined) ? opts.loadW[id] : 12;
     sites[id] = {
       nights: opts.nights || 14, dropV: 0.09, loadW: loadW, lowLoad: loadW < 5,
@@ -289,7 +289,7 @@ export function buildBatteryHealth(opts = {}) {
   });
   return {
     generatedAt: new Date(opts.nowMs || Date.now()).toISOString(),
-    referenceSiteId: "cam11", nights: opts.nights || 14,
+    referenceSiteId: "cam03", nights: opts.nights || 1,
     fit: opts.fit || { a: 0.0625, b: 0.0019, r: 0.5, sites: Object.keys(sites).length },
     nightStartHourJst: 22, nightHours: 6, loadWByDate: {}, sites
   };

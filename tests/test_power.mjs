@@ -165,7 +165,7 @@ export async function run() {
   /* ========== Request X: バッテリー劣化の指標(祇園大橋比の差の割合) ========== */
   const pageH = await newPage(null, {
     nowMs: NOW, matsuhisaBody: NO_BAT_BODY,
-    batteryHealth: buildBatteryHealth({ nowMs: NOW, diff: { cam11: 0, cam02: 35, cam03: -20, cam04: 60, cam08: 20, cam41: 300 },
+    batteryHealth: buildBatteryHealth({ nowMs: NOW, diff: { cam03: 0, cam02: 35, cam11: -20, cam04: 60, cam08: 20, cam41: 300 },
       loadW: { cam41: 0.6 } })
   });
   await openDashboard(pageH, () => {
@@ -189,7 +189,7 @@ export async function run() {
     const thumbIdx = kids.findIndex((c) => String(c).indexOf("site-thumb") >= 0);
     const svg = d.siteStates.cam02.batteryGaugeEl.querySelector("svg");
     return {
-      ref: read("cam11"), up: read("cam02"), down: read("cam03"), bad: read("cam04"), none: read("cam09"),
+      ref: read("cam03"), up: read("cam02"), down: read("cam11"), bad: read("cam04"), none: read("cam09"),
       low: read("cam41"),
       kids, gaugeIdx, healthIdx, thumbIdx,
       gaugeW: svg ? Number(svg.getAttribute("width")) : null,
@@ -202,18 +202,19 @@ export async function run() {
     health.gaugeIdx >= 0 && health.healthIdx === health.gaugeIdx + 1 && health.thumbIdx === health.healthIdx + 1, health.kids);
   r.check("p8-c 電池マークを小さくしてある(幅84)", health.gaugeW === 84, health.gaugeW);
   r.check("p8-d 見出しは「劣化」", health.label === "劣化", health.label);
-  r.check("p8-e 基準拠点は「±0%」と「基準拠点」表記", health.ref.text === "±0%" && health.ref.sub === "基準拠点", health.ref);
+  r.check("p8-e 基準拠点(北沢アンダーパス)は「±0%」と「基準拠点」表記",
+    health.ref.text === "±0%" && health.ref.sub === "基準拠点", health.ref);
   r.check("p8-f 基準より劣化はプラス表記", health.up.text === "+35%", health.up);
   r.check("p8-g 基準より持ちが良い場合はマイナス表記", health.down.text === "−20%", health.down);
   r.check("p8-h 大きく劣化は危険色", health.bad.cls === "critical", health.bad);
   r.check("p8-i 軽い劣化は注意色", health.up.cls === "warn", health.up);
   r.check("p8-j 基準より良い場合は良好色", health.down.cls === "ok", health.down);
   r.check("p8-k データが無い拠点は「—」", health.none.text === "—" && health.none.cls === "muted", health.none);
-  r.check("p8-l 何との比較かを併記", health.up.sub === "祇園大橋比", health.up.sub);
+  r.check("p8-l 何との比較かを併記", health.up.sub === "基準比", health.up.sub);
   r.check("p8-m 算出根拠をtitleに出す", health.up.title.indexOf("前夜") === 0, health.up.title);
   r.check("p8-m2 消費が小さい拠点は参考値として淡色にする",
     health.low.cls === "muted" && health.low.text === "+300%", health.low);
-  r.check("p8-m3 参考値には消費電力を併記する", health.low.sub === "参考（消費 0.6W）", health.low.sub);
+  r.check("p8-m3 参考値には消費電力を併記する", health.low.sub === "参考 0.6W", health.low.sub);
 
   // 書式と色分けの単体確認
   const fmt = await pageH.evaluate(() => {
@@ -249,6 +250,17 @@ export async function run() {
   r.check("p8-v 読み方と対象の夜を説明する",
     scatter.note.indexOf("線より上") >= 0 && scatter.note.indexOf("前夜") >= 0, scatter.note.slice(0, 90));
   r.check("p8-w 傾向線の式を併記する", scatter.note.indexOf("降下 = ") >= 0, scatter.note.slice(-60));
+  r.check("p8-x 基準拠点名を説明に出す", scatter.note.indexOf("基準: 北沢アンダーパス") >= 0, scatter.note.slice(0, 120));
+
+  // グラフが枠に対して引き伸ばされていないこと(発電グラフを外して幅が広がった際の不具合対策)
+  const aspect = await pageH.evaluate(() => {
+    const box = document.getElementById("pchart-bat-cam02");
+    const svg = box.querySelector("svg");
+    const vb = (svg.getAttribute("viewBox") || "").split(" ").map(Number);
+    const rect = box.getBoundingClientRect();
+    return { ratio: (vb[2] / vb[3]) / (rect.width / rect.height) };
+  });
+  r.check("p8-y BATのグラフが横に伸びない(枠と同じ縦横比)", Math.abs(aspect.ratio - 1) < 0.02, aspect);
 
   r.check("p8-p ページ例外にはならない", pageH.errMsgs().length === 0, pageH.errMsgs());
   await pageH.close();
