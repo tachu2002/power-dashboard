@@ -1266,6 +1266,9 @@
   var VIA_LABEL_SERVER_FALLBACK = "サーバー保存値（国交省 川の防災情報）";
   // バッテリーの劣化指標(サーバー側で算出。scripts/poll.mjs の updateBatteryHealthFile を参照)。
   var SERVER_BATTERY_HEALTH_URL = "data/battery_health.json";
+  // 当日ぶんを含む電源の日次集計。中継サーバーの積算値(発電Wh・消費Wh)から作られ、
+  // サーバー側の取得ごと(10分間隔)に更新される。現在の残量を出すのに使う。
+  var SERVER_POWER_DAILY_URL = "data/power_daily.json";
   var BATTERY_HEALTH_REFRESH_MS = 60 * 60 * 1000;
   var IMAGE_MANIFEST_URL = "data/images/manifest.json";
   // タイムラプス再生の対象期間(直近2日分)。サーバー側の画像保持期間(poll.mjsのIMAGE_RETENTION_DAYS)も2日。
@@ -1582,6 +1585,33 @@
     [11.36, 0], [11.51, 10], [11.66, 20], [11.81, 30], [11.96, 40], [12.10, 50],
     [12.24, 60], [12.37, 70], [12.50, 80], [12.62, 90], [12.70, 100]
   ];
+  var powerDailyState = { days: {}, generatedAt: null, lastError: null };
+  function loadPowerDaily() {
+    return fetch(SERVER_POWER_DAILY_URL + "?_ts=" + Date.now(), { cache: "no-store" })
+      .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
+      .then(function (json) {
+        powerDailyState.days = (json && json.days) || {};
+        powerDailyState.generatedAt = json && json.generatedAt ? new Date(json.generatedAt) : null;
+        powerDailyState.lastError = null;
+        outlookCache = {};
+        predictionCache = {};
+        refreshAllBatteryHealth();
+        refreshAllPredictionCharts();
+        return Object.keys(powerDailyState.days).length;
+      })
+      .catch(function (err) {
+        powerDailyState.lastError = err && err.message ? err.message : String(err);
+        return 0;
+      });
+  }
+  // 今日(JST)の日次集計。0時の電圧と、そこからの収支[Wh]を持つ。
+  function todayPowerDaily(siteId) {
+    var d = new Date(Date.now() + 9 * 60 * 60 * 1000);
+    var p2 = function (n) { return String(n).padStart(2, "0"); };
+    var key = d.getUTCFullYear() + "-" + p2(d.getUTCMonth() + 1) + "-" + p2(d.getUTCDate());
+    var day = powerDailyState.days[key];
+    return (day && day[siteId]) || null;
+  }
   function loadBatteryHealth() {
     return fetch(SERVER_BATTERY_HEALTH_URL + "?_ts=" + Date.now(), { cache: "no-store" })
       .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
@@ -1631,7 +1661,11 @@
     return (d.getUTCMonth() + 1) + "/" + d.getUTCDate() + " " + hm;
   }
   function outlookDetail(o, e) {
-    return "現在の残量 " + o.socNow + "%（0時の " + e.socPct + "% から実測の発電で更新）\n" +
+    var how = o.socSource === "balance"
+      ? "0時の電圧から求めた残量に、当日の収支 " +
+        (o.balWhToday >= 0 ? "+" : "") + o.balWhToday + "Wh（発電−消費）を足した値"
+      : "0時の " + e.socPct + "% から実測の発電で更新した値";
+    return "現在の残量 " + o.socNow + "%（" + how + "）\n" +
       "発電の見積り: 日射 × " + o.pvCoef + "（過去の発電実績から）／曇り具合 " +
       Math.round(o.cloudFactor * 100) + "%\n" +
       "消費 " + o.loadW + "W\n" +
@@ -4868,19 +4902,28 @@
     var nowMs = Date.now();
     var reserve = batteryHealthState.reserveSocPct;
 
-    // --- 起点: 直近の0:00の残量から「今」までを実測の発電で積み上げる ---
-    var jst = new Date(nowMs + 9 * HOUR_MS);
-    var midnight = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate()) - 9 * HOUR_MS;
-    if (typeof e.socPct !== "number") return null;
-    var soc = e.socPct;
-    var meas = s.points.filter(function (p) { return p.fetchedAt.getTime() >= midnight && typeof p.pv === "number"; })
-      .sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
-    for (var i = 1; i < meas.length; i++) {
-      var dtH = (meas[i].fetchedAt - meas[i - 1].fetchedAt) / HOUR_MS;
-      if (!(dtH > 0) || dtH > 1) continue;
-      var pvAvg = (meas[i].pv + meas[i - 1].pv) / 2;
-      soc += (pvAvg - loadW) * dtH / capWh * 100;
+    // --- 起点: 今日の0:00の残量に、そこからの収支[Wh]を足して「今」の残量を出す ---
+    // 収支は中継サーバーの積算値(発電Wh − 消費Wh)そのものなので、発電の取りこぼしがない。
+    // これが取れない場合だけ、実測の発電Wを積分する方法に切り替える。
+    var today = todayPowerDaily(site.id);
+    var soc = null, socSource = null;
+    if (today && typeof today.v0 === "number" && typeof today.balWh === "number") {
+      soc = socFromVoltage(today.v0) + today.balWh / capWh * 100;
+      socSource = "balance";
+    } else if (typeof e.socPct === "number") {
+      var jst = new Date(nowMs + 9 * HOUR_MS);
+      var midnight = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate()) - 9 * HOUR_MS;
+      soc = e.socPct;
+      socSource = "pv";
+      var meas = s.points.filter(function (p) { return p.fetchedAt.getTime() >= midnight && typeof p.pv === "number"; })
+        .sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+      for (var i = 1; i < meas.length; i++) {
+        var dtH = (meas[i].fetchedAt - meas[i - 1].fetchedAt) / HOUR_MS;
+        if (!(dtH > 0) || dtH > 1) continue;
+        soc += ((meas[i].pv + meas[i - 1].pv) / 2 - loadW) * dtH / capWh * 100;
+      }
     }
+    if (soc === null) return null;
     soc = Math.max(0, Math.min(100, soc));
     var socNow = soc;
     // 実測の電圧と、残量から求めた休止時電圧とのズレ(充電中の下駄)。グラフを実測から
@@ -4909,7 +4952,8 @@
     }
     var sun = sunTimesFor(lat, lon, nowMs);
     return {
-      computedAt: nowMs, socNow: Math.round(socNow), minSocPct: Math.round(minSoc), minSocAt: minSocAt,
+      computedAt: nowMs, socNow: Math.round(socNow), socSource: socSource,
+      minSocPct: Math.round(minSoc), minSocAt: minSocAt, balWhToday: today ? today.balWh : null,
       hoursToReserve: hoursToReserve, cloudFactor: Math.round(cloud * 100) / 100,
       pvCoef: Math.round(k * 1000) / 1000, loadW: Math.round(loadW * 100) / 100,
       sunrise: sun.sunrise, sunset: sun.sunset, series: series
@@ -5756,6 +5800,9 @@
   // バッテリーの実効容量(サーバー側で1時間ごとに算出)
   loadBatteryHealth();
   setInterval(loadBatteryHealth, BATTERY_HEALTH_REFRESH_MS);
+  // 当日の収支(中継サーバーの積算値)。サーバー側も10分ごとに更新している。
+  loadPowerDaily();
+  setInterval(loadPowerDaily, OUTLOOK_REFRESH_MS);
   // 残量の見通しは天気と実測で都度変わるため、10分ごとに計算し直す。
   setInterval(refreshBatteryOutlook, OUTLOOK_REFRESH_MS);
   setInterval(pollAll, FETCH_INTERVAL_MS);
@@ -5880,6 +5927,9 @@
     cloudFactorFromForecast: cloudFactorFromForecast, pvCoefficient: pvCoefficient,
     voltageFromSoc: voltageFromSoc, socFromVoltage: socFromVoltage,
     batteryOutlook: batteryOutlook, computeBatteryOutlook: computeBatteryOutlook,
+    loadPowerDaily: loadPowerDaily, todayPowerDaily: todayPowerDaily,
+    getPowerDailyState: function () { return powerDailyState; },
+    SERVER_POWER_DAILY_URL: SERVER_POWER_DAILY_URL,
     refreshBatteryOutlook: refreshBatteryOutlook,
     OUTLOOK_HORIZON_MS: OUTLOOK_HORIZON_MS, OUTLOOK_STEP_MS: OUTLOOK_STEP_MS,
     OUTLOOK_REFRESH_MS: OUTLOOK_REFRESH_MS,
