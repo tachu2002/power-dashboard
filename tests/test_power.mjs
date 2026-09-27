@@ -297,6 +297,20 @@ export async function run() {
     }, 500));
   });
   r.check("p8-z1 数値はgridで2段に置く", layout.display === "grid" && layout.cols === 3, layout);
+  // 画像がまだ来ていない拠点でも並びが変わらないこと(自動配置だと電池マークが繰り上がる)
+  const noImg = await pageH.evaluate(() => {
+    const card = Array.from(document.querySelectorAll("#sitesGrid .card"))
+      .find((c) => !c.querySelector(".site-thumb"));
+    if (!card) return { skipped: true };
+    const mini = card.querySelector(".mini-stats");
+    const mb = mini.getBoundingClientRect();
+    const g = mini.querySelector(".battery-gauge").getBoundingClientRect();
+    const first = mini.children[0].getBoundingClientRect();
+    return { gaugeLeft: Math.round(g.left - mb.left), gaugeTop: Math.round(g.top - mb.top),
+      firstLeft: Math.round(first.left - mb.left), firstTop: Math.round(first.top - mb.top) };
+  });
+  r.check("p8-z1b 画像が無い拠点でも電池マークは2段目の左に留まる",
+    noImg.skipped || (noImg.gaugeLeft === noImg.firstLeft && noImg.gaugeTop > noImg.firstTop), noImg);
   r.check("p8-z2 画像は右に2段ぶち抜き（折り返さない）",
     layout.thumb.w === 116 && layout.thumb.h === 88 && layout.thumb.h <= layout.miniH, layout.thumb);
   r.check("p8-z3 数値行の高さが中身ぶんに収まる(以前は131px)", layout.miniH <= 115, layout.miniH);
