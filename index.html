@@ -1576,6 +1576,12 @@
    * 常時電源の拠点(mains)と、まだ日数が足りない拠点(capacityAh が null)は区別して出す。
    * --------------------------------------------------------------------- */
   var batteryHealthState = { sites: {}, generatedAt: null, days: null, reserveSocPct: 20, lastError: null };
+  // 鉛蓄電池(12V)の休止時開回路電圧 → 残量(SOC)。サーバー側(poll.mjs)と同じ表。
+  // 残量→電圧の逆引きにも使い、グラフの予測線を電圧に戻すのに使う。
+  var BATTERY_OCV_TABLE_CLIENT = [
+    [11.36, 0], [11.51, 10], [11.66, 20], [11.81, 30], [11.96, 40], [12.10, 50],
+    [12.24, 60], [12.37, 70], [12.50, 80], [12.62, 90], [12.70, 100]
+  ];
   function loadBatteryHealth() {
     return fetch(SERVER_BATTERY_HEALTH_URL + "?_ts=" + Date.now(), { cache: "no-store" })
       .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
@@ -1585,7 +1591,10 @@
         batteryHealthState.days = json && json.days || null;
         batteryHealthState.reserveSocPct = json && typeof json.reserveSocPct === "number" ? json.reserveSocPct : 20;
         batteryHealthState.lastError = null;
+        outlookCache = {};          // 実効容量が変わったので見通しも作り直す
+        predictionCache = {};
         refreshAllBatteryHealth();
+        refreshAllPredictionCharts();
         return Object.keys(batteryHealthState.sites).length;
       })
       .catch(function (err) {
@@ -1611,6 +1620,25 @@
     return "";
   }
   function batteryHealthEntry(siteId) { return batteryHealthState.sites[siteId] || null; }
+  // 見通しの補助表示。時刻は「今日 18:20」「明日 06:10」「9/30 12:00」のように出す。
+  function fmtOutlookWhen(tMs) {
+    var d = new Date(tMs + 9 * HOUR_MS), now = new Date(Date.now() + 9 * HOUR_MS);
+    var hm = String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0");
+    var dayDiff = Math.round((Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+      - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) / 86400000);
+    if (dayDiff === 0) return "今日 " + hm;
+    if (dayDiff === 1) return "明日 " + hm;
+    return (d.getUTCMonth() + 1) + "/" + d.getUTCDate() + " " + hm;
+  }
+  function outlookDetail(o, e) {
+    return "現在の残量 " + o.socNow + "%（0時の " + e.socPct + "% から実測の発電で更新）\n" +
+      "発電の見積り: 日射 × " + o.pvCoef + "（過去の発電実績から）／曇り具合 " +
+      Math.round(o.cloudFactor * 100) + "%\n" +
+      "消費 " + o.loadW + "W\n" +
+      (o.sunrise ? "日の出 " + fmtOutlookWhen(o.sunrise).replace(/^今日 /, "") +
+        "／日の入り " + fmtOutlookWhen(o.sunset).replace(/^今日 /, "") + "\n" : "") +
+      "10分ごとに計算し直しています。";
+  }
   function updateBatteryHealth(site) {
     var s = siteStates[site.id];
     if (!s || !s.healthValueEl) return;
@@ -1635,12 +1663,29 @@
         (typeof e.fitR === "number" ? "\n現在の当てはまり具合 r=" + e.fitR + "（0.6以上で確定します）" : "") +
         (e.days ? "\n集計できた日数: " + e.days + "日" : "");
     } else {
-      text = fmtEndurance(hours); cls = enduranceClass(hours); sub = "日射ゼロ時";
-      title = "日射がゼロのまま続いた場合、残量 " + e.socPct + "% から下限 " +
-        batteryHealthState.reserveSocPct + "% まで " + fmtEndurance(hours) + " もちます。\n" +
-        "実効容量 " + e.capacityAh + "Ah（" + e.days + "日分の実測・当てはまり r=" + e.fitR + "）\n" +
-        "夜間の平均消費 " + e.nightA + "A（0:00〜4:00の実際の放電電流）\n" +
-        "0時基準の電圧 " + (typeof e.v0 === "number" ? e.v0.toFixed(2) + "V" : "–") + " → 残量 " + e.socPct + "%";
+      // 日射予報(2日先まで)＋日の出日の入りからの快晴モデルで、下限に達するまでを見通す。
+      // 10分ごとに計算し直すため、天気が変われば数字もその都度変わる。
+      var o = batteryOutlook(site);
+      var base = "実効容量 " + e.capacityAh + "Ah（" + e.days + "日分の実測・当てはまり r=" + e.fitR + "）\n" +
+        "夜間の平均消費 " + e.nightA + "A（0:00〜4:00の実際の放電電流）";
+      if (!o) {
+        // 予報や発電実績がまだ足りない間は、日射ゼロの前提の値を出しておく
+        text = fmtEndurance(hours); cls = enduranceClass(hours); sub = "日射ゼロ時";
+        title = "日射がゼロのまま続いた場合、残量 " + e.socPct + "% から下限 " +
+          batteryHealthState.reserveSocPct + "% まで " + fmtEndurance(hours) + " もちます。\n" + base +
+          "\n（日射予報または発電実績がまだ足りないため、予報込みの見通しは出せていません）";
+      } else if (o.hoursToReserve === null) {
+        text = "継続可"; cls = "ok"; sub = "最低 " + o.minSocPct + "%";
+        title = "日射予報を織り込むと、7日先まで下限 " + batteryHealthState.reserveSocPct +
+          "% に達しません（期間中の最低は " + o.minSocPct + "%／" + fmtOutlookWhen(o.minSocAt) + "）。\n" +
+          "日射ゼロが続いた場合は " + fmtEndurance(hours) + " です。\n" + outlookDetail(o, e);
+      } else {
+        text = fmtEndurance(o.hoursToReserve); cls = enduranceClass(o.hoursToReserve); sub = "予報込み";
+        title = "日射予報を織り込むと、" + fmtEndurance(o.hoursToReserve) + "後（" +
+          fmtOutlookWhen(o.computedAt + o.hoursToReserve * HOUR_MS) + "）に下限 " +
+          batteryHealthState.reserveSocPct + "% に達する見通しです。\n" +
+          "日射ゼロが続いた場合は " + fmtEndurance(hours) + " です。\n" + outlookDetail(o, e);
+      }
     }
     s.healthValueEl.textContent = text;
     s.healthValueEl.className = "health-value " + cls;
@@ -2048,7 +2093,9 @@
     }
     function el(tag, attrs) { var e = document.createElementNS(svgNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
     function drawSeriesEndLabel(svg, pal, x, y, text) {
-      var approxWidth = text.length * 7 + 10;
+      // 幅の見積もり。全角は半角のおよそ2倍あるので分けて数える(残量表示を足して長くなったため)。
+      var wide = (String(text).match(/[^\x00-\x7F]/g) || []).length;
+      var approxWidth = (text.length - wide) * 7 + wide * 13 + 10;
       var boxX = Math.min(x + 8, W - approxWidth - 4);
       var boxY = y - 10;
       svg.appendChild(el("rect", { x: boxX - 4, y: boxY, width: approxWidth, height: 20, rx: 4, fill: pal.surface, opacity: 0.9 }));
@@ -2117,7 +2164,15 @@
       var lastIdx = split.boundaryIndex > 0 ? split.boundaryIndex - 1 : n - 1;
       var ex = xAt(lastIdx), ey = yAt(vals[lastIdx]);
       svg.appendChild(el("circle", { cx: ex, cy: ey, r: 4, fill: color, stroke: pal.surface, "stroke-width": 2 }));
-      drawSeriesEndLabel(svg, pal, ex, ey, vals[lastIdx].toFixed(2) + " " + valueUnit);
+      // 端点ラベルは電圧に加えて、同じ時点の残量予測(%)も出す。
+      // 予測の1コマ目が持つ残量が「これからどうなるか」の入口なので、それを添える。
+      var endText = vals[lastIdx].toFixed(2) + " " + valueUnit;
+      var firstPredicted = null;
+      for (var pi = 0; pi < points.length; pi++) {
+        if (points[pi].predicted && typeof points[pi].soc === "number") { firstPredicted = points[pi]; break; }
+      }
+      if (firstPredicted) endText += " ／ 残量 " + firstPredicted.soc + "%";
+      drawSeriesEndLabel(svg, pal, ex, ey, endText);
       var hoverGroup = el("g", { opacity: 0 });
       var crosshair = el("line", { x1: 0, x2: 0, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1 });
       var hoverDot = el("circle", { r: 4, fill: color, stroke: pal.surface, "stroke-width": 2 });
@@ -2777,7 +2832,9 @@
       return { label: fmtClockHm(p.fetchedAt), value: p[key], t: p.fetchedAt.getTime() };
     });
     (forecastSeries || []).forEach(function (f) {
-      data.push({ label: fmtClockHm(new Date(f.t)), value: f.value, t: f.t, predicted: true });
+      // soc(残量の予測%)はバッテリーの見通しから来る。グラフ右端のラベルに添えるため持ち越す。
+      data.push({ label: fmtClockHm(new Date(f.t)), value: f.value, t: f.t, predicted: true,
+        soc: typeof f.soc === "number" ? f.soc : undefined });
     });
     return data;
   }
@@ -2836,6 +2893,9 @@
     var batWindow = batForecast.length ? CHART_PAST_WINDOW_WITH_FORECAST_MS : undefined;
     var batSel = selectRecentForChart(s.points, function (p) { return typeof p.bat === "number"; }, batWindow);
     s.batChart.setData(buildSeriesWithForecast(batSel.points, "bat", batForecast));
+    // 残量の見通しは実測(発電W)を使うため、新しい実測が入ったら「持ち」の表示も出し直す。
+    // (これが無いと、起動直後にまだ実測が無くて見通しを出せなかった表示のままになる。)
+    updateBatteryHealth(site);
   }
 
   /* =====================================================================
@@ -4630,7 +4690,9 @@
         forecastState.fetchedAt = new Date();
         forecastState.error = null;
         predictionCache = {};
+        outlookCache = {};          // 予報が変わったので残量の見通しも作り直す
         refreshAllPredictionCharts();
+        refreshAllBatteryHealth();
         return hours.length;
       })
       .catch(function (err) {
@@ -4658,6 +4720,207 @@
   }
   function futureWeatherHours(fromMs, horizonMs) {
     return forecastState.hours.filter(function (h) { return h.t > fromMs && h.t <= fromMs + horizonMs; });
+  }
+
+  /* =====================================================================
+   * 太陽の位置と快晴時の日射量
+   * ---------------------------------------------------------------------
+   * 予報(Open-Meteo)は2日先までしか無いため、それより先は
+   * 「日の出・日の入りから決まる快晴時の日射量 × 直近の曇り具合」で補う。
+   * 10分ごとに計算し直すので、日の出・日の入りも都度その時刻のものを使う。
+   * ===================================================================== */
+  var DEG = Math.PI / 180;
+  // 太陽の高度[度]。天文の標準的な近似式(誤差は1分角以下で、この用途には十分)。
+  function solarAltitudeDeg(lat, lon, tMs) {
+    var n = tMs / 86400000 + 2440587.5 - 2451545.0;      // J2000からの経過日数
+    var L = (280.460 + 0.9856474 * n) % 360;             // 太陽の平均黄経
+    var g = ((357.528 + 0.9856003 * n) % 360) * DEG;     // 平均近点角
+    var lambda = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * DEG;  // 黄経
+    var eps = (23.439 - 0.0000004 * n) * DEG;            // 黄道傾斜角
+    var decl = Math.asin(Math.sin(eps) * Math.sin(lambda));                  // 赤緯
+    var ra = Math.atan2(Math.cos(eps) * Math.sin(lambda), Math.cos(lambda)); // 赤経
+    var gmst = (18.697374558 + 24.06570982441908 * n) % 24;                  // グリニッジ恒星時[時]
+    var ha = (gmst * 15 + lon) * DEG - ra;               // 時角
+    var sinAlt = Math.sin(lat * DEG) * Math.sin(decl) + Math.cos(lat * DEG) * Math.cos(decl) * Math.cos(ha);
+    return Math.asin(Math.max(-1, Math.min(1, sinAlt))) / DEG;
+  }
+  // 快晴時の全天日射量[W/m2]。Haurwitzの式(太陽高度だけで決まる素直なモデル)。
+  function clearSkyRadiation(lat, lon, tMs) {
+    var sinAlt = Math.sin(solarAltitudeDeg(lat, lon, tMs) * DEG);
+    if (sinAlt <= 0.01) return 0;
+    return 1098 * sinAlt * Math.exp(-0.059 / sinAlt);
+  }
+  // その日の日の出・日の入り(JST)。太陽高度が -0.833度(大気差と太陽の視半径ぶん。
+  // 暦の日の出・日の入りの定義)を跨ぐ時刻を二分探索で求める。
+  var SUN_HORIZON_DEG = -0.833;
+  function sunTimesFor(lat, lon, tMs) {
+    var jst = new Date(tMs + 9 * HOUR_MS);
+    var dayStart = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate()) - 9 * HOUR_MS;
+    var above = function (ms) { return solarAltitudeDeg(lat, lon, ms) > SUN_HORIZON_DEG; };
+    function cross(fromMs, toMs) {
+      var lo = fromMs, hi = toMs, loUp = above(lo);
+      for (var i = 0; i < 26; i++) {
+        var mid = (lo + hi) / 2;
+        if (above(mid) === loUp) lo = mid; else hi = mid;
+      }
+      return (lo + hi) / 2;
+    }
+    var noon = dayStart + 12 * HOUR_MS;
+    if (!above(noon)) return { sunrise: null, sunset: null };
+    return { sunrise: cross(dayStart, noon), sunset: cross(noon, dayStart + 24 * HOUR_MS) };
+  }
+  // 予報のある範囲で「実際の日射 ÷ 快晴時の日射」を出す。予報の先を補うときの曇り具合。
+  function cloudFactorFromForecast(lat, lon, nowMs) {
+    var sumF = 0, sumC = 0;
+    forecastState.hours.forEach(function (h) {
+      if (h.t < nowMs - 2 * 24 * HOUR_MS) return;
+      var cs = clearSkyRadiation(lat, lon, h.t);
+      if (cs < 80) return;                 // 朝夕の薄い時間帯は比が暴れるので使わない
+      sumF += Math.max(0, h.rad); sumC += cs;
+    });
+    if (sumC <= 0) return 0.6;             // 予報が無いときの控えめな既定値
+    return Math.max(0.1, Math.min(1.0, sumF / sumC));
+  }
+
+  /* =====================================================================
+   * バッテリー残量の見通し(10分ごとに計算し直す)
+   * ---------------------------------------------------------------------
+   *   1. 前夜0:00の残量(SOC)を起点にする(充電の下駄が抜けた素の電圧から換算した値)。
+   *   2. そこから「今」までは、実測の発電W − 平均消費W を積み上げて現在の残量を出す。
+   *   3. 「今」から先は、日射予報(2日先まで)＋日の出日の入りからの快晴モデル(それ以降)で
+   *      発電Wを見積もり、同じように積み上げる。
+   *   4. 下限(既定20%)に達するまでの時間を「持ち」として表示する。
+   *      7日先まで下限に達しなければ「継続可」とし、期間中の最低残量を添える。
+   * 発電Wは「日射[W/m2] × その拠点の実測から求めた係数」。係数は predictPvSeries と同じ
+   * 求め方(原点を通る比例)で、過去の発電実績そのものから決まる。
+   * ===================================================================== */
+  var OUTLOOK_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;   // 見通しを立てる先(これを超えたら「継続可」)
+  var OUTLOOK_STEP_MS = 10 * 60 * 1000;               // 10分刻み
+  var OUTLOOK_REFRESH_MS = 10 * 60 * 1000;            // 10分ごとに計算し直す
+  var OUTLOOK_V_NOM = 12.5;                           // Ah↔Wh の換算に使う公称電圧
+  var OUTLOOK_SURFACE_TAU_MS = 3 * 60 * 60 * 1000;    // 表面電荷(充電中の電圧の下駄)が抜ける時定数
+  var outlookCache = {};
+  // 残量[%] → 休止時の開回路電圧。OCV表の逆引き。
+  function voltageFromSoc(pct) {
+    var t = BATTERY_OCV_TABLE_CLIENT;
+    if (pct <= t[0][1]) return t[0][0];
+    if (pct >= t[t.length - 1][1]) return t[t.length - 1][0];
+    for (var i = 1; i < t.length; i++) {
+      if (pct <= t[i][1]) {
+        var lo = t[i - 1], hi = t[i];
+        return lo[0] + (pct - lo[1]) / (hi[1] - lo[1]) * (hi[0] - lo[0]);
+      }
+    }
+    return t[t.length - 1][0];
+  }
+  function socFromVoltage(v) {
+    var t = BATTERY_OCV_TABLE_CLIENT;
+    if (!isFinite(v)) return null;
+    if (v <= t[0][0]) return 0;
+    if (v >= t[t.length - 1][0]) return 100;
+    for (var i = 1; i < t.length; i++) {
+      if (v <= t[i][0]) {
+        var lo = t[i - 1], hi = t[i];
+        return lo[1] + (v - lo[0]) / (hi[0] - lo[0]) * (hi[1] - lo[1]);
+      }
+    }
+    return 100;
+  }
+  // 発電W = 係数 × 日射[W/m2]。過去の実測(発電Wと予報日射)から原点を通る比例で求める。
+  function pvCoefficient(site) {
+    var s = siteStates[site.id];
+    if (!s || !forecastState.hours.length) return null;
+    var sxy = 0, sxx = 0, n = 0;
+    s.points.filter(function (p) { return typeof p.pv === "number"; }).slice(-600).forEach(function (p) {
+      var w = weatherHourAt(p.fetchedAt.getTime());
+      if (!w || !isFinite(w.rad) || w.rad < 20) return;
+      sxy += w.rad * p.pv; sxx += w.rad * w.rad; n++;
+    });
+    if (n < MIN_POINTS_FOR_REGRESSION || sxx <= 0) return null;
+    var k = sxy / sxx;
+    return (isFinite(k) && k > 0) ? k : null;
+  }
+  // 任意の時刻の日射[W/m2]。予報があればそれを、無ければ快晴モデル×曇り具合を使う。
+  function radiationAt(lat, lon, tMs, cloudFactor) {
+    var w = weatherHourAt(tMs);
+    if (w && isFinite(w.rad)) return Math.max(0, w.rad);
+    return clearSkyRadiation(lat, lon, tMs) * cloudFactor;
+  }
+  function batteryOutlook(site) {
+    var hit = outlookCache[site.id];
+    // 出せなかった結果(null)はキャッシュしない。予報や実効容量がまだ届いていないだけの
+    // ことが多く、キャッシュしてしまうと届いたあとも10分間そのままになってしまう。
+    if (hit && hit.value && Date.now() - hit.at < OUTLOOK_REFRESH_MS) return hit.value;
+    var value = computeBatteryOutlook(site);
+    if (value) outlookCache[site.id] = { at: Date.now(), value: value };
+    return value;
+  }
+  function computeBatteryOutlook(site) {
+    var e = batteryHealthEntry(site.id);
+    var s = siteStates[site.id];
+    if (!e || e.mains || typeof e.capacityAh !== "number" || typeof e.nightA !== "number" || !s) return null;
+    var k = pvCoefficient(site);
+    if (k === null) return null;
+    var lat = typeof site.lat === "number" ? site.lat : WEATHER_LAT;
+    var lon = typeof site.lon === "number" ? site.lon : WEATHER_LON;
+    var capWh = e.capacityAh * OUTLOOK_V_NOM;
+    var loadW = e.nightA * OUTLOOK_V_NOM;
+    var nowMs = Date.now();
+    var reserve = batteryHealthState.reserveSocPct;
+
+    // --- 起点: 直近の0:00の残量から「今」までを実測の発電で積み上げる ---
+    var jst = new Date(nowMs + 9 * HOUR_MS);
+    var midnight = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate()) - 9 * HOUR_MS;
+    if (typeof e.socPct !== "number") return null;
+    var soc = e.socPct;
+    var meas = s.points.filter(function (p) { return p.fetchedAt.getTime() >= midnight && typeof p.pv === "number"; })
+      .sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+    for (var i = 1; i < meas.length; i++) {
+      var dtH = (meas[i].fetchedAt - meas[i - 1].fetchedAt) / HOUR_MS;
+      if (!(dtH > 0) || dtH > 1) continue;
+      var pvAvg = (meas[i].pv + meas[i - 1].pv) / 2;
+      soc += (pvAvg - loadW) * dtH / capWh * 100;
+    }
+    soc = Math.max(0, Math.min(100, soc));
+    var socNow = soc;
+    // 実測の電圧と、残量から求めた休止時電圧とのズレ(充電中の下駄)。グラフを実測から
+    // 滑らかに続けるために持ち越し、時定数3時間で抜けていくものとして扱う。
+    var lastBat = lastPointWith(s.points, "bat");
+    var offsetV = lastBat ? (lastBat.bat - voltageFromSoc(socNow)) : 0;
+    if (!isFinite(offsetV)) offsetV = 0;
+
+    // --- 先の見通し ---
+    var cloud = cloudFactorFromForecast(lat, lon, nowMs);
+    var series = [];
+    var hoursToReserve = null, minSoc = socNow, minSocAt = nowMs;
+    var steps = Math.round(OUTLOOK_HORIZON_MS / OUTLOOK_STEP_MS);
+    var stepH = OUTLOOK_STEP_MS / HOUR_MS;
+    for (var j = 1; j <= steps; j++) {
+      var t = nowMs + j * OUTLOOK_STEP_MS;
+      var pvW = k * radiationAt(lat, lon, t - OUTLOOK_STEP_MS / 2, cloud);
+      soc = Math.max(0, Math.min(100, soc + (pvW - loadW) * stepH / capWh * 100));
+      if (soc < minSoc) { minSoc = soc; minSocAt = t; }
+      if (hoursToReserve === null && soc <= reserve) hoursToReserve = j * stepH;
+      // グラフ用は12時間先まで(それ以降は描かないので持たない)
+      if (t - nowMs <= PREDICTION_HORIZON_MS) {
+        var decay = Math.exp(-(t - nowMs) / OUTLOOK_SURFACE_TAU_MS);
+        series.push({ t: t, soc: soc, v: voltageFromSoc(soc) + offsetV * decay });
+      }
+    }
+    var sun = sunTimesFor(lat, lon, nowMs);
+    return {
+      computedAt: nowMs, socNow: Math.round(socNow), minSocPct: Math.round(minSoc), minSocAt: minSocAt,
+      hoursToReserve: hoursToReserve, cloudFactor: Math.round(cloud * 100) / 100,
+      pvCoef: Math.round(k * 1000) / 1000, loadW: Math.round(loadW * 100) / 100,
+      sunrise: sun.sunrise, sunset: sun.sunset, series: series
+    };
+  }
+  // 10分ごとに計算し直して、カードとグラフへ反映する。
+  function refreshBatteryOutlook() {
+    outlookCache = {};
+    predictionCache = {};
+    refreshAllBatteryHealth();
+    refreshAllPredictionCharts();
   }
   // 連立正規方程式 (2変数の最小二乗法) を解く。解けない場合はnull。
   function solveLeastSquares2(samples) {
@@ -4779,6 +5042,19 @@
     return buckets.map(function (a) { return a.length ? medianOf(a) : null; });
   }
   function predictBatterySeries(site) {
+    // まずは残量の見通し(日射予報＋快晴モデル)から。表示している「持ち」と同じ計算なので、
+    // グラフの点線と右端の残量表示が必ず一致する。
+    var outlook = batteryOutlook(site);
+    if (outlook && outlook.series.length) {
+      return outlook.series.map(function (p) {
+        return { t: p.t, value: Math.round(p.v * 100) / 100, soc: Math.round(p.soc),
+          predicted: true, fitted: true };
+      });
+    }
+    // 見通しが出せない拠点(実効容量がまだ測れていない等)は、従来の日変化プロファイルで補う。
+    return predictBatterySeriesFromProfile(site);
+  }
+  function predictBatterySeriesFromProfile(site) {
     var s = siteStates[site.id];
     if (!s || !forecastState.hours.length) return [];
     var pts = s.points.filter(function (p) { return typeof p.bat === "number"; });
@@ -5477,9 +5753,11 @@
   // 失敗してもそのまま取得へ進む(loadServerLatestは失敗時も解決する)。
   loadServerLatest().then(function () { pollAll(); pollFastSites(); });
   setInterval(loadServerLatest, SERVER_LATEST_REFRESH_MS);
-  // バッテリーの劣化指標(サーバー側で1時間ごとに算出)
+  // バッテリーの実効容量(サーバー側で1時間ごとに算出)
   loadBatteryHealth();
   setInterval(loadBatteryHealth, BATTERY_HEALTH_REFRESH_MS);
+  // 残量の見通しは天気と実測で都度変わるため、10分ごとに計算し直す。
+  setInterval(refreshBatteryOutlook, OUTLOOK_REFRESH_MS);
   setInterval(pollAll, FETCH_INTERVAL_MS);
   setInterval(pollFastSites, FAST_POLL_INTERVAL_MS);
   updateRainfallSignal().then(refreshAllForecasts);
@@ -5597,6 +5875,14 @@
     // --- バッテリーの持ち(無日射で何時間もつか) ---
     loadBatteryHealth: loadBatteryHealth, fmtEndurance: fmtEndurance,
     enduranceClass: enduranceClass, updateBatteryHealth: updateBatteryHealth,
+    // --- 残量の見通し(日の出日の入り＋日射予報＋発電実績、10分ごと) ---
+    solarAltitudeDeg: solarAltitudeDeg, clearSkyRadiation: clearSkyRadiation, sunTimesFor: sunTimesFor,
+    cloudFactorFromForecast: cloudFactorFromForecast, pvCoefficient: pvCoefficient,
+    voltageFromSoc: voltageFromSoc, socFromVoltage: socFromVoltage,
+    batteryOutlook: batteryOutlook, computeBatteryOutlook: computeBatteryOutlook,
+    refreshBatteryOutlook: refreshBatteryOutlook,
+    OUTLOOK_HORIZON_MS: OUTLOOK_HORIZON_MS, OUTLOOK_STEP_MS: OUTLOOK_STEP_MS,
+    OUTLOOK_REFRESH_MS: OUTLOOK_REFRESH_MS,
     refreshAllBatteryHealth: refreshAllBatteryHealth,
     createHealthScatter: createHealthScatter,
     getHealthScatter: function () { return healthScatter; },
