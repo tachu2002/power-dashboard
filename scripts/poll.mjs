@@ -482,7 +482,7 @@ async function updateRainfallFile() {
 }
 
 /* =====================================================================
- * バッテリーの劣化指標(残存容量比)
+ * バッテリーの劣化指標(いちばん持ちが良い拠点を100%とした持ち率)
  * ---------------------------------------------------------------------
  * 考え方: 日射が無い夜間(既定 22:00〜翌4:00 JST)はバッテリーが放電するだけなので、
  * その間の電圧の下がり方が「容量の減り具合」を表す。ただし拠点ごとに機器構成が違い
@@ -500,15 +500,26 @@ async function updateRainfallFile() {
  *
  *   ズレ = 実測降下 ÷ (a + b × その拠点の消費W)
  *
- * 最後に基準拠点(北沢アンダーパス)のズレが±0%になるよう据え直す。
- *   差の割合 = 100 × (その拠点のズレ ÷ 基準拠点のズレ − 1)
- *   プラスなら同じ消費の拠点より速く落ちる(劣化が進んでいる)、マイナスなら持ちが良い。
+ * 最後に「ズレが最も小さい拠点(=いちばん持ちが良い拠点)」を基準に選び直し、
+ * バッテリーの持ちを100%としたパーセンテージで表す。
+ *   持ち[%] = 100 × (基準拠点のズレ ÷ その拠点のズレ)
+ *   いちばん良い拠点が100%で、悪い拠点はそれ以下になる(下限は5%で打ち切る)。
+ * 基準は固定せず毎回の実測から選び直すため、バッテリー交換の効果がそのまま順位に出る。
+ * 基準の候補は電源監視画面にカードがある拠点(BATTERY_HEALTH_CARD_IDS)のうち、
+ * 消費が小さすぎない(lowLoadでない)拠点に限る。消費が極端に小さい拠点はズレが実態から
+ * ずれやすく、そこが基準になると全拠点の数字が一斉に歪むためである。
  *
  * バッテリーは随時交換するため、過去数日の平均では交換直後の状態が見えない。
  * そこで**前夜1晩ぶんの実測だけ**を使い、毎日その日の朝以降に入れ替わるようにしている
  * (消費電力も同じ前夜の実測の中央値を使う)。
  * ===================================================================== */
-const BATTERY_HEALTH_REFERENCE_ID = "cam03";          // 北沢アンダーパス(この拠点を±0%とする)
+// 基準(=100%)に選べる拠点。電源監視画面にカードがある23拠点(index.htmlのPOWER_ORDERと同じ)。
+// 中継サーバーには他の拠点の消費電力も載っているが、画面に出ない拠点が基準になると
+// 「100%の拠点がどこにも表示されない」状態になるため、候補をここに限っている。
+const BATTERY_HEALTH_CARD_IDS = ["cam01", "cam02", "cam03", "cam04", "cam08", "cam09", "cam11", "cam12",
+  "cam13", "cam14", "cam36", "cam40", "cam41", "cam42", "cam43", "cam44", "cam45", "cam46", "cam47",
+  "cam52", "cam53", "cam54", "cam55"];
+const BATTERY_HEALTH_PCT_MIN = 5;                      // 持ち率の下限(%)。これ未満は5%で打ち切る
 const BATTERY_HEALTH_NIGHTS = 1;                       // 集計に使う夜数(前夜のみ)
 const BATTERY_HEALTH_NIGHT_START_H = 22;               // 夜間帯の開始(JST)
 const BATTERY_HEALTH_NIGHT_HOURS = 6;                  // 夜間帯の長さ(22:00→翌4:00)
@@ -524,7 +535,6 @@ const BATTERY_HEALTH_LOW_LOAD_W = 5;
 // 傾向線(降下 = a + b×消費W)を当てはめるのに最低限必要な拠点数。
 const BATTERY_HEALTH_MIN_FIT_SITES = 8;
 const BATTERY_HEALTH_REFRESH_MS = 60 * 60 * 1000;      // 再計算の間隔(1時間)
-const BATTERY_HEALTH_RANGE = [-90, 300];               // 表示する差の割合の範囲(%)
 
 // 最小二乗で y = a + b x を当てはめる。相関係数(r)と使った点数も返す。
 function fitLine(points) {
@@ -655,19 +665,21 @@ async function updateBatteryHealthFile(powerRows) {
     s.expectedV = (fit && s.usable) ? Math.round((fit.a + fit.b * s.loadW) * 10000) / 10000 : null;
     s.deviation = (s.expectedV && s.expectedV > 0) ? s.dropV / s.expectedV : null;
   });
-  const ref = stats[BATTERY_HEALTH_REFERENCE_ID];
-  const refDev = ref && ref.deviation;
+  // 基準(=100%)は固定せず、「ズレがいちばん小さい拠点」を毎回選び直す。
+  // まずはカードのある拠点で消費が小さすぎないものから、見つからなければ順に条件を緩める。
+  const referenceSiteId = pickBatteryHealthReference(stats);
+  const refDev = referenceSiteId ? stats[referenceSiteId].deviation : null;
   Object.keys(stats).forEach(function (id) {
     const s = stats[id];
-    if (!refDev || !s.deviation) { s.diffPct = null; s.ratio = null; return; }
-    const ratio = s.deviation / refDev;
+    if (!refDev || !s.deviation) { s.healthPct = null; s.ratio = null; return; }
+    const ratio = s.deviation / refDev;   // 1.0が基準。大きいほど速く落ちている
     s.ratio = Math.round(ratio * 1000) / 1000;
-    const pct = 100 * (ratio - 1);
-    s.diffPct = Math.round(Math.min(BATTERY_HEALTH_RANGE[1], Math.max(BATTERY_HEALTH_RANGE[0], pct)));
+    // 持ち率は基準のズレ÷自分のズレ。基準そのものは必ず100%になる。
+    s.healthPct = Math.round(Math.min(100, Math.max(BATTERY_HEALTH_PCT_MIN, 100 / ratio)));
   });
   await writeFile(BATTERY_HEALTH_JSON_PATH, JSON.stringify({
     generatedAt: new Date(nowMs).toISOString(),
-    referenceSiteId: BATTERY_HEALTH_REFERENCE_ID,
+    referenceSiteId: referenceSiteId,
     // 散布図に引く傾向線(降下 = a + b×消費W)と、当てはめの手応え(相関係数 r)
     fit: fit,
     nights: BATTERY_HEALTH_NIGHTS,
@@ -676,8 +688,26 @@ async function updateBatteryHealthFile(powerRows) {
     loadWByDate: loadWByDate,
     sites: stats
   }, null, 2) + "\n", "utf8");
-  const rated = Object.keys(stats).filter(function (id) { return typeof stats[id].diffPct === "number"; }).length;
-  return { skipped: false, sites: Object.keys(stats).length, rated: rated };
+  const rated = Object.keys(stats).filter(function (id) { return typeof stats[id].healthPct === "number"; }).length;
+  return { skipped: false, sites: Object.keys(stats).length, rated: rated, referenceSiteId: referenceSiteId };
+}
+// 「いちばん持ちが良い拠点」を基準に選ぶ。ズレ(deviation)が最小の拠点＝同じ消費の拠点より
+// 電圧が落ちにくい拠点である。候補は段階的に緩める:
+//   1) カードがあり、消費が小さすぎない拠点  2) カードがある拠点  3) 算出できた全拠点
+function pickBatteryHealthReference(stats) {
+  const ids = Object.keys(stats).filter(function (id) { return stats[id].deviation > 0; });
+  const tiers = [
+    ids.filter(function (id) { return BATTERY_HEALTH_CARD_IDS.indexOf(id) >= 0 && !stats[id].lowLoad; }),
+    ids.filter(function (id) { return BATTERY_HEALTH_CARD_IDS.indexOf(id) >= 0; }),
+    ids
+  ];
+  for (const tier of tiers) {
+    if (!tier.length) continue;
+    return tier.reduce(function (best, id) {
+      return stats[id].deviation < stats[best].deviation ? id : best;
+    }, tier[0]);
+  }
+  return null;
 }
 
 // ---- 画像アーカイブ(全46拠点、直近IMAGE_RETENTION_DAYS日分のみ保持) ----
@@ -1126,6 +1156,7 @@ export {
   WATER_RECENT_CSV_PATH, WATER_RECENT_WINDOW_MS,
   parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID, POWER_CSV_BASE_URL,
   RAINFALL_JSON_PATH, rainfallJsonUrl, parseRainfallJson, parseJstTime, MISHIMA_RAIN_OBS_CD13,
-  BATTERY_HEALTH_JSON_PATH, BATTERY_HEALTH_REFERENCE_ID, BATTERY_HEALTH_NIGHTS,
-  nightlyVoltageDrops, nightLoadWBySite, updateBatteryHealthFile, medianOf, fitLine, BATTERY_HEALTH_LOW_LOAD_W
+  BATTERY_HEALTH_JSON_PATH, BATTERY_HEALTH_CARD_IDS, BATTERY_HEALTH_NIGHTS, BATTERY_HEALTH_PCT_MIN,
+  nightlyVoltageDrops, nightLoadWBySite, updateBatteryHealthFile, medianOf, fitLine,
+  BATTERY_HEALTH_LOW_LOAD_W, pickBatteryHealthReference
 };
