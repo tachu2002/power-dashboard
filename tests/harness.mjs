@@ -66,7 +66,14 @@ export function buildHourly(opts) {
     const jst = new Date(now + h * 3600000 + 9 * 3600000);
     time.push(`${jst.getUTCFullYear()}-${p2(jst.getUTCMonth() + 1)}-${p2(jst.getUTCDate())}T${p2(jst.getUTCHours())}:00`);
     precipitation.push(opts.rain === false ? 0 : (h >= 2 && h <= 5 ? 3.0 : 0));
-    shortwave_radiation.push(Math.max(20, 500 - Math.abs(((h % 24) + 24) % 24 - 12) * 40));
+    if (opts.realisticSun) {
+      // 夜は0、日中は正午を頂点の山にする(残量の見通しの検証に使う)
+      const jh = jst.getUTCHours();
+      const peak = opts.peakRad ?? 700;
+      shortwave_radiation.push(jh >= 6 && jh <= 17 ? Math.round(peak * Math.cos((jh - 12) / 6 * Math.PI / 2)) : 0);
+    } else {
+      shortwave_radiation.push(Math.max(20, 500 - Math.abs(((h % 24) + 24) % 24 - 12) * 40));
+    }
     temperature_2m.push(25 + (h % 5));
     cloud_cover.push(40);
   }

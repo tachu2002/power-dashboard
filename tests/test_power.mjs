@@ -163,8 +163,10 @@ export async function run() {
   await page.close();
 
   /* ===== バッテリーの持ち(無日射で何時間もつか) ＋ カードのレイアウト ===== */
+  // 日射予報を落として「日射ゼロ時」の表示(見通しが出せないときの控え)を検証する。
+  // 予報込みの見通しそのものは test_forecast.mjs の f7-* で見る。
   const pageH = await newPage(null, {
-    nowMs: NOW, matsuhisaBody: NO_BAT_BODY,
+    nowMs: NOW, matsuhisaBody: NO_BAT_BODY, openMeteoStatus: 500,
     batteryHealth: buildBatteryHealth({ nowMs: NOW })
   });
   await openDashboard(pageH, () => {

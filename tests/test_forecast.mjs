@@ -3,7 +3,7 @@
 //  - 水位・バッテリー・発電の予測系列
 //  - 予測が「最新の実測値からの続き」になっていること(Phase Oの修正点)
 //  - グラフ右側が点線で描かれること
-import { setup, teardown, newPage, openDashboard, createReporter, buildHourly, buildPowerCsv } from "./harness.mjs";
+import { setup, teardown, newPage, openDashboard, createReporter, buildHourly, buildPowerCsv, buildBatteryHealth } from "./harness.mjs";
 
 const NOW = Date.now();
 
@@ -441,6 +441,147 @@ export async function run() {
   r.check("f5-b エラーが記録される", noFc.error, noFc);
   r.check("f5-c 予測が無くてもページ例外にはならない", page2.errMsgs().length === 0, page2.errMsgs());
   await page2.close();
+
+  /* ====== f7: 日の出・日の入り＋日射予報からの残量の見通し ====== */
+  // 太陽の位置は暦と数分以内で合っているか(三島 35.1216N / 138.9107E)
+  const page3 = await newPage(null, {
+    nowMs: NOW, hourly: buildHourly({ nowMs: NOW, realisticSun: true, rain: false }),
+    batteryHealth: buildBatteryHealth({ nowMs: NOW, sites: {
+      cam11: { capacityAh: 50, nightA: 1.0, socPct: 80 },    // 標準
+      cam03: { capacityAh: 20, nightA: 1.5, socPct: 30 },    // すぐ落ちる
+      cam41: { capacityAh: 40, nightA: 0.07, socPct: 90 },   // 余裕たっぷり
+      cam13: { fitR: 0.4 }                                   // 容量が出ていない
+    } })
+  });
+  await openDashboard(page3, () => {
+    const d = window.__dashboardDebug;
+    return d.getForecastState().hours.length > 0 && Object.keys(d.getBatteryHealthState().sites || {}).length > 0;
+  });
+  await page3.evaluate(() => window.__dashboardDebug.showView("power"));
+  await page3.waitForTimeout(900);
+  const sun = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const lat = 35.1216, lon = 138.9107;
+    const hm = (ms) => { const x = new Date(ms + 9 * 3600000);
+      return x.getUTCHours() * 60 + x.getUTCMinutes(); };
+    const at = (y, m, dd) => Date.UTC(y, m - 1, dd, 3, 0, 0);
+    const eq = d.sunTimesFor(lat, lon, at(2026, 3, 20));     // 春分: 暦は 5:49 / 17:56
+    const so = d.sunTimesFor(lat, lon, at(2026, 6, 21));     // 夏至: 暦は 4:31 / 19:00
+    const wi = d.sunTimesFor(lat, lon, at(2026, 12, 22));    // 冬至: 暦は 6:52 / 16:35
+    return {
+      eq: [hm(eq.sunrise), hm(eq.sunset)], so: [hm(so.sunrise), hm(so.sunset)], wi: [hm(wi.sunrise), hm(wi.sunset)],
+      radNight: d.clearSkyRadiation(lat, lon, Date.UTC(2026, 8, 27, 15, 0, 0)),   // JST 0時
+      radNoon: d.clearSkyRadiation(lat, lon, Date.UTC(2026, 8, 27, 3, 0, 0)),     // JST 12時
+      altNoon: d.solarAltitudeDeg(lat, lon, Date.UTC(2026, 8, 27, 3, 0, 0))
+    };
+  });
+  const near = (got, want, tol) => Math.abs(got - want) <= tol;
+  r.check("f7-a 春分の日の出・日の入りが暦と5分以内",
+    near(sun.eq[0], 5 * 60 + 49, 5) && near(sun.eq[1], 17 * 60 + 56, 5), sun.eq);
+  r.check("f7-b 夏至の日の出・日の入りが暦と5分以内",
+    near(sun.so[0], 4 * 60 + 31, 5) && near(sun.so[1], 19 * 60 + 0, 5), sun.so);
+  r.check("f7-c 冬至の日の出・日の入りが暦と5分以内",
+    near(sun.wi[0], 6 * 60 + 52, 5) && near(sun.wi[1], 16 * 60 + 35, 5), sun.wi);
+  r.check("f7-d 夜間の快晴日射はゼロ", sun.radNight === 0, sun.radNight);
+  r.check("f7-e 南中時の快晴日射と太陽高度が妥当",
+    sun.radNoon > 600 && sun.radNoon < 1000 && sun.altNoon > 45 && sun.altNoon < 60, sun);
+
+  // 残量↔電圧の換算(OCV表の往復)
+  const ocv = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    return { v: [d.voltageFromSoc(100), d.voltageFromSoc(50), d.voltageFromSoc(20), d.voltageFromSoc(0)],
+      s: [d.socFromVoltage(12.70), d.socFromVoltage(12.10), d.socFromVoltage(11.66)],
+      roundTrip: [35, 60, 85].map((p) => Math.round(d.socFromVoltage(d.voltageFromSoc(p)))) };
+  });
+  r.check("f7-f 残量→電圧→残量で元に戻る",
+    JSON.stringify(ocv.roundTrip) === JSON.stringify([35, 60, 85]), ocv);
+  r.check("f7-g 換算はOCV表どおり(12.70V=100% / 12.10V=50% / 11.66V=20%)",
+    JSON.stringify(ocv.s) === JSON.stringify([100, 50, 20]), ocv.s);
+
+  // 見通しそのもの
+  const look = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const S = d.SITE_CATALOG;
+    const o11 = d.computeBatteryOutlook(S.cam11);
+    const o03 = d.computeBatteryOutlook(S.cam03);
+    const o41 = d.computeBatteryOutlook(S.cam41);
+    const o13 = d.computeBatteryOutlook(S.cam13);
+    const pick = (o) => o && { h: o.hoursToReserve, minSoc: o.minSocPct, socNow: o.socNow,
+      len: o.series.length, first: o.series[0], last: o.series[o.series.length - 1],
+      sunrise: !!o.sunrise, cloud: o.cloudFactor, pvCoef: o.pvCoef, loadW: o.loadW };
+    // 日射を織り込んでいるか: 昼のコマの残量変化が、夜のコマより必ず上向きになっているか
+    // (発電量の大小は拠点によるので「増える」ことまでは求めず、夜より良いことを見る)
+    let dayAvg = null, nightAvg = null;
+    if (o11) {
+      const day = [], night = [];
+      for (let i = 1; i < o11.series.length; i++) {
+        const dsoc = o11.series[i].soc - o11.series[i - 1].soc;
+        const jh = new Date(o11.series[i].t + 9 * 3600000).getUTCHours();
+        (jh >= 8 && jh <= 15 ? day : (jh >= 20 || jh <= 4) ? night : []).push(dsoc);
+      }
+      const mean = (a) => a.length ? a.reduce((x, y) => x + y, 0) / a.length : null;
+      dayAvg = mean(day); nightAvg = mean(night);
+    }
+    return { o11: pick(o11), o03: pick(o03), o41: pick(o41), o13: o13, dayAvg, nightAvg,
+      stepMin: o11 && o11.series.length > 1 ? (o11.series[1].t - o11.series[0].t) / 60000 : null,
+      horizonH: o11 ? (o11.series[o11.series.length - 1].t - o11.computedAt) / 3600000 : null };
+  });
+  r.check("f7-h 10分刻みで12時間先まで見通す",
+    look.stepMin === 10 && look.horizonH >= 11.9 && look.horizonH <= 12.1, { step: look.stepMin, h: look.horizonH });
+  r.check("f7-i 日の出・日の入りと発電係数・曇り具合を持つ",
+    look.o11 && look.o11.sunrise && look.o11.pvCoef > 0 && look.o11.cloud > 0 && look.o11.loadW > 0, look.o11);
+  r.check("f7-j 昼は夜より残量の減りが小さい（日射を織り込んでいる）",
+    look.dayAvg === null || look.nightAvg === null || look.dayAvg > look.nightAvg,
+    { 昼: look.dayAvg, 夜: look.nightAvg });
+  r.check("f7-k 容量が小さく消費が大きい拠点は下限に達する見通しになる",
+    look.o03 && typeof look.o03.h === "number", look.o03);
+  r.check("f7-l 消費が極端に小さい拠点は下限に達しない（継続可）",
+    look.o41 && look.o41.h === null && look.o41.minSoc >= 20, look.o41);
+  r.check("f7-m 実効容量が出ていない拠点は見通しを出さない", look.o13 === null, look.o13);
+
+  // グラフの点線と右端ラベル
+  const chart = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const series = d.predictBatterySeries(d.SITE_CATALOG.cam11);
+    const svg = document.getElementById("pchart-bat-cam11").querySelector("svg");
+    const texts = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent);
+    return { hasSoc: series.length > 0 && typeof series[0].soc === "number",
+      endLabel: texts.find((t) => /V ／ 残量 \d+%/.test(t)) || null };
+  });
+  r.check("f7-n 予測の各コマが残量(%)を持つ", chart.hasSoc, chart.hasSoc);
+  r.check("f7-o グラフ右端に電圧と残量予測を並べて出す", !!chart.endLabel, chart.endLabel);
+
+  // 10分間はキャッシュし、明示的に更新すれば計算し直す
+  const outlookCacheCheck = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const a = d.batteryOutlook(d.SITE_CATALOG.cam11);
+    const b = d.batteryOutlook(d.SITE_CATALOG.cam11);
+    d.refreshBatteryOutlook();
+    const c = d.batteryOutlook(d.SITE_CATALOG.cam11);
+    return { same: a === b, renewed: c !== a, interval: d.OUTLOOK_REFRESH_MS };
+  });
+  r.check("f7-p 10分ごとに計算し直す設定になっている", outlookCacheCheck.interval === 10 * 60 * 1000, outlookCacheCheck.interval);
+  r.check("f7-q 同じ10分の間は使い回し、更新すると計算し直す",
+    outlookCacheCheck.same && outlookCacheCheck.renewed, outlookCacheCheck);
+  // カードの表示が見通しに切り替わっているか(予報が無いときの「日射ゼロ時」と書き分ける)
+  const cardText = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const read = (id) => { const s = d.siteStates[id];
+      return { text: s.healthValueEl.textContent, sub: s.healthSubEl.textContent,
+        title: s.healthValueEl.parentElement.title }; };
+    return { c11: read("cam11"), c41: read("cam41") };
+  });
+  r.check("f7-s 見通しが出せた拠点は「予報込み」と表示する",
+    cardText.c11.sub === "予報込み" || cardText.c11.sub.indexOf("最低") === 0, cardText.c11);
+  r.check("f7-t 下限に達しない拠点は「継続可」と最低残量を出す",
+    cardText.c41.text === "継続可" && cardText.c41.sub.indexOf("最低 ") === 0, cardText.c41);
+  r.check("f7-u titleに日の出・日の入りと発電の見積りを出す",
+    cardText.c11.title.indexOf("日の出") >= 0 && cardText.c11.title.indexOf("発電の見積り") >= 0
+    && cardText.c11.title.indexOf("10分ごとに計算し直しています") >= 0, cardText.c11.title.slice(0, 200));
+  r.check("f7-v 日射ゼロの場合の値も併記する",
+    cardText.c11.title.indexOf("日射ゼロが続いた場合") >= 0, cardText.c11.title.slice(0, 200));
+  r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
+  await page3.close();
 
   return r.finish();
 }
