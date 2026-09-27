@@ -1650,6 +1650,22 @@
     return "";
   }
   function batteryHealthEntry(siteId) { return batteryHealthState.sites[siteId] || null; }
+  /* 「もう使えない」とみなす下限は拠点ごとに違う(BATTERY_EMPTY_VOLTAGE_OVERRIDE)。
+     北沢アンダーパス 9.5V / 多呂樋管・梅名樋管2号・芝橋 10.5V / 既定 11.5V。
+     持ち時間はこの電圧に達するまでで測る。以前は全拠点一律に残量20%(=11.66V)で
+     打ち切っていたため、下限の低い拠点(北沢など)の持ち時間が実態より大幅に短く出ていた。 */
+  function reserveSocFor(siteId) {
+    var v = batteryEmptyVoltageFor(siteId);
+    var pct = socFromVoltage(v);
+    return typeof pct === "number" ? pct : 20;
+  }
+  // 日射がゼロのまま続いた場合に、その拠点の下限まで何時間もつか。
+  function noSunHoursFor(siteId, e) {
+    if (!e || typeof e.capacityAh !== "number" || typeof e.socPct !== "number"
+      || typeof e.nightA !== "number" || !(e.nightA > 0.01)) return null;
+    var usable = e.capacityAh * Math.max(0, e.socPct - reserveSocFor(siteId)) / 100;
+    return Math.round(usable / e.nightA * 10) / 10;
+  }
   // 見通しの補助表示。時刻は「今日 18:20」「明日 06:10」「9/30 12:00」のように出す。
   function fmtOutlookWhen(tMs) {
     var d = new Date(tMs + 9 * HOUR_MS), now = new Date(Date.now() + 9 * HOUR_MS);
@@ -1677,7 +1693,8 @@
     var s = siteStates[site.id];
     if (!s || !s.healthValueEl) return;
     var e = batteryHealthEntry(site.id);
-    var hours = e && typeof e.enduranceH === "number" ? e.enduranceH : null;
+    // サーバー側の enduranceH は一律20%下限のため使わず、拠点ごとの下限で出し直す。
+    var hours = noSunHoursFor(site.id, e);
     var text, cls, sub, title;
     if (!e) {
       text = "—"; cls = "muted"; sub = "データなし";
@@ -1706,18 +1723,18 @@
         // 予報や発電実績がまだ足りない間は、日射ゼロの前提の値を出しておく
         text = fmtEndurance(hours); cls = enduranceClass(hours); sub = "日射ゼロ時";
         title = "日射がゼロのまま続いた場合、残量 " + e.socPct + "% から下限 " +
-          batteryHealthState.reserveSocPct + "% まで " + fmtEndurance(hours) + " もちます。\n" + base +
+          batteryEmptyVoltageFor(site.id).toFixed(2) + "V まで " + fmtEndurance(hours) + " もちます。\n" + base +
           "\n（日射予報または発電実績がまだ足りないため、予報込みの見通しは出せていません）";
       } else if (o.hoursToReserve === null) {
         text = "継続可"; cls = "ok"; sub = "最低 " + o.minSocPct + "%";
-        title = "日射予報を織り込むと、7日先まで下限 " + batteryHealthState.reserveSocPct +
-          "% に達しません（期間中の最低は " + o.minSocPct + "%／" + fmtOutlookWhen(o.minSocAt) + "）。\n" +
+        title = "日射予報を織り込むと、7日先まで下限 " + o.reserveV.toFixed(2) +
+          "V に達しません（期間中の最低は 残量" + o.minSocPct + "%／" + fmtOutlookWhen(o.minSocAt) + "）。\n" +
           "日射ゼロが続いた場合は " + fmtEndurance(hours) + " です。\n" + outlookDetail(o, e);
       } else {
         text = fmtEndurance(o.hoursToReserve); cls = enduranceClass(o.hoursToReserve); sub = "予報込み";
         title = "日射予報を織り込むと、" + fmtEndurance(o.hoursToReserve) + "後（" +
           fmtOutlookWhen(o.computedAt + o.hoursToReserve * HOUR_MS) + "）に下限 " +
-          batteryHealthState.reserveSocPct + "% に達する見通しです。\n" +
+          o.reserveV.toFixed(2) + "V に達する見通しです。\n" +
           "日射ゼロが続いた場合は " + fmtEndurance(hours) + " です。\n" + outlookDetail(o, e);
       }
     }
@@ -1803,8 +1820,9 @@
         "font-size": 10, "font-family": FONT, transform: "rotate(-90 11 " + (marginTop + plotH / 2) + ")" });
       yTitle.textContent = "実効容量（Ah）"; svg.appendChild(yTitle);
 
-      // 等持ち時間の線。満充電(100%)から下限まで使ったときに、ちょうどその時間もつ組み合わせ。
-      var usableFrac = Math.max(0.1, (100 - batteryHealthState.reserveSocPct) / 100);
+      // 等持ち時間の線。満充電から空まで使ったときに、ちょうどその時間もつ組み合わせ。
+      // 下限は拠点ごとに違うため、線の基準は「満充電から空まで使った場合」に統一する。
+      var usableFrac = 1;
       [{ h: 12, c: pal.critical || "#d03b3b" }, { h: 24, c: pal.warn || "#c98a00" }, { h: 48, c: pal.ok || "#2e9e63" }]
         .forEach(function (iso) {
           var d = "", drawn = false;
@@ -2198,14 +2216,18 @@
       var lastIdx = split.boundaryIndex > 0 ? split.boundaryIndex - 1 : n - 1;
       var ex = xAt(lastIdx), ey = yAt(vals[lastIdx]);
       svg.appendChild(el("circle", { cx: ex, cy: ey, r: 4, fill: color, stroke: pal.surface, "stroke-width": 2 }));
-      // 端点ラベルは電圧に加えて、同じ時点の残量予測(%)も出す。
-      // 予測の1コマ目が持つ残量が「これからどうなるか」の入口なので、それを添える。
+      // 端点ラベルは電圧に加えて「下限まであと何時間もつか」を出す。
+      // (残量%は電池マークで見られるので、グラフ側は時間で示す。)
       var endText = vals[lastIdx].toFixed(2) + " " + valueUnit;
       var firstPredicted = null;
       for (var pi = 0; pi < points.length; pi++) {
-        if (points[pi].predicted && typeof points[pi].soc === "number") { firstPredicted = points[pi]; break; }
+        if (points[pi].predicted && (typeof points[pi].remainH === "number" || points[pi].sustain)) {
+          firstPredicted = points[pi]; break;
+        }
       }
-      if (firstPredicted) endText += " ／ 残量 " + firstPredicted.soc + "%";
+      if (firstPredicted) {
+        endText += firstPredicted.sustain ? " ／ 継続可" : " ／ あと " + fmtEndurance(firstPredicted.remainH);
+      }
       drawSeriesEndLabel(svg, pal, ex, ey, endText);
       var hoverGroup = el("g", { opacity: 0 });
       var crosshair = el("line", { x1: 0, x2: 0, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1 });
@@ -2868,7 +2890,8 @@
     (forecastSeries || []).forEach(function (f) {
       // soc(残量の予測%)はバッテリーの見通しから来る。グラフ右端のラベルに添えるため持ち越す。
       data.push({ label: fmtClockHm(new Date(f.t)), value: f.value, t: f.t, predicted: true,
-        soc: typeof f.soc === "number" ? f.soc : undefined });
+        soc: typeof f.soc === "number" ? f.soc : undefined,
+        remainH: f.remainH, sustain: f.sustain });
     });
     return data;
   }
@@ -4900,7 +4923,8 @@
     var capWh = e.capacityAh * OUTLOOK_V_NOM;
     var loadW = e.nightA * OUTLOOK_V_NOM;
     var nowMs = Date.now();
-    var reserve = batteryHealthState.reserveSocPct;
+    var reserve = reserveSocFor(site.id);          // 拠点ごとの下限電圧を残量に換算したもの
+    var reserveV = batteryEmptyVoltageFor(site.id);
 
     // --- 起点: 今日の0:00の残量に、そこからの収支[Wh]を足して「今」の残量を出す ---
     // 収支は中継サーバーの積算値(発電Wh − 消費Wh)そのものなので、発電の取りこぼしがない。
@@ -4953,6 +4977,7 @@
     var sun = sunTimesFor(lat, lon, nowMs);
     return {
       computedAt: nowMs, socNow: Math.round(socNow), socSource: socSource,
+      reserveSocPct: Math.round(reserve), reserveV: reserveV,
       minSocPct: Math.round(minSoc), minSocAt: minSocAt, balWhToday: today ? today.balWh : null,
       hoursToReserve: hoursToReserve, cloudFactor: Math.round(cloud * 100) / 100,
       pvCoef: Math.round(k * 1000) / 1000, loadW: Math.round(loadW * 100) / 100,
@@ -5090,9 +5115,12 @@
     // グラフの点線と右端の残量表示が必ず一致する。
     var outlook = batteryOutlook(site);
     if (outlook && outlook.series.length) {
-      return outlook.series.map(function (p) {
-        return { t: p.t, value: Math.round(p.v * 100) / 100, soc: Math.round(p.soc),
+      return outlook.series.map(function (p, i) {
+        var row = { t: p.t, value: Math.round(p.v * 100) / 100, soc: Math.round(p.soc),
           predicted: true, fitted: true };
+        // グラフ右端のラベル用。1コマ目に「下限まであと何時間か」を持たせる。
+        if (i === 0) { row.remainH = outlook.hoursToReserve; row.sustain = outlook.hoursToReserve === null; }
+        return row;
       });
     }
     // 見通しが出せない拠点(実効容量がまだ測れていない等)は、従来の日変化プロファイルで補う。
@@ -5921,6 +5949,7 @@
     loadServerLatest: loadServerLatest, serverLatestWaterReading: serverLatestWaterReading,
     // --- バッテリーの持ち(無日射で何時間もつか) ---
     loadBatteryHealth: loadBatteryHealth, fmtEndurance: fmtEndurance,
+    reserveSocFor: reserveSocFor, noSunHoursFor: noSunHoursFor,
     enduranceClass: enduranceClass, updateBatteryHealth: updateBatteryHealth,
     // --- 残量の見通し(日の出日の入り＋日射予報＋発電実績、10分ごと) ---
     solarAltitudeDeg: solarAltitudeDeg, clearSkyRadiation: clearSkyRadiation, sunTimesFor: sunTimesFor,
