@@ -315,14 +315,24 @@ function parsePowerCsv(text) {
     const pvW = parseFloat(cols[idx["pv_w"]]);
     const batMv = parseFloat(cols[idx["bat_mv"]]);
     const loadW = parseFloat(cols[idx["load_w"]]);
+    const chgMa = parseFloat(cols[idx["bat_charge_ma"]]);
+    const disMa = parseFloat(cols[idx["bat_discharge_ma"]]);
+    const genWh = parseFloat(cols[idx["gen_wh_today"]]);
+    const useWh = parseFloat(cols[idx["load_wh_today"]]);
     if (!isFinite(pvW) && !isFinite(batMv)) continue;
     out.push({
       siteId: siteId,
       fetchedAt: ts,
       pv: isFinite(pvW) ? pvW : null,
       bat: isFinite(batMv) ? batMv / 1000 : null,
-      // 消費(負荷)の瞬時電力[W]。バッテリー劣化の指標を出すのに使う(拠点ごとに機器構成が違うため)。
-      loadW: isFinite(loadW) ? loadW : null
+      // 消費(負荷)の瞬時電力[W]。
+      loadW: isFinite(loadW) ? loadW : null,
+      // バッテリーの実際の充放電電流[mA]。「夜間に何Ah取り出したか」がこれで分かる。
+      chgMa: isFinite(chgMa) ? chgMa : null,
+      disMa: isFinite(disMa) ? disMa : null,
+      // 当日ぶんの積算[Wh]。1日の収支(発電−消費)から実効容量を出すのに使う。
+      genWh: isFinite(genWh) ? genWh : null,
+      useWh: isFinite(useWh) ? useWh : null
     });
   }
   out.sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
@@ -482,64 +492,90 @@ async function updateRainfallFile() {
 }
 
 /* =====================================================================
- * バッテリーの劣化指標(いちばん持ちが良い拠点を100%とした持ち率)
+ * バッテリーの持ち(無日射で何時間もつか)
  * ---------------------------------------------------------------------
- * 考え方: 日射が無い夜間(既定 22:00〜翌4:00 JST)はバッテリーが放電するだけなので、
- * その間の電圧の下がり方が「容量の減り具合」を表す。ただし拠点ごとに機器構成が違い
- * 消費電力が異なるため、そのままでは比べられない。中継サーバー(mini.lhlab-vps.net)の
- * 「消費(負荷)」の瞬時電力[W]で割って、"1Wあたりの電圧降下" にそろえてから比較する。
+ * 【以前の方式と、なぜ変えたか】
+ * 以前は「夜間の電圧降下 ÷ 消費W」を全拠点の傾向線と比べていた。しかし中継サーバーの
+ * 実測(2026-09-27・7夜)を見ると、祇園大橋は毎晩ほぼ同じ 5.92〜6.17Ah を取り出しているのに、
+ * 電圧降下は 0.048〜0.101V と2倍以上ばらついていた。表面電荷の抜け方と開始SOCで変わるだけで、
+ * バッテリーの状態をほとんど表していない。つまり天候を測っているような指標だった。
+ * また「持ち」を実際に決めているのは主に消費電流で、こも池 0.073A に対し祇園大橋 1.027A と
+ * 14倍の差がある。旧指標はこも池を62%(悪い側)と出していたが、実際は最も余裕がある。
  *
- * ただし「降下量 ÷ 消費W」で単純に割ると、消費が小さい拠点で破綻する。電圧降下には消費に
- * 比例しない下駄(気温・自己放電・測定の丸め)があり、消費が小さいほどその影響が相対的に
- * 大きくなるためである(2026-09-27実測: こも池0.6Wで+1729%という非現実的な値になった)。
+ * 【新しい考え方】
+ * 中継サーバーのCSVには、使っていなかった次の列がある。
+ *   bat_charge_ma / bat_discharge_ma … バッテリーの実際の充放電電流
+ *   gen_wh_today  / load_wh_today    … 当日の発電量・消費量[Wh]
+ * これを使って、次の2つを実測する。
  *
- * そこで、全拠点の実測から次の直線を最小二乗で当てはめ、その予測からのズレで比べる。
+ *  (1) 実効容量[Ah]
+ *      1日の収支(発電−消費)[Wh]だけバッテリーに出入りすると、翌日の「0:00基準電圧」が
+ *      どれだけ動くか。その比が容量である。
+ *        翌日の0時電圧 − 当日の0時電圧 = α + β × その日の収支[Wh]
+ *        容量[Wh/V] = 1/β       容量[Ah] = 容量[Wh/V] ÷ 平均電圧 × (満充電V − 空V)
+ *      前日との差分で見るので、積算値の系統的なズレはαに吸収される。
+ *      0:00は日没から5時間ほど経ち充電の下駄が抜けているため、素の電圧として使える
+ *      (中継サーバー自身も「0:00基準の電圧が下がる→劣化のサイン」と説明している)。
+ *      28日ぶんで相関 r=0.85〜0.96、容量は標準的な拠点で38〜52Ah、小型拠点で14〜24Ahと
+ *      物理的に筋の通る値に収束することを確認済み(2026-09-27)。
  *
- *   夜間降下[V] = a + b × 消費[W]      (2026-09-27実測: a=0.0625V, b=0.00190V/W, r=0.50)
- *     a …… 消費に依存しない下駄   b …… 負荷1Wあたりの降下
+ *  (2) 夜間の平均消費電流[A]
+ *      日射ゼロ(pv_w<0.5)の時間帯に bat_discharge_ma − bat_charge_ma を積分して時間で割る。
+ *      瞬時Wと違い、カメラのON/OFFをならした実効値になる。
  *
- *   ズレ = 実測降下 ÷ (a + b × その拠点の消費W)
+ * 【表示する指標】
+ *      持ち[h] = 実効容量[Ah] × (現在のSOC% − 下限SOC%) ÷ 100 ÷ 夜間平均電流[A]
+ *      = 「日射ゼロが続いたとき、下限(既定20%)まで何時間もつか」。
+ *      容量と消費の両方が1つの数字に入り、そのまま運用判断に使える。
  *
- * 最後に「ズレが最も小さい拠点(=いちばん持ちが良い拠点)」を基準に選び直し、
- * バッテリーの持ちを100%としたパーセンテージで表す。
- *   持ち[%] = 100 × (基準拠点のズレ ÷ その拠点のズレ)
- *   いちばん良い拠点が100%で、悪い拠点はそれ以下になる(下限は5%で打ち切る)。
- * 基準は固定せず毎回の実測から選び直すため、バッテリー交換の効果がそのまま順位に出る。
- * 基準の候補は電源監視画面にカードがある拠点(BATTERY_HEALTH_CARD_IDS)のうち、
- * 消費が小さすぎない(lowLoadでない)拠点に限る。消費が極端に小さい拠点はズレが実態から
- * ずれやすく、そこが基準になると全拠点の数字が一斉に歪むためである。
- *
- * バッテリーは随時交換するため、過去数日の平均では交換直後の状態が見えない。
- * そこで**前夜1晩ぶんの実測だけ**を使い、毎日その日の朝以降に入れ替わるようにしている
- * (消費電力も同じ前夜の実測の中央値を使う)。
+ * 【対象外】
+ *      常時電源の拠点(0時電圧が常に13.2Vを超える。大場ポンプ場・島田浄水場・
+ *      徳倉下水路・神川下水路)はバッテリー運用をしていないので「常時電源」と表示する。
+ *      回帰の相関が低い拠点(r<0.6)は日数が足りないだけなので「測定中」と表示する。
  * ===================================================================== */
-// 基準(=100%)に選べる拠点。電源監視画面にカードがある23拠点(index.htmlのPOWER_ORDERと同じ)。
-// 中継サーバーには他の拠点の消費電力も載っているが、画面に出ない拠点が基準になると
-// 「100%の拠点がどこにも表示されない」状態になるため、候補をここに限っている。
-const BATTERY_HEALTH_CARD_IDS = ["cam01", "cam02", "cam03", "cam04", "cam08", "cam09", "cam11", "cam12",
-  "cam13", "cam14", "cam36", "cam40", "cam41", "cam42", "cam43", "cam44", "cam45", "cam46", "cam47",
-  "cam52", "cam53", "cam54", "cam55"];
-const BATTERY_HEALTH_PCT_MIN = 5;                      // 持ち率の下限(%)。これ未満は5%で打ち切る
-const BATTERY_HEALTH_NIGHTS = 1;                       // 集計に使う夜数(前夜のみ)
-const BATTERY_HEALTH_NIGHT_START_H = 22;               // 夜間帯の開始(JST)
-const BATTERY_HEALTH_NIGHT_HOURS = 6;                  // 夜間帯の長さ(22:00→翌4:00)
-const BATTERY_HEALTH_MIN_SAMPLES = 20;                 // 1夜あたりに必要な実測点数
-const BATTERY_HEALTH_MIN_NIGHTS = 1;                   // 指標を出すのに必要な夜数
-const BATTERY_HEALTH_MIN_DROP_V = 0.005;               // これ未満の降下は0扱い(ゼロ除算回避)
-const BATTERY_HEALTH_MIN_LOAD_W = 0.05;                // これ未満の消費は信用しない
-// 消費がこれより小さい拠点は「参考値」として区別する。
-// 消費が極端に小さいと、電圧降下が消費に比例しなくなる(気温・自己放電・バッテリー容量差の影響が
-// 相対的に大きくなる)ため、そのまま割り算すると実態より大幅に劣化して見える。
-// 実測(2026-09-27): 祇園大橋12.1Wに対し、こも池0.6W・竹倉用水路4.2W・ほたるの里3.0W。
-const BATTERY_HEALTH_LOW_LOAD_W = 5;
-// 傾向線(降下 = a + b×消費W)を当てはめるのに最低限必要な拠点数。
-const BATTERY_HEALTH_MIN_FIT_SITES = 8;
-const BATTERY_HEALTH_REFRESH_MS = 60 * 60 * 1000;      // 再計算の間隔(1時間)
+const POWER_DAILY_JSON_PATH = path.join(DATA_DIR, "power_daily.json");
+const POWER_DAILY_KEEP_DAYS = 45;        // 日次集計を残す日数
+const POWER_DAILY_BACKFILL_PER_RUN = 3;  // 1回の実行で遡って取りに行く日数(負荷を分散する)
+const BATTERY_NIGHT_END_H = 4;           // 夜間帯の終わり(JST)。0:00〜4:00を使う
+const BATTERY_V0_WINDOW_MIN = 40;        // 「0時基準電圧」を平均する幅(分)
+const BATTERY_MIN_DAYS = 10;             // 容量の回帰に必要な日数
+const BATTERY_MIN_R = 0.6;               // これ未満は「測定中」扱い
+const BATTERY_MAINS_V = 13.2;            // 0時電圧がこれを超え続ける拠点は常時電源
+const BATTERY_MAINS_RATIO = 0.8;
+const BATTERY_RESERVE_SOC = 20;          // ここまでを「使える量」とする(鉛蓄電池の推奨下限)
+const BATTERY_MIN_NIGHT_A = 0.01;        // これ未満の電流では持ち時間を出さない
+const BATTERY_CAP_RANGE_AH = [3, 200];   // 現実的な容量の範囲。外れたら測定中扱い
+const BATTERY_HEALTH_REFRESH_MS = 60 * 60 * 1000;   // 再計算の間隔(1時間)
+// 鉛蓄電池(12V)の休止時開回路電圧 → 残量(SOC)。0:00は充電の下駄が抜けているのでこの表が使える。
+const BATTERY_OCV_TABLE = [
+  [11.36, 0], [11.51, 10], [11.66, 20], [11.81, 30], [11.96, 40], [12.10, 50],
+  [12.24, 60], [12.37, 70], [12.50, 80], [12.62, 90], [12.70, 100]
+];
+const BATTERY_OCV_SPAN_V = BATTERY_OCV_TABLE[BATTERY_OCV_TABLE.length - 1][0] - BATTERY_OCV_TABLE[0][0];
 
-// 最小二乗で y = a + b x を当てはめる。相関係数(r)と使った点数も返す。
+function socFromRestingVoltage(v) {
+  if (!isFinite(v)) return null;
+  const t = BATTERY_OCV_TABLE;
+  if (v <= t[0][0]) return 0;
+  if (v >= t[t.length - 1][0]) return 100;
+  for (let i = 1; i < t.length; i++) {
+    if (v <= t[i][0]) {
+      const lo = t[i - 1], hi = t[i];
+      return lo[1] + (v - lo[0]) / (hi[0] - lo[0]) * (hi[1] - lo[1]);
+    }
+  }
+  return 100;
+}
+function medianOf(list) {
+  if (!list.length) return null;
+  const s = list.slice().sort(function (a, b) { return a - b; });
+  const mid = Math.floor(s.length / 2);
+  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+}
+// 最小二乗で y = a + b x。相関係数(r)と点数も返す。
 function fitLine(points) {
   const pts = points.filter(function (p) { return isFinite(p.x) && isFinite(p.y); });
-  if (pts.length < BATTERY_HEALTH_MIN_FIT_SITES) return null;
+  if (pts.length < 3) return null;
   const n = pts.length;
   const mx = pts.reduce(function (a, p) { return a + p.x; }, 0) / n;
   const my = pts.reduce(function (a, p) { return a + p.y; }, 0) / n;
@@ -554,160 +590,171 @@ function fitLine(points) {
     sites: n
   };
 }
-function medianOf(list) {
-  if (!list.length) return null;
-  const s = list.slice().sort(function (a, b) { return a - b; });
-  const mid = Math.floor(s.length / 2);
-  return s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
-}
-// history.csv から、指定時刻以降のBAT(V)の時系列を拠点ごとに取り出す。
-async function readBatteryHistory(sinceMs) {
-  let text = "";
-  try {
-    text = await readFile(HISTORY_CSV_PATH, "utf8");
-  } catch (err) {
-    return {};
-  }
+
+// 中継サーバーの1日ぶんのCSV行から、拠点ごとの日次集計を作る。
+//   v0     … 0:00〜0:40 JST の平均電圧(充電の下駄が抜けた素の電圧)
+//   balWh  … その日の収支(発電Wh − 消費Wh)。積算の最終値どうしの差
+//   nightA … 0:00〜4:00 JST の平均放電電流[A]
+//   vmin   … その日の最低電圧
+function summarizePowerDay(rows) {
+  const bySite = {};
+  rows.forEach(function (r) {
+    if (!r.siteId) return;
+    (bySite[r.siteId] = bySite[r.siteId] || []).push(r);
+  });
   const out = {};
-  const lines = text.split(/\r?\n/);
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i];
-    if (!line) continue;
-    const cols = line.split(",");
-    if (cols.length < CSV_COLUMNS) continue;
-    const bat = parseFloat(cols[4]);
-    if (!isFinite(bat)) continue;
-    const t = Date.parse(cols[1]);
-    if (!isFinite(t) || t < sinceMs) continue;
-    (out[cols[0]] = out[cols[0]] || []).push({ t: t, v: bat });
-  }
-  Object.keys(out).forEach(function (id) { out[id].sort(function (a, b) { return a.t - b.t; }); });
-  return out;
-}
-// 夜間帯ごとの電圧降下量[V]。最小二乗で傾きを出し、夜間帯の長さぶんに換算する
-// (端点2点だけで引き算すると、その1点のノイズがそのまま出てしまうため)。
-function nightlyVoltageDrops(points, nowMs) {
-  const drops = [];
-  if (!points.length) return drops;
-  const windowMs = BATTERY_HEALTH_NIGHT_HOURS * 3600000;
-  for (let back = 1; back <= BATTERY_HEALTH_NIGHTS; back++) {
-    // back日前の夜(JSTのBATTERY_HEALTH_NIGHT_START_H時)の開始時刻をUTCで求める
-    const jst = new Date(nowMs + 9 * 3600000 - back * 24 * 3600000);
-    const startUtc = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate(),
-      BATTERY_HEALTH_NIGHT_START_H - 9, 0, 0);
-    const seg = points.filter(function (p) { return p.t >= startUtc && p.t <= startUtc + windowMs; });
-    if (seg.length < BATTERY_HEALTH_MIN_SAMPLES) continue;
-    const n = seg.length;
-    const mx = seg.reduce(function (a, p) { return a + p.t; }, 0) / n;
-    const my = seg.reduce(function (a, p) { return a + p.v; }, 0) / n;
-    let num = 0, den = 0;
-    seg.forEach(function (p) { num += (p.t - mx) * (p.v - my); den += (p.t - mx) * (p.t - mx); });
-    if (!den) continue;
-    const drop = -(num / den) * windowMs; // 下がっていればプラスになる
-    if (!isFinite(drop)) continue;
-    drops.push(Math.max(0, drop));
-  }
-  return drops;
-}
-// 中継サーバーの当日CSVから、夜間帯(0:00〜4:00 JST)の消費電力[W]の中央値を拠点ごとに出す。
-function nightLoadWBySite(powerRows, nowMs) {
-  const byId = {};
-  powerRows.forEach(function (r) {
-    if (typeof r.loadW !== "number") return;
-    const h = toJstParts(r.fetchedAt).h;
-    if (h >= BATTERY_HEALTH_NIGHT_START_H || h < BATTERY_HEALTH_NIGHT_START_H + BATTERY_HEALTH_NIGHT_HOURS - 24) {
-      (byId[r.siteId] = byId[r.siteId] || []).push(r.loadW);
+  Object.keys(bySite).forEach(function (id) {
+    const seg = bySite[id].slice().sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+    const v0s = [], nights = [];
+    let vmin = null;
+    seg.forEach(function (r) {
+      const p = toJstParts(r.fetchedAt);
+      if (typeof r.bat === "number") {
+        if (vmin === null || r.bat < vmin) vmin = r.bat;
+        if (p.h === 0 && p.mi < BATTERY_V0_WINDOW_MIN) v0s.push(r.bat);
+      }
+      if (p.h < BATTERY_NIGHT_END_H && typeof r.pv === "number" && r.pv < 0.5
+        && typeof r.chgMa === "number" && typeof r.disMa === "number") {
+        nights.push(r);
+      }
+    });
+    // 夜間に取り出した電気量[Ah]を、実際の放電電流を時間で積分して出す
+    let ah = 0, hours = 0;
+    for (let i = 1; i < nights.length; i++) {
+      const dt = (nights[i].fetchedAt - nights[i - 1].fetchedAt) / 3600000;
+      if (!(dt > 0) || dt > 0.5) continue;
+      const a1 = (nights[i].disMa - nights[i].chgMa) / 1000;
+      const a0 = (nights[i - 1].disMa - nights[i - 1].chgMa) / 1000;
+      ah += (a1 + a0) / 2 * dt;
+      hours += dt;
     }
-  });
-  const out = {};
-  Object.keys(byId).forEach(function (id) {
-    const m = medianOf(byId[id]);
-    if (typeof m === "number" && m >= BATTERY_HEALTH_MIN_LOAD_W) out[id] = Math.round(m * 1000) / 1000;
+    const last = seg[seg.length - 1];
+    const bal = (last && typeof last.genWh === "number" && typeof last.useWh === "number")
+      ? last.genWh - last.useWh : null;
+    const r3 = function (x) { return Math.round(x * 1000) / 1000; };
+    out[id] = {
+      v0: v0s.length ? r3(v0s.reduce(function (a, b) { return a + b; }, 0) / v0s.length) : null,
+      balWh: bal === null ? null : Math.round(bal * 10) / 10,
+      nightA: hours > 2 ? r3(ah / hours) : null,
+      vmin: vmin === null ? null : r3(vmin)
+    };
   });
   return out;
 }
-async function updateBatteryHealthFile(powerRows) {
+// data/power_daily.json を更新する。当日ぶんは毎回上書きし、足りない過去日は少しずつ取りに行く。
+async function updatePowerDailyFile(todayRows) {
+  const store = await readJsonSafe(POWER_DAILY_JSON_PATH, null) || { generatedAt: null, days: {} };
+  if (!store.days) store.days = {};
+  const nowMs = Date.now();
+  const p2 = function (n) { return String(n).padStart(2, "0"); };
+  const keyFor = function (d) { const p = toJstParts(d); return p.y + "-" + p2(p.mo + 1) + "-" + p2(p.day); };
+  const todayKey = keyFor(new Date(nowMs));
+  if (todayRows && todayRows.length) store.days[todayKey] = summarizePowerDay(todayRows);
+
+  // 過去日の穴埋め(1回の実行で数日ぶんだけ)。昨日より前で、まだ無い日を古い順に埋めていく。
+  let filled = 0;
+  for (let back = 1; back <= POWER_DAILY_KEEP_DAYS && filled < POWER_DAILY_BACKFILL_PER_RUN; back++) {
+    const d = new Date(nowMs - back * 24 * 3600000);
+    const k = keyFor(d);
+    if (store.days[k]) continue;
+    try {
+      const res = await fetchWithTimeout(powerCsvUrlFor(d));
+      const text = await res.text();
+      const rows = parsePowerCsv(text);
+      if (rows.length) { store.days[k] = summarizePowerDay(rows); filled++; }
+      else store.days[k] = {};   // その日はデータ自体が無い。空で埋めて再取得しない
+    } catch (err) {
+      break;   // 取れないときは次の実行に回す
+    }
+  }
+  // 古い日を落とす
+  const cutoff = keyFor(new Date(nowMs - POWER_DAILY_KEEP_DAYS * 24 * 3600000));
+  Object.keys(store.days).forEach(function (k) { if (k < cutoff) delete store.days[k]; });
+  store.generatedAt = new Date(nowMs).toISOString();
+  await writeFile(POWER_DAILY_JSON_PATH, JSON.stringify(store, null, 2) + "\n", "utf8");
+  return { days: Object.keys(store.days).length, filled: filled };
+}
+
+// 日次集計から、拠点ごとの実効容量と「無日射で何時間もつか」を出す。
+function computeBatteryEndurance(store) {
+  const days = Object.keys(store.days || {}).sort();
+  const ids = {};
+  days.forEach(function (k) { Object.keys(store.days[k] || {}).forEach(function (id) { ids[id] = 1; }); });
+  const sites = {};
+  Object.keys(ids).forEach(function (id) {
+    const series = days.map(function (k) { return { day: k, d: (store.days[k] || {})[id] || null }; })
+      .filter(function (p) { return p.d; });
+    const v0s = series.map(function (p) { return p.d.v0; }).filter(function (v) { return typeof v === "number"; });
+    if (!v0s.length) return;
+    // 常時電源(0時でも13.2Vを超え続ける)はバッテリー運用をしていない
+    const mainsRatio = v0s.filter(function (v) { return v > BATTERY_MAINS_V; }).length / v0s.length;
+    const nightAs = series.map(function (p) { return p.d.nightA; })
+      .filter(function (a) { return typeof a === "number" && a > 0; });
+    const nightA = medianOf(nightAs);
+    const lastWithV0 = series.filter(function (p) { return typeof p.d.v0 === "number"; }).pop();
+    const v0Now = lastWithV0 ? lastWithV0.d.v0 : null;
+    const entry = {
+      days: series.length,
+      mains: mainsRatio > BATTERY_MAINS_RATIO,
+      v0: v0Now,
+      socPct: v0Now === null ? null : Math.round(socFromRestingVoltage(v0Now)),
+      nightA: nightA === null ? null : Math.round(nightA * 1000) / 1000,
+      vmin: medianOf(series.map(function (p) { return p.d.vmin; })
+        .filter(function (v) { return typeof v === "number"; })),
+      capacityAh: null, fitR: null, whPerV: null, enduranceH: null, usableAh: null
+    };
+    if (entry.vmin !== null) entry.vmin = Math.round(entry.vmin * 1000) / 1000;
+    // 「翌日の0時電圧 − 当日の0時電圧」と「当日の収支Wh」の回帰から容量を出す
+    const pts = [];
+    for (let i = 0; i < series.length - 1; i++) {
+      const a = series[i].d, b = series[i + 1].d;
+      // 日付が連続していない箇所はまたがせない
+      const gap = (Date.parse(series[i + 1].day) - Date.parse(series[i].day)) / 86400000;
+      if (gap !== 1) continue;
+      if (typeof a.v0 !== "number" || typeof b.v0 !== "number" || typeof a.balWh !== "number") continue;
+      pts.push({ x: a.balWh, y: b.v0 - a.v0 });
+    }
+    const fit = pts.length >= BATTERY_MIN_DAYS ? fitLine(pts) : null;
+    if (fit && fit.b > 1e-6 && !entry.mains) {
+      const vAvg = v0s.reduce(function (a, b) { return a + b; }, 0) / v0s.length;
+      const whPerV = 1 / fit.b;
+      const capAh = whPerV / vAvg * BATTERY_OCV_SPAN_V;
+      entry.fitR = fit.r;
+      entry.whPerV = Math.round(whPerV);
+      if (fit.r >= BATTERY_MIN_R && capAh >= BATTERY_CAP_RANGE_AH[0] && capAh <= BATTERY_CAP_RANGE_AH[1]) {
+        entry.capacityAh = Math.round(capAh * 10) / 10;
+        if (entry.socPct !== null) {
+          const usable = capAh * Math.max(0, entry.socPct - BATTERY_RESERVE_SOC) / 100;
+          entry.usableAh = Math.round(usable * 100) / 100;
+          if (nightA !== null && nightA >= BATTERY_MIN_NIGHT_A) {
+            entry.enduranceH = Math.round(usable / nightA * 10) / 10;
+          }
+        }
+      }
+    }
+    sites[id] = entry;
+  });
+  return sites;
+}
+async function updateBatteryHealthFile() {
   const prev = await readJsonSafe(BATTERY_HEALTH_JSON_PATH, null);
   const nowMs = Date.now();
   if (prev && prev.generatedAt && nowMs - Date.parse(prev.generatedAt) < BATTERY_HEALTH_REFRESH_MS) {
     return { skipped: true, sites: prev.sites ? Object.keys(prev.sites).length : 0 };
   }
-  const jstNow = toJstParts(new Date(nowMs));
-  const p2 = function (n) { return String(n).padStart(2, "0"); };
-  const dateKey = jstNow.y + "-" + p2(jstNow.mo + 1) + "-" + p2(jstNow.day);  // 「今日の朝までの夜」の日付
-  // 消費電力も前夜ぶんのみ。まだ今夜ぶんが取れていない時間帯のために、前回値を控えとして残す。
-  const todayLoadW = nightLoadWBySite(powerRows || [], nowMs);
-  const loadWMedian = Object.assign({}, (prev && prev.loadWByDate && prev.loadWByDate[dateKey]) || {}, todayLoadW);
-  const loadWByDate = {};
-  loadWByDate[dateKey] = loadWMedian;
-
-  const since = nowMs - (BATTERY_HEALTH_NIGHTS + 1) * 24 * 3600000;  // 前夜ぶんが確実に入る範囲だけ読む
-  const history = await readBatteryHistory(since);
-  const stats = {};
-  Object.keys(history).forEach(function (id) {
-    const drops = nightlyVoltageDrops(history[id], nowMs);
-    if (drops.length < BATTERY_HEALTH_MIN_NIGHTS) return;
-    const dropV = medianOf(drops);
-    const w = loadWMedian[id];
-    stats[id] = {
-      nights: drops.length,
-      dropV: Math.round(dropV * 10000) / 10000,
-      loadW: typeof w === "number" ? Math.round(w * 1000) / 1000 : null,
-      lowLoad: typeof w === "number" && w < BATTERY_HEALTH_LOW_LOAD_W,
-      usable: typeof w === "number" && w >= BATTERY_HEALTH_MIN_LOAD_W && dropV >= BATTERY_HEALTH_MIN_DROP_V
-    };
-  });
-  // 全拠点で「降下 = a + b×消費W」を当てはめる
-  const fitIds = Object.keys(stats).filter(function (id) { return stats[id].usable; });
-  const fit = fitLine(fitIds.map(function (id) { return { x: stats[id].loadW, y: stats[id].dropV }; }));
-  Object.keys(stats).forEach(function (id) {
-    const s = stats[id];
-    s.expectedV = (fit && s.usable) ? Math.round((fit.a + fit.b * s.loadW) * 10000) / 10000 : null;
-    s.deviation = (s.expectedV && s.expectedV > 0) ? s.dropV / s.expectedV : null;
-  });
-  // 基準(=100%)は固定せず、「ズレがいちばん小さい拠点」を毎回選び直す。
-  // まずはカードのある拠点で消費が小さすぎないものから、見つからなければ順に条件を緩める。
-  const referenceSiteId = pickBatteryHealthReference(stats);
-  const refDev = referenceSiteId ? stats[referenceSiteId].deviation : null;
-  Object.keys(stats).forEach(function (id) {
-    const s = stats[id];
-    if (!refDev || !s.deviation) { s.healthPct = null; s.ratio = null; return; }
-    const ratio = s.deviation / refDev;   // 1.0が基準。大きいほど速く落ちている
-    s.ratio = Math.round(ratio * 1000) / 1000;
-    // 持ち率は基準のズレ÷自分のズレ。基準そのものは必ず100%になる。
-    s.healthPct = Math.round(Math.min(100, Math.max(BATTERY_HEALTH_PCT_MIN, 100 / ratio)));
-  });
+  const store = await readJsonSafe(POWER_DAILY_JSON_PATH, null);
+  if (!store || !store.days) return { skipped: false, sites: 0, rated: 0, reason: "日次集計がありません" };
+  const sites = computeBatteryEndurance(store);
   await writeFile(BATTERY_HEALTH_JSON_PATH, JSON.stringify({
     generatedAt: new Date(nowMs).toISOString(),
-    referenceSiteId: referenceSiteId,
-    // 散布図に引く傾向線(降下 = a + b×消費W)と、当てはめの手応え(相関係数 r)
-    fit: fit,
-    nights: BATTERY_HEALTH_NIGHTS,
-    nightStartHourJst: BATTERY_HEALTH_NIGHT_START_H,
-    nightHours: BATTERY_HEALTH_NIGHT_HOURS,
-    loadWByDate: loadWByDate,
-    sites: stats
+    method: "endurance",         // 旧方式(持ち率%)と区別するための印
+    reserveSocPct: BATTERY_RESERVE_SOC,
+    nightEndHourJst: BATTERY_NIGHT_END_H,
+    days: Object.keys(store.days).length,
+    sites: sites
   }, null, 2) + "\n", "utf8");
-  const rated = Object.keys(stats).filter(function (id) { return typeof stats[id].healthPct === "number"; }).length;
-  return { skipped: false, sites: Object.keys(stats).length, rated: rated, referenceSiteId: referenceSiteId };
-}
-// 「いちばん持ちが良い拠点」を基準に選ぶ。ズレ(deviation)が最小の拠点＝同じ消費の拠点より
-// 電圧が落ちにくい拠点である。候補は段階的に緩める:
-//   1) カードがあり、消費が小さすぎない拠点  2) カードがある拠点  3) 算出できた全拠点
-function pickBatteryHealthReference(stats) {
-  const ids = Object.keys(stats).filter(function (id) { return stats[id].deviation > 0; });
-  const tiers = [
-    ids.filter(function (id) { return BATTERY_HEALTH_CARD_IDS.indexOf(id) >= 0 && !stats[id].lowLoad; }),
-    ids.filter(function (id) { return BATTERY_HEALTH_CARD_IDS.indexOf(id) >= 0; }),
-    ids
-  ];
-  for (const tier of tiers) {
-    if (!tier.length) continue;
-    return tier.reduce(function (best, id) {
-      return stats[id].deviation < stats[best].deviation ? id : best;
-    }, tier[0]);
-  }
-  return null;
+  const rated = Object.keys(sites).filter(function (id) { return typeof sites[id].enduranceH === "number"; }).length;
+  return { skipped: false, sites: Object.keys(sites).length, rated: rated };
 }
 
 // ---- 画像アーカイブ(全46拠点、直近IMAGE_RETENTION_DAYS日分のみ保持) ----
@@ -1121,13 +1168,24 @@ async function main() {
     console.warn("[NG] 雨量計(三島)の取得に失敗しました: " + (err && err.message ? err.message : String(err)));
   }
 
-  // バッテリーの劣化指標(夜間の電圧降下 ÷ 消費電力)。1時間に1回だけ計算し直す。
+  // 電源の日次集計(0時基準電圧・収支Wh・夜間電流)。毎回、当日ぶんを上書きし、
+  // 足りない過去日を少しずつ遡って埋める。バッテリーの持ちはこれを元に出す。
   try {
-    const health = await updateBatteryHealthFile(relayRows);
-    if (health.skipped) console.log("バッテリー劣化指標は前回計算から1時間未満のためスキップしました。");
-    else console.log("[OK] バッテリー劣化指標: " + health.rated + "/" + health.sites + "拠点を算出しました。");
+    const daily = await updatePowerDailyFile(relayRows);
+    console.log("[OK] 電源の日次集計: " + daily.days + "日分"
+      + (daily.filled ? "（過去 " + daily.filled + "日分を追加取得）" : ""));
   } catch (err) {
-    console.warn("[NG] バッテリー劣化指標の算出に失敗しました: " + (err && err.message ? err.message : String(err)));
+    console.warn("[NG] 電源の日次集計に失敗しました: " + (err && err.message ? err.message : String(err)));
+  }
+
+  // バッテリーの持ち(無日射で何時間もつか)。1時間に1回だけ計算し直す。
+  try {
+    const health = await updateBatteryHealthFile();
+    if (health.skipped) console.log("バッテリーの持ちは前回計算から1時間未満のためスキップしました。");
+    else console.log("[OK] バッテリーの持ち: " + health.rated + "/" + health.sites + "拠点を算出しました。"
+      + (health.reason ? "（" + health.reason + "）" : ""));
+  } catch (err) {
+    console.warn("[NG] バッテリーの持ちの算出に失敗しました: " + (err && err.message ? err.message : String(err)));
   }
 
   // 画像アーカイブはデータ取得(上記)とは独立したベストエフォート処理とし、
@@ -1156,7 +1214,8 @@ export {
   WATER_RECENT_CSV_PATH, WATER_RECENT_WINDOW_MS,
   parsePowerCsv, powerCsvUrlFor, POWER_SOURCE_NAME_TO_ID, POWER_CSV_BASE_URL,
   RAINFALL_JSON_PATH, rainfallJsonUrl, parseRainfallJson, parseJstTime, MISHIMA_RAIN_OBS_CD13,
-  BATTERY_HEALTH_JSON_PATH, BATTERY_HEALTH_CARD_IDS, BATTERY_HEALTH_NIGHTS, BATTERY_HEALTH_PCT_MIN,
-  nightlyVoltageDrops, nightLoadWBySite, updateBatteryHealthFile, medianOf, fitLine,
-  BATTERY_HEALTH_LOW_LOAD_W, pickBatteryHealthReference
+  BATTERY_HEALTH_JSON_PATH, POWER_DAILY_JSON_PATH, BATTERY_RESERVE_SOC, BATTERY_MIN_R,
+  BATTERY_MIN_DAYS, BATTERY_MAINS_V, BATTERY_OCV_TABLE,
+  socFromRestingVoltage, summarizePowerDay, updatePowerDailyFile,
+  computeBatteryEndurance, updateBatteryHealthFile, medianOf, fitLine
 };
