@@ -276,26 +276,38 @@ export function buildServerRainfall(opts = {}) {
   return { generatedAt: new Date(nowMs).toISOString(), obsCd13: "0563300100034", stationName: "三島", values };
 }
 
-// data/battery_health.json 相当(バッテリー劣化の指標。いちばん持ちが良い拠点=100%で持つ)。
-// opts.health は { 拠点ID: 持ち率% }。100%の拠点が基準(referenceSiteId)になる。
+// data/battery_health.json 相当(バッテリーの持ち = 無日射で何時間もつか)。
+// opts.sites は { 拠点ID: {capacityAh, nightA, socPct, mains, fitR} }。
+// enduranceH は容量・残量・電流から自動で計算する(サーバー側と同じ式)。
 export function buildBatteryHealth(opts = {}) {
+  const reserve = opts.reserveSocPct ?? 20;
+  const spec = opts.sites || {
+    cam11: { capacityAh: 50, nightA: 1.00, socPct: 80 },   // 30h ぶん(既定色)
+    cam03: { capacityAh: 50, nightA: 0.96, socPct: 45 },   // 13h ぶん(注意)
+    cam09: { capacityAh: 54, nightA: 1.59, socPct: 48 },   //  9h ぶん(危険)
+    cam41: { capacityAh: 14, nightA: 0.07, socPct: 86 },   // 5日ぶん(良好)
+    cam12: { mains: true, v0: 13.45 },                     // 常時電源
+    cam13: { fitR: 0.41 }                                  // 測定中(日数不足)
+  };
   const sites = {};
-  const health = opts.health || { cam03: 100, cam02: 74, cam11: 92, cam04: 62 };
-  Object.entries(health).forEach(([id, healthPct]) => {
-    const loadW = (opts.loadW && opts.loadW[id] !== undefined) ? opts.loadW[id] : 12;
-    const ratio = 100 / healthPct;   // 基準のズレを1.0としたときの、この拠点のズレ
+  Object.entries(spec).forEach(([id, s]) => {
+    const cap = s.capacityAh ?? null, a = s.nightA ?? null, soc = s.socPct ?? null;
+    const usable = (cap != null && soc != null) ? cap * Math.max(0, soc - reserve) / 100 : null;
+    const hours = (usable != null && a) ? Math.round(usable / a * 10) / 10 : null;
     sites[id] = {
-      nights: opts.nights || 1, dropV: 0.09, loadW: loadW, lowLoad: loadW < 5,
-      expectedV: 0.0625 + 0.0019 * loadW, deviation: ratio,
-      ratio: Math.round(ratio * 1000) / 1000, healthPct
+      days: s.days ?? 28, mains: !!s.mains,
+      v0: s.v0 ?? (soc != null ? 12.4 : null), socPct: soc,
+      nightA: a, vmin: s.vmin ?? 12.1,
+      capacityAh: cap, fitR: s.fitR ?? (cap != null ? 0.93 : null),
+      whPerV: cap != null ? Math.round(cap * 12.4 / 1.34) : null,
+      usableAh: usable != null ? Math.round(usable * 100) / 100 : null,
+      enduranceH: s.mains ? null : hours
     };
   });
-  const best = Object.keys(health).reduce((a, b) => (health[b] > health[a] ? b : a), Object.keys(health)[0]);
   return {
     generatedAt: new Date(opts.nowMs || Date.now()).toISOString(),
-    referenceSiteId: opts.referenceSiteId || best, nights: opts.nights || 1,
-    fit: opts.fit || { a: 0.0625, b: 0.0019, r: 0.5, sites: Object.keys(sites).length },
-    nightStartHourJst: 22, nightHours: 6, loadWByDate: {}, sites
+    method: "endurance", reserveSocPct: reserve, nightEndHourJst: 4,
+    days: opts.days ?? 28, sites
   };
 }
 

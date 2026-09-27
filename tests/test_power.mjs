@@ -162,12 +162,10 @@ export async function run() {
 
   await page.close();
 
-  /* ===== Request X: バッテリー劣化の指標(いちばん持ちが良い拠点=100%の持ち率) ===== */
+  /* ===== バッテリーの持ち(無日射で何時間もつか) ＋ カードのレイアウト ===== */
   const pageH = await newPage(null, {
     nowMs: NOW, matsuhisaBody: NO_BAT_BODY,
-    batteryHealth: buildBatteryHealth({ nowMs: NOW,
-      health: { cam03: 100, cam02: 62, cam11: 95, cam04: 40, cam08: 75, cam41: 25 },
-      loadW: { cam41: 0.6 } })
+    batteryHealth: buildBatteryHealth({ nowMs: NOW })
   });
   await openDashboard(pageH, () => {
     const d = window.__dashboardDebug;
@@ -181,7 +179,7 @@ export async function run() {
     const read = (id) => {
       const s = d.siteStates[id];
       return { text: s.healthValueEl.textContent, cls: s.healthValueEl.className.replace("health-value", "").trim(),
-        sub: s.healthSubEl.textContent, title: s.healthValueEl.parentElement.title.slice(0, 40) };
+        sub: s.healthSubEl.textContent, title: s.healthValueEl.parentElement.title.slice(0, 220) };
     };
     const mini = d.siteStates.cam02.thumbSlot;
     const kids = Array.from(mini.children).map((c) => c.className || "");
@@ -190,8 +188,8 @@ export async function run() {
     const thumbIdx = kids.findIndex((c) => String(c).indexOf("site-thumb") >= 0);
     const svg = d.siteStates.cam02.batteryGaugeEl.querySelector("svg");
     return {
-      ref: read("cam03"), up: read("cam02"), down: read("cam11"), bad: read("cam04"), none: read("cam09"),
-      low: read("cam41"),
+      ok: read("cam11"), warn: read("cam03"), bad: read("cam09"), long: read("cam41"),
+      mains: read("cam12"), pending: read("cam13"), none: read("cam02"),
       kids, gaugeIdx, healthIdx, thumbIdx,
       gaugeW: svg ? Number(svg.getAttribute("width")) : null,
       count: document.querySelectorAll("#sitesGrid .battery-health").length,
@@ -203,57 +201,63 @@ export async function run() {
     health.gaugeIdx >= 0 && health.healthIdx === health.gaugeIdx + 1 && health.thumbIdx === health.healthIdx + 1, health.kids);
   r.check("p8-c 電池マークを小さくしてある(幅84)", health.gaugeW === 84, health.gaugeW);
   r.check("p8-d 見出しは「持ち」", health.label === "持ち", health.label);
-  r.check("p8-e いちばん持ちが良い拠点は「100%」と「最良＝基準」表記",
-    health.ref.text === "100%" && health.ref.sub === "最良＝基準", health.ref);
-  r.check("p8-f 劣化している拠点は100%未満の持ち率", health.up.text === "62%", health.up);
-  r.check("p8-g 基準に近い拠点は100%近くの持ち率", health.down.text === "95%", health.down);
-  r.check("p8-h 大きく劣化(50%未満)は危険色", health.bad.cls === "critical", health.bad);
-  r.check("p8-i 中程度の劣化(50〜70%未満)は注意色", health.up.cls === "warn", health.up);
-  r.check("p8-j 基準並み(90%以上)は良好色", health.down.cls === "ok", health.down);
-  r.check("p8-j2 基準拠点も良好色", health.ref.cls === "ok", health.ref);
-  r.check("p8-k データが無い拠点は「—」", health.none.text === "—" && health.none.cls === "muted", health.none);
-  r.check("p8-l 何との比較かを併記", health.up.sub === "最良比", health.up.sub);
-  r.check("p8-m 算出根拠をtitleに出す", health.up.title.indexOf("前夜") === 0, health.up.title);
-  r.check("p8-m2 消費が小さい拠点は参考値として淡色にする",
-    health.low.cls === "muted" && health.low.text === "25%", health.low);
-  r.check("p8-m3 参考値には消費電力を併記する", health.low.sub === "参考 0.6W", health.low.sub);
+  // 50Ah × (80-20)% ÷ 1.00A = 30h
+  r.check("p8-e 持ち時間を時間で出す（丸一日以上は既定色）",
+    health.ok.text === "30h" && health.ok.sub === "日射ゼロ時" && health.ok.cls === "", health.ok);
+  // 50Ah × (45-20)% ÷ 0.96A = 13.0h → 24h未満は注意色
+  r.check("p8-f 丸一日もたない拠点は注意色", health.warn.text === "13h" && health.warn.cls === "warn", health.warn);
+  // 54Ah × (48-20)% ÷ 1.59A = 9.5h → 12h未満は危険色
+  r.check("p8-g 一晩もたない拠点は危険色", health.bad.text === "9.5h" && health.bad.cls === "critical", health.bad);
+  // 14Ah × (86-20)% ÷ 0.07A = 132h → 48時間を超えたら「日」表記
+  r.check("p8-h 2日以上もつ拠点は「日」表記で良好色",
+    health.long.text.endsWith("日") && health.long.cls === "ok", health.long);
+  r.check("p8-i 常時電源の拠点は「常時」と出す",
+    health.mains.text === "常時" && health.mains.sub === "常時電源" && health.mains.cls === "ok", health.mains);
+  r.check("p8-j 日数が足りない拠点は「測定中」",
+    health.pending.text === "測定中" && health.pending.cls === "muted", health.pending);
+  r.check("p8-k 指標に出ていない拠点は「—」",
+    health.none.text === "—" && health.none.cls === "muted" && health.none.sub === "データなし", health.none);
+  r.check("p8-m 算出根拠(容量・夜間電流・残量)をtitleに出す",
+    health.ok.title.indexOf("実効容量") >= 0 && health.ok.title.indexOf("夜間の平均消費") >= 0
+    && health.ok.title.indexOf("残量") >= 0, health.ok.title);
+  r.check("p8-m2 測定中の理由をtitleで説明する",
+    health.pending.title.indexOf("日数がたまるまで") >= 0, health.pending.title);
 
   // 書式と色分けの単体確認
   const fmt = await pageH.evaluate(() => {
     const d = window.__dashboardDebug;
     return {
-      f: [d.fmtBatteryHealth(100), d.fmtBatteryHealth(72), d.fmtBatteryHealth(5), d.fmtBatteryHealth(null)],
-      c: [d.batteryHealthClass(100, true), d.batteryHealthClass(90, false), d.batteryHealthClass(89, false),
-        d.batteryHealthClass(70, false), d.batteryHealthClass(69, false), d.batteryHealthClass(50, false),
-        d.batteryHealthClass(49, false), d.batteryHealthClass(null, false), d.batteryHealthClass(25, false, true)]
+      f: [d.fmtEndurance(9.46), d.fmtEndurance(23.2), d.fmtEndurance(47.9), d.fmtEndurance(132), d.fmtEndurance(null)],
+      c: [d.enduranceClass(11.9), d.enduranceClass(12), d.enduranceClass(23.9), d.enduranceClass(24),
+        d.enduranceClass(47.9), d.enduranceClass(48), d.enduranceClass(null)]
     };
   });
-  r.check("p8-n 書式: 100% / 72% / 5% / —",
-    JSON.stringify(fmt.f) === JSON.stringify(["100%", "72%", "5%", "—"]), fmt.f);
-  r.check("p8-o 色分けの境目(90%以上で良好・70%未満で注意・50%未満で危険・低消費は参考)",
-    JSON.stringify(fmt.c) === JSON.stringify(["ok", "ok", "", "", "warn", "warn", "critical", "muted", "muted"]), fmt.c);
-  // 散布図(横軸=消費W / 縦軸=夜間降下V / 破線=全拠点の傾向)
+  r.check("p8-n 書式: 9.5h / 23h / 48h / 5.5日 / —",
+    JSON.stringify(fmt.f) === JSON.stringify(["9.5h", "23h", "48h", "5.5日", "—"]), fmt.f);
+  r.check("p8-o 色分けの境目(12h未満=危険・24h未満=注意・48h以上=良好)",
+    JSON.stringify(fmt.c) === JSON.stringify(["critical", "warn", "warn", "", "", "ok", "muted"]), fmt.c);
+
+  // 散布図(横軸=夜間の消費電流 / 縦軸=実効容量 / 破線=等持ち時間の線)
   const scatter = await pageH.evaluate(() => {
     const box = document.getElementById("healthScatter");
     const svg = box.querySelector("svg");
     const texts = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent);
     return {
       dots: svg.querySelectorAll("circle").length,
-      dashed: svg.querySelectorAll('line[stroke-dasharray]').length,
-      axisX: texts.includes("前夜の消費電力（W）"),
-      axisY: texts.includes("前夜の電圧降下（V）"),
-      fitLabel: texts.includes("全拠点の傾向"),
+      isoLines: svg.querySelectorAll('path[stroke-dasharray]').length,
+      isoLabels: ["12時間", "24時間", "48時間"].filter((t) => texts.includes(t)).length,
+      axisX: texts.includes("夜間の消費電流（A）"),
+      axisY: texts.includes("実効容量（Ah）"),
       note: document.getElementById("healthScatterNote").textContent
     };
   });
-  r.check("p8-s 散布図に拠点の点が描かれる(指標のある6拠点)", scatter.dots === 6, scatter.dots);
-  r.check("p8-t 傾向線を破線で引く", scatter.dashed >= 1 && scatter.fitLabel, scatter);
+  r.check("p8-s 散布図に拠点の点が描かれる(容量が出ている4拠点)", scatter.dots === 4, scatter.dots);
+  r.check("p8-t 等持ち時間の線を3本引く", scatter.isoLines === 3 && scatter.isoLabels === 3, scatter);
   r.check("p8-u 軸の意味を明記する", scatter.axisX && scatter.axisY, scatter);
-  r.check("p8-v 読み方と対象の夜を説明する",
-    scatter.note.indexOf("線より上") >= 0 && scatter.note.indexOf("前夜") >= 0, scatter.note.slice(0, 90));
-  r.check("p8-w 傾向線の式を併記する", scatter.note.indexOf("降下 = ") >= 0, scatter.note.slice(-60));
-  r.check("p8-x 100%の拠点名を説明に出す",
-    scatter.note.indexOf("100%＝いちばん持ちが良い 北沢アンダーパス") >= 0, scatter.note.slice(0, 140));
+  r.check("p8-v 読み方を説明する",
+    scatter.note.indexOf("右下へ行くほど") >= 0 && scatter.note.indexOf("実効容量") >= 0, scatter.note.slice(0, 120));
+  r.check("p8-x 常時電源の拠点は散布図の対象外と明記する",
+    scatter.note.indexOf("常時電源") >= 0, scatter.note.slice(-70));
 
   // グラフが枠に対して引き伸ばされていないこと(発電グラフを外して幅が広がった際の不具合対策)
   const aspect = await pageH.evaluate(() => {
@@ -261,7 +265,7 @@ export async function run() {
     const svg = box.querySelector("svg");
     const vb = (svg.getAttribute("viewBox") || "").split(" ").map(Number);
     const rect = box.getBoundingClientRect();
-    return { ratio: (vb[2] / vb[3]) / (rect.width / rect.height) };
+    return { ratio: (vb[2] / vb[3]) / (rect.width / rect.height), vb: vb.slice(2), box: [Math.round(rect.width), Math.round(rect.height)] };
   });
   r.check("p8-y BATのグラフが横に伸びない(枠と同じ縦横比)", Math.abs(aspect.ratio - 1) < 0.02, aspect);
 
@@ -323,12 +327,8 @@ export async function run() {
     const svg = document.getElementById("pchart-bat-cam02").querySelector("svg");
     const texts = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent);
     const nums = texts.filter((t) => /^\d+\.\d\d$/.test(t)).map(Number);
-    const d = window.__dashboardDebug;
-    const pts = d.siteStates.cam02.points.map((p) => p.bat).filter((v) => typeof v === "number");
-    const ratedLabel = texts.find((t) => t.indexOf("定格") === 0);
     const ratedEl = Array.from(svg.querySelectorAll("text")).find((t) => t.textContent.indexOf("定格") === 0);
-    return { ticks: nums, dataMin: Math.min.apply(null, pts), dataMax: Math.max.apply(null, pts),
-      ratedLabel: ratedLabel || null,
+    return { ticks: nums,
       ratedAnchor: ratedEl ? ratedEl.getAttribute("text-anchor") : null,
       ratedX: ratedEl ? Number(ratedEl.getAttribute("x")) : null,
       vbW: Number((svg.getAttribute("viewBox") || "0 0 0 0").split(" ")[2]) };

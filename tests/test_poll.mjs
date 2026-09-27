@@ -22,9 +22,11 @@ const POWER_CSV_HEADER =
   "bat_discharge_ma,bat_net_ma,ld1_ma,ld2_ma,ld3_ma,load_w,gen_wh_today,load_wh_today";
 
 function powerCsv(rows) {
+  const d = (v, dflt) => (v === undefined ? dflt : v);
   return [POWER_CSV_HEADER].concat(rows.map((x) =>
     [x.ts, 0, x.name, "solar", "ok", "", 120, 18500, 600, x.pvW, x.batMv,
-      700, 100, 600, 90, 5, 500, x.loadW === undefined ? "10.4" : x.loadW, "0.0", "0.0"].join(","))).join("\n") + "\n";
+      d(x.chgMa, 700), d(x.disMa, 100), 600, 90, 5, 500,
+      d(x.loadW, "10.4"), d(x.genWh, "0.0"), d(x.useWh, "0.0")].join(","))).join("\n") + "\n";
 }
 
 // 一時ディレクトリへ scripts/poll.mjs を複製する(data/ はその隣に作られる)
@@ -445,89 +447,108 @@ export async function run() {
   fs.rmSync(sandbox, { recursive: true, force: true });
   fs.rmSync(sandbox2, { recursive: true, force: true });
   fs.rmSync(sandbox3, { recursive: true, force: true });
-  /* ============ バッテリー劣化の指標(data/battery_health.json) ============ */
-  // 前夜(22:00〜翌4:00 JST)の電圧降下を、全拠点の傾向線「降下 = a + b×消費W」と比べる。
-  // 消費で単純に割ると消費が小さい拠点で破綻するため、この方式にしている。
-  // バッテリーは随時交換するため、平均ではなく前夜1晩ぶんだけを使う。
+  /* ====== バッテリーの持ち(data/power_daily.json → data/battery_health.json) ====== */
+  // 実効容量は「1日の収支[Wh]」と「翌日の0時基準電圧の変化」の回帰から出す。
+  // 検証用に、容量が既知(WH_PER_V)のバッテリーを想定した日次集計を直接置いて、
+  // その容量を正しく復元できるかを見る。
   const healthSandbox = makeSandbox("health");
   fs.mkdirSync(path.join(healthSandbox, "data"), { recursive: true });
   const HOUR = 3600000;
-  // 8拠点を傾向線どおり(降下 = 0.05 + 0.005×消費W)に置き、多呂樋管だけ予測の1.5倍にする。
-  const siteLoad = { cam02: 2, cam03: 4, cam04: 6, cam08: 8, cam11: 10, cam09: 12, cam12: 14, cam13: 16, cam14: 10 };
-  const onLine = (w) => 0.05 + 0.005 * w;
-  const siteDrop = {};
-  Object.keys(siteLoad).forEach((id) => { siteDrop[id] = onLine(siteLoad[id]); });
-  siteDrop.cam14 = onLine(siteLoad.cam14) * 1.5;   // 劣化している拠点
-  const histLines = ["拠点,取得時刻,機器の計測時刻,PV(W),BAT(V),水位(m),取得方法"];
-  for (let back = 1; back <= 3; back++) {   // 直前の3晩ぶん作る(使われるのは前夜のみ)
-    const jstMid = new Date(now + 9 * HOUR - back * 24 * HOUR);
-    const start = Date.UTC(jstMid.getUTCFullYear(), jstMid.getUTCMonth(), jstMid.getUTCDate(), 13, 0, 0);
-    for (const id of Object.keys(siteDrop)) {
-      for (let k = 0; k <= 36; k++) {          // 10分間隔で6時間ぶん(37点)
-        const t = start + k * 10 * 60000;
-        const v = 12.5 - siteDrop[id] * (k / 36);
-        histLines.push([id, new Date(t).toISOString(), "", "0.000", v.toFixed(4), "", "サーバー(mini.lhlab-vps.net 電源CSV)"].join(","));
-      }
+  const dayKey = (ms) => { const d = new Date(ms + 9 * HOUR); return d.toISOString().slice(0, 10); };
+  // 既知の容量: 500Wh/V。平均電圧12.3Vなら 500/12.3*1.34 ≒ 54.5Ah
+  const WH_PER_V = 500;
+  const OCV_SPAN = 12.70 - 11.36;
+  const plan = {
+    cam11: { v0: 12.40, nightA: 1.00, mains: false },   // 標準的な拠点
+    cam03: { v0: 12.03, nightA: 0.96, mains: false },   // 残量が少ない拠点
+    cam41: { v0: 12.58, nightA: 0.07, mains: false },   // 消費が極端に小さい拠点
+    cam39: { v0: 13.45, nightA: 0.00, mains: true },    // 常時電源
+    cam13: { v0: 12.58, nightA: 0.78, mains: false, noisy: true }  // 当てはまりが悪い拠点
+  };
+  // 14日ぶん。収支は日替わりで振り、電圧は「前日の収支 ÷ 容量」だけ動かす。
+  const bal = [-60, 40, -55, 80, -70, 30, -45, 90, -65, 25, -50, 70, -60, 35];
+  const daysOut = {};
+  Object.keys(plan).forEach((id) => {
+    let v = plan[id].v0;
+    for (let back = bal.length; back >= 1; back--) {
+      const k = dayKey(now - back * 24 * HOUR);
+      const b = bal[bal.length - back];
+      daysOut[k] = daysOut[k] || {};
+      // noisy な拠点は電圧の動きを収支と無関係にして、相関が立たないようにする。
+      // 収支(bal)は符号が交互に変わるため、交互の揺らぎを入れると逆に相関してしまう。
+      // 収支の並びと周期が合わない別パターンを使う。
+      const noise = plan[id].noisy ? [0.08, 0.05, -0.09, 0.07, -0.04, -0.08, 0.06][back % 7] : 0;
+      daysOut[k][id] = { v0: Math.round(v * 1000) / 1000, balWh: b,
+        nightA: plan[id].nightA || null, vmin: Math.round((v - 0.05) * 1000) / 1000 };
+      v += (plan[id].noisy ? 0 : b / WH_PER_V) + noise;
     }
-  }
-  fs.writeFileSync(path.join(healthSandbox, "data", "history.csv"), histLines.join("\n") + "\n", "utf8");
-  // 中継サーバーのCSVは今夜の0〜4時台を返し、消費電力(load_w)を拠点ごとに変える
-  const relayName = { cam02: "中郷第１樋管", cam03: "北沢アンダー", cam04: "中郷第２樋管", cam08: "宮川橋",
-    cam11: "祇園大橋", cam09: "梅名樋管2号", cam12: "安間樋管", cam13: "上町樋管", cam14: "多呂樋管" };
-  const jstNow = new Date(now + 9 * HOUR);
-  const todayStart = Date.UTC(jstNow.getUTCFullYear(), jstNow.getUTCMonth(), jstNow.getUTCDate(), 0, 0, 0) - 9 * HOUR;
+  });
+  fs.writeFileSync(path.join(healthSandbox, "data", "power_daily.json"),
+    JSON.stringify({ generatedAt: new Date(now).toISOString(), days: daysOut }, null, 2), "utf8");
+  // 中継サーバーのCSVは当日ぶん(夜間の放電電流と当日の積算Wh)を返す
+  const jstNow0 = new Date(now + 9 * HOUR);
+  const todayStart = Date.UTC(jstNow0.getUTCFullYear(), jstNow0.getUTCMonth(), jstNow0.getUTCDate(), 0, 0, 0) - 9 * HOUR;
+  const relayName = { cam11: "祇園大橋", cam03: "北沢アンダー", cam41: "こも池", cam39: "大場ポンプ場", cam13: "上町樋管" };
   const nightRows = [];
-  Object.keys(siteLoad).forEach((id) => {
-    for (let h = 0; h < 4; h++) {
-      nightRows.push({ ts: new Date(todayStart + h * HOUR).toISOString(), name: relayName[id],
-        pvW: "0.000", batMv: 12400, loadW: String(siteLoad[id]) });
+  Object.keys(plan).forEach((id) => {
+    for (let m = 0; m < 4 * 60; m += 10) {   // 0:00〜4:00 を10分刻み
+      nightRows.push({ ts: new Date(todayStart + m * 60000).toISOString(), name: relayName[id],
+        pvW: "0.000", batMv: Math.round(plan[id].v0 * 1000),
+        chgMa: 0, disMa: Math.round(plan[id].nightA * 1000),
+        genWh: "0.0", useWh: (m / 60 * 12).toFixed(1) });
     }
   });
   const healthHandler = (u) => {
     if (u.includes("mini.lhlab-vps.net/power/logs/")) return { text: async () => powerCsv(nightRows) };
     return handler(u);
   };
-  await runPoll(healthSandbox, healthHandler, "health1");
+  const hp = await runPoll(healthSandbox, healthHandler, "health1");
   const healthPath = path.join(healthSandbox, "data", "battery_health.json");
   const health = fs.existsSync(healthPath) ? JSON.parse(fs.readFileSync(healthPath, "utf8")) : null;
-  r.check("s18-a data/battery_health.jsonが作られる", !!health, health && Object.keys(health.sites || {}).length);
-  r.check("s18-b 基準は自動で選ばれ、消費が小さい参考値の拠点は基準にしない",
-    health && !!health.referenceSiteId && health.referenceSiteId !== "cam02"
-      && health.sites[health.referenceSiteId] && health.sites[health.referenceSiteId].lowLoad === false,
-    health && health.referenceSiteId);
-  r.check("s18-c 集計は前夜1晩のみ", health && health.nights === 1, health && health.nights);
-  r.check("s18-d 夜間帯は22時から6時間", health && health.nightStartHourJst === 22 && health.nightHours === 6, health);
-  const hc11 = health && health.sites.cam11, hc02 = health && health.sites.cam02,
-    hc14 = health && health.sites.cam14, hc03 = health && health.sites.cam03;
-  r.check("s18-e 前夜1晩ぶんを使う", hc11 && hc11.nights === 1, hc11);
-  r.check("s18-f 夜間の降下量を拾える", hc11 && Math.abs(hc11.dropV - 0.1) < 0.005, hc11);
-  r.check("s18-g 消費電力(load_w)を拠点ごとに拾う",
-    hc11 && hc11.loadW === 10 && hc02 && hc02.loadW === 2, { cam11: hc11 && hc11.loadW, cam02: hc02 && hc02.loadW });
-  r.check("s18-h 傾向線(降下 = a + b×消費W)を当てはめる",
-    health && health.fit && Math.abs(health.fit.b - 0.005) < 0.002 && health.fit.sites === 9, health && health.fit);
-  const refEntry = health && health.sites[health.referenceSiteId];
-  r.check("s18-i 基準拠点は必ず100%", refEntry && refEntry.healthPct === 100, refEntry);
-  r.check("s18-i2 どの拠点も100%を超えない",
-    health && Object.values(health.sites).every(function (s) { return s.healthPct === null || s.healthPct <= 100; }),
-    health && Object.entries(health.sites).map(function (e) { return e[0] + ":" + e[1].healthPct; }).join(" "));
-  r.check("s18-i3 傾向線どおりの拠点は基準に近い(90%以上)",
-    hc03 && hc03.healthPct >= 90 && hc11 && hc11.healthPct >= 90,
-    { cam03: hc03 && hc03.healthPct, cam11: hc11 && hc11.healthPct });
-  r.check("s18-j 傾向線より大きく落ちる拠点は100%を大きく下回る",
-    hc14 && hc14.healthPct <= 80, hc14);
-  r.check("s18-k2 消費5W未満は参考値の印を付ける",
-    hc02 && hc02.lowLoad === true && hc11 && hc11.lowLoad === false,
-    { cam02: hc02 && hc02.lowLoad, cam11: hc11 && hc11.lowLoad });
-  r.check("s18-k 夜間の実測が無い拠点は算出しない",
-    health && !health.sites.cam55, health && Object.keys(health.sites));
-  r.check("s18-m 散布図用に消費Wと降下Vを持たせる",
-    hc14 && typeof hc14.loadW === "number" && typeof hc14.dropV === "number" && typeof hc14.expectedV === "number", hc14);
+  const dailyPath = path.join(healthSandbox, "data", "power_daily.json");
+  const daily = fs.existsSync(dailyPath) ? JSON.parse(fs.readFileSync(dailyPath, "utf8")) : null;
+
+  r.check("s19-a data/battery_health.jsonが作られる", !!health, health && Object.keys(health.sites || {}).length);
+  r.check("s19-b 方式の印と下限SOCを持つ",
+    health && health.method === "endurance" && health.reserveSocPct === 20, health && { m: health.method, s: health.reserveSocPct });
+  const h11 = health && health.sites.cam11, h03 = health && health.sites.cam03,
+    h41 = health && health.sites.cam41, h39 = health && health.sites.cam39, h13 = health && health.sites.cam13;
+  // 既知の容量を復元できるか(500Wh/V → 平均電圧で割って電圧幅を掛けた値)
+  const expectAh = (v) => WH_PER_V / v * OCV_SPAN;
+  r.check("s19-c 収支と0時電圧の回帰から実効容量を復元する",
+    h11 && Math.abs(h11.capacityAh - expectAh(h11.v0)) / expectAh(h11.v0) < 0.15,
+    h11 && { 実測: h11.capacityAh, 期待: +expectAh(h11.v0).toFixed(1), r: h11.fitR });
+  // 遡って取りに行った日ぶんは同じCSVを返すため完全な直線にはならない。0.9以上あれば十分。
+  r.check("s19-d 当てはまりの良さ(r)を持つ", h11 && h11.fitR >= 0.9, h11 && h11.fitR);
+  r.check("s19-e 0時電圧から残量(SOC)を出す",
+    h11 && h11.socPct >= 65 && h11.socPct <= 80 && h03 && h03.socPct < h11.socPct,
+    { cam11: h11 && h11.socPct, cam03: h03 && h03.socPct });
+  // 持ち時間 = 容量 × (残量% − 20%) ÷ 100 ÷ 夜間電流
+  const wantH = (e) => e.capacityAh * (e.socPct - 20) / 100 / e.nightA;
+  r.check("s19-f 持ち時間 = 使える容量 ÷ 夜間の消費電流",
+    h11 && Math.abs(h11.enduranceH - wantH(h11)) < 0.2, h11);
+  r.check("s19-g 消費が小さい拠点ほど長くもつ",
+    h41 && h11 && h41.enduranceH > h11.enduranceH * 5, { こも池: h41 && h41.enduranceH, 祇園: h11 && h11.enduranceH });
+  r.check("s19-h 残量が少ない拠点は短くなる",
+    h03 && h11 && h03.enduranceH < h11.enduranceH, { 北沢: h03 && h03.enduranceH, 祇園: h11 && h11.enduranceH });
+  r.check("s19-i 常時電源の拠点は持ち時間を出さない",
+    h39 && h39.mains === true && h39.enduranceH === null && h39.capacityAh === null, h39);
+  r.check("s19-j 当てはまりが悪い拠点は「測定中」(容量を出さない)",
+    h13 && h13.capacityAh === null && h13.enduranceH === null && h13.fitR < 0.6, h13);
+  r.check("s19-k 夜間の消費電流を実際の放電電流から出す",
+    h11 && Math.abs(h11.nightA - 1.0) < 0.05 && h41 && Math.abs(h41.nightA - 0.07) < 0.02,
+    { cam11: h11 && h11.nightA, cam41: h41 && h41.nightA });
+  r.check("s19-l 日次集計に当日ぶんが追記される",
+    daily && daily.days[dayKey(now)] && daily.days[dayKey(now)].cam11, daily && Object.keys(daily.days).length);
+  r.check("s19-m 過去日を少しずつ遡って取りに行く",
+    hp.calls.filter((u) => u.includes("/power/logs/")).length >= 2,
+    hp.calls.filter((u) => u.includes("/power/logs/")).length);
 
   // 2回目はすぐには計算し直さない(1時間に1回)
   const firstGeneratedAt = health.generatedAt;
   await runPoll(healthSandbox, healthHandler, "health2");
   const health2 = JSON.parse(fs.readFileSync(healthPath, "utf8"));
-  r.check("s18-l 1時間以内は再計算しない", health2.generatedAt === firstGeneratedAt, health2.generatedAt);
+  r.check("s19-n 1時間以内は再計算しない", health2.generatedAt === firstGeneratedAt, health2.generatedAt);
   fs.rmSync(healthSandbox, { recursive: true, force: true });
 
   /* ---- 後片付け ---- */
