@@ -500,7 +500,7 @@ async function updateRainfallFile() {
  *
  *   ズレ = 実測降下 ÷ (a + b × その拠点の消費W)
  *
- * 最後に基準拠点(祇園大橋)のズレが±0%になるよう据え直す。
+ * 最後に基準拠点(北沢アンダーパス)のズレが±0%になるよう据え直す。
  *   差の割合 = 100 × (その拠点のズレ ÷ 基準拠点のズレ − 1)
  *   プラスなら同じ消費の拠点より速く落ちる(劣化が進んでいる)、マイナスなら持ちが良い。
  *
@@ -508,7 +508,7 @@ async function updateRainfallFile() {
  * そこで**前夜1晩ぶんの実測だけ**を使い、毎日その日の朝以降に入れ替わるようにしている
  * (消費電力も同じ前夜の実測の中央値を使う)。
  * ===================================================================== */
-const BATTERY_HEALTH_REFERENCE_ID = "cam11";          // 祇園大橋(この拠点を100%とする)
+const BATTERY_HEALTH_REFERENCE_ID = "cam03";          // 北沢アンダーパス(この拠点を±0%とする)
 const BATTERY_HEALTH_NIGHTS = 1;                       // 集計に使う夜数(前夜のみ)
 const BATTERY_HEALTH_NIGHT_START_H = 22;               // 夜間帯の開始(JST)
 const BATTERY_HEALTH_NIGHT_HOURS = 6;                  // 夜間帯の長さ(22:00→翌4:00)
