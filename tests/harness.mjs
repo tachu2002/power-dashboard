@@ -356,13 +356,24 @@ export function createReporter(suiteName) {
 // 当日ぶん(0時の電圧と、そこからの収支Wh)だけあれば現在の残量が出せる。
 export function buildPowerDaily(opts = {}) {
   const now = opts.nowMs || Date.now();
-  const d = new Date(now + 9 * 3600000);
   const p2 = (n) => String(n).padStart(2, "0");
-  const key = `${d.getUTCFullYear()}-${p2(d.getUTCMonth() + 1)}-${p2(d.getUTCDate())}`;
+  const keyOf = (ms) => { const x = new Date(ms + 9 * 3600000);
+    return `${x.getUTCFullYear()}-${p2(x.getUTCMonth() + 1)}-${p2(x.getUTCDate())}`; };
+  const key = keyOf(now);
   const days = {};
   days[key] = {};
+  // opts.history 夜ぶん、同じ値の過去日も作る(夜間降下の中央値を取るテスト用)
+  for (let back = 1; back <= (opts.history || 0); back++) {
+    const k = keyOf(now - back * 86400000);
+    days[k] = {};
+    Object.entries(opts.today || {}).forEach(([id, v]) => {
+      days[k][id] = { v0: v.v0 ?? 12.4, balWh: v.balWh ?? 0, nightA: v.nightA ?? null,
+        nightVPerH: v.nightVPerH ?? null, vmin: v.vmin ?? 12.1 };
+    });
+  }
   Object.entries(opts.today || {}).forEach(([id, v]) => {
-    days[key][id] = { v0: v.v0 ?? 12.4, balWh: v.balWh ?? 0, nightA: v.nightA ?? null, vmin: v.vmin ?? 12.1 };
+    days[key][id] = { v0: v.v0 ?? 12.4, balWh: v.balWh ?? 0, nightA: v.nightA ?? null,
+      nightVPerH: v.nightVPerH ?? null, vmin: v.vmin ?? 12.1 };
   });
   return { generatedAt: new Date(now).toISOString(), days };
 }

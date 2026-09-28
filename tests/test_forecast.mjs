@@ -632,6 +632,54 @@ export async function run() {
     Math.abs(limits.北沢の持ち - 32) < 0.5, limits.北沢の持ち);
   r.check("f7-z5 見通しも拠点ごとの下限を使う",
     limits.見通しの下限 && limits.見通しの下限.v === 9.5 && limits.見通しの下限.socPct === -4, limits.見通しの下限);
+  /* 充電されない夜間の電圧降下(実測)を持ち時間に反映しているか。
+     実測: 夜間 1.0A で 0.0134V/h 落ちる → 1Vあたり 74.6Ah → 容量 100Ah。
+     収支から出した容量(50Ah)の2倍なので、持ち時間も約2倍になる。 */
+  const nightPage = await newPage(null, {
+    nowMs: NOW, hourly: buildHourly({ nowMs: NOW, realisticSun: true, rain: false, nightRad: 30 }),
+    powerDaily: buildPowerDaily({ nowMs: NOW, history: 8, today: {
+      cam11: { v0: 12.24, balWh: 0, nightA: 1.0, nightVPerH: 0.0134 },
+      cam04: { v0: 12.24, balWh: 0, nightA: 1.0 }               // 夜間降下が取れていない拠点
+    } }),
+    batteryHealth: buildBatteryHealth({ nowMs: NOW, sites: {
+      cam11: { capacityAh: 50, nightA: 1.0, socPct: 60 },
+      cam04: { capacityAh: 50, nightA: 1.0, socPct: 60 }
+    } })
+  });
+  await openDashboard(nightPage, () => {
+    const d = window.__dashboardDebug;
+    return Object.keys(d.getBatteryHealthState().sites || {}).length > 0
+      && Object.keys(d.getPowerDailyState().days || {}).length > 0;
+  });
+  await nightPage.evaluate(() => window.__dashboardDebug.showView("power"));
+  await nightPage.waitForTimeout(700);
+  const night = await nightPage.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const withNight = d.nightDeclineCapacityAh("cam11", 50);
+    const without = d.nightDeclineCapacityAh("cam04", 50);
+    const e = { capacityAh: 50, socPct: 60, nightA: 1.0 };
+    return { withNight, without,
+      持ち_実測あり: d.noSunHoursFor("cam11", e),
+      持ち_実測なし: d.noSunHoursFor("cam04", e),
+      見通し: (() => { const o = d.computeBatteryOutlook(d.SITE_CATALOG.cam11);
+        return o && { capAh: o.nightCapacityAh, ratio: o.nightCapacityRatio, nights: o.nightCapacityNights }; })(),
+      title: d.siteStates.cam11.healthValueEl.parentElement.title };
+  });
+  r.check("f7-aa 夜間の電圧降下から放電時の実効容量を出す（1.0A ÷ 0.0134V/h × 1.34 = 100Ah）",
+    night.withNight && Math.abs(night.withNight.capacityAh - 100) < 3, night.withNight);
+  r.check("f7-ab 収支から出した容量との比を持つ（約2倍）",
+    night.withNight && Math.abs(night.withNight.ratio - 2) < 0.1, night.withNight);
+  r.check("f7-ac 夜数が足りない拠点では使わない", night.without === null, night.without);
+  r.check("f7-ad 実測があるほうが持ち時間が長くなる（約2倍）",
+    night.持ち_実測あり > night.持ち_実測なし * 1.8, { あり: night.持ち_実測あり, なし: night.持ち_実測なし });
+  r.check("f7-ae 見通しにも放電時の実効容量が入る",
+    night.見通し && night.見通し.capAh && night.見通し.nights >= 5, night.見通し);
+  r.check("f7-af titleに放電時と充電時の容量を書き分ける",
+    night.title.indexOf("放電時の実効容量") >= 0 && night.title.indexOf("充電時は") >= 0,
+    night.title.slice(0, 220));
+  r.check("f7-ag ページ例外にはならない", nightPage.errMsgs().length === 0, nightPage.errMsgs());
+  await nightPage.close();
+
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();
 

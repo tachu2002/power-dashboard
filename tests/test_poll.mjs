@@ -478,8 +478,10 @@ export async function run() {
       // 収支(bal)は符号が交互に変わるため、交互の揺らぎを入れると逆に相関してしまう。
       // 収支の並びと周期が合わない別パターンを使う。
       const noise = plan[id].noisy ? [0.08, 0.05, -0.09, 0.07, -0.04, -0.08, 0.06][back % 7] : 0;
+      // nightVPerH を持たせておく(持たない日は「古い形式」とみなして取り直されるため)
       daysOut[k][id] = { v0: Math.round(v * 1000) / 1000, balWh: b,
-        nightA: plan[id].nightA || null, vmin: Math.round((v - 0.05) * 1000) / 1000 };
+        nightA: plan[id].nightA || null, nightVPerH: 0.015,
+        vmin: Math.round((v - 0.05) * 1000) / 1000 };
       v += (plan[id].noisy ? 0 : b / WH_PER_V) + noise;
     }
   });
@@ -492,8 +494,9 @@ export async function run() {
   const nightRows = [];
   Object.keys(plan).forEach((id) => {
     for (let m = 0; m < 4 * 60; m += 10) {   // 0:00〜4:00 を10分刻み
+      // 夜間は充電されないので電圧が落ちていく(0.015V/h)。この傾きを集計が拾えるか見る。
       nightRows.push({ ts: new Date(todayStart + m * 60000).toISOString(), name: relayName[id],
-        pvW: "0.000", batMv: Math.round(plan[id].v0 * 1000),
+        pvW: "0.000", batMv: Math.round((plan[id].v0 - 0.015 * (m / 60)) * 1000),
         chgMa: 0, disMa: Math.round(plan[id].nightA * 1000),
         genWh: "0.0", useWh: (m / 60 * 12).toFixed(1) });
     }
@@ -540,6 +543,10 @@ export async function run() {
     { cam11: h11 && h11.nightA, cam41: h41 && h41.nightA });
   r.check("s19-l 日次集計に当日ぶんが追記される",
     daily && daily.days[dayKey(now)] && daily.days[dayKey(now)].cam11, daily && Object.keys(daily.days).length);
+  r.check("s19-m2 夜間の電圧降下[V/h]を日次集計に持つ",
+    daily && (() => { const dk = dayKey(now); const e = daily.days[dk] && daily.days[dk].cam11;
+      return e && typeof e.nightVPerH === "number" && Math.abs(e.nightVPerH - 0.015) < 0.002; })(),
+    daily && daily.days[dayKey(now)] && daily.days[dayKey(now)].cam11);
   r.check("s19-m 過去日を少しずつ遡って取りに行く",
     hp.calls.filter((u) => u.includes("/power/logs/")).length >= 2,
     hp.calls.filter((u) => u.includes("/power/logs/")).length);
