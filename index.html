@@ -25,6 +25,8 @@
     --critical-border:#d03b3b;
     --critical-bg:    #fbe9e7;
     --ok-border:      #2e9e63;
+    --ok-bg:          #e8f6ee;
+    --surface-2:      #f4fafc;
     /* 電源監視の差分(▲▼)の色。ご要望により上昇=青・下降=赤で固定する。 */
     --delta-up:       #1f6fd0;
     --delta-down:     #d03b3b;
@@ -54,6 +56,8 @@
       --warn-bg:        #3a2f0f;
       --critical-border:#e05c5c;
       --ok-border:      #46b87d;
+      --ok-bg:          #12352a;
+      --surface-2:      #123040;
       --delta-up:       #5aa6f5;
       --delta-down:     #e05c5c;
       --critical-bg:    #3a1f1a;
@@ -86,6 +90,8 @@
     --critical-border:#e05c5c;
     --critical-bg:    #3a1f1a;
     --ok-border:      #46b87d;
+    --ok-bg:          #12352a;
+    --surface-2:      #123040;
     --delta-up:       #5aa6f5;
     --delta-down:     #e05c5c;
   }
@@ -445,6 +451,40 @@
   .health-scatter-card .chart-box { height: 280px; min-height: 160px; }
   .health-scatter-card h2 { font-size: 14px; margin: 0; }
   .health-scatter-card .subtitle { font-size: 11px; margin: 2px 0 0; }
+  /* バッテリー健全性の一覧(「健全性の一覧」ボタンで開閉)。
+     左ほど「今すぐ困るか」、右ほど「これから困りそうか」の順に並べている。 */
+  .health-table-card { margin-bottom: 10px; display: none; }
+  .health-table-card.show { display: block; }
+  .health-table-card h2 { font-size: 14px; margin: 0; }
+  .health-table-card .subtitle { font-size: 11px; margin: 2px 0 0; }
+  .health-table-scroll { overflow-x: auto; margin-top: 10px; }
+  table.health-table { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+  table.health-table th { text-align: left; font-size: 10.5px; color: var(--text-secondary); font-weight: 600;
+    padding: 0 8px 7px; border-bottom: 1px solid var(--gridline); white-space: nowrap; vertical-align: bottom; }
+  table.health-table th .sub { display: block; font-weight: 400; color: var(--text-muted); font-size: 9.5px; }
+  table.health-table td { padding: 6px 7px; border-bottom: 1px solid var(--gridline); white-space: nowrap;
+    font-variant-numeric: tabular-nums; }
+  table.health-table th { padding-left: 7px; padding-right: 7px; }
+  table.health-table tbody tr:hover td { background: var(--surface-2); }
+  table.health-table .ht-name { font-weight: 600; }
+  table.health-table .num { font-weight: 700; }
+  table.health-table .ht-bad { color: var(--critical-border); }
+  table.health-table .ht-warn { color: var(--warn-border); }
+  table.health-table .ht-ok { color: var(--ok-border); }
+  table.health-table .ht-mute { color: var(--text-muted); }
+  table.health-table .ht-small { font-size: 10.5px; font-weight: 400; color: var(--text-muted); }
+  .ht-pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 10.5px; font-weight: 700; }
+  .ht-pill.bad { background: var(--critical-bg); color: var(--critical-border); }
+  .ht-pill.warn { background: var(--warn-bg); color: var(--warn-border); }
+  .ht-pill.ok { background: var(--ok-bg); color: var(--ok-border); }
+  .ht-barbg { display: inline-block; width: 64px; height: 7px; background: var(--gridline); border-radius: 4px;
+    vertical-align: middle; margin-right: 6px; overflow: hidden; }
+  .ht-barbg > i { display: block; height: 100%; border-radius: 4px; }
+  .health-note { font-size: 11.5px; color: var(--text-secondary); line-height: 1.8; margin-top: 12px;
+    background: var(--surface-2); border: 1px solid var(--gridline); border-radius: 8px; padding: 10px 12px; }
+  .health-note b { color: var(--text-primary); }
+  .health-caveat { font-size: 11.5px; line-height: 1.8; margin-top: 10px; border-radius: 8px; padding: 10px 12px;
+    background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--text-primary); }
   /* バッテリー残量ゲージ(スマートフォンの電池表示のイメージ)。
      数値(パーセンテージ)は必ず文字として表示するため、色だけに意味を持たせていない。 */
   .battery-gauge { display: flex; flex-direction: column; gap: 2px; }
@@ -709,6 +749,7 @@
             <div class="toolbar">
               <div class="status" id="statusText"><span class="dot pending" id="statusDot"></span>読み込み中…</div>
               <button id="refreshBtn">全拠点を今すぐ更新</button>
+              <button id="healthTableBtn">健全性の一覧</button>
               <button id="tableBtn">表で表示</button>
             </div>
           </div>
@@ -723,6 +764,47 @@
           </div>
           <div class="chart-box" id="healthScatter"></div>
         </div>
+
+        <div class="card health-table-card" id="healthTableCard">
+          <div class="site-card-header">
+            <div class="site-title-wrap">
+              <h2>バッテリー健全性の一覧</h2>
+              <p class="subtitle" id="healthTableNote">算出中…</p>
+            </div>
+          </div>
+          <div class="health-table-scroll">
+            <table class="health-table">
+              <thead>
+                <tr>
+                  <th>拠点</th>
+                  <th>状態</th>
+                  <th>あと何時間<span class="sub">日射予報込み・下限まで</span></th>
+                  <th>朝の最低電圧<span class="sub">直近30日の中央値</span></th>
+                  <th>下限までの余裕<span class="sub">V・下限は拠点ごとに異なる</span></th>
+                  <th>深放電した日<span class="sub">11.8V未満・直近30日 ← その前30日</span></th>
+                  <th>1日の収支<span class="sub">発電−消費 Wh</span></th>
+                  <th>消費<span class="sub">Wh/日</span></th>
+                  <th>実効容量<span class="sub">直近35日の実測 ／ 推定定格</span></th>
+                  <th>定格比<span class="sub">参考値・誤差±15%程度</span></th>
+                  <th>放電の速さ<span class="sub">1Ahあたりの降下 mV・直近15夜 ← 前15夜</span></th>
+                  <th>交換の可能性<span class="sub">電圧の急変を検出した日</span></th>
+                </tr>
+              </thead>
+              <tbody id="healthTableBody"></tbody>
+            </table>
+          </div>
+          <div class="health-caveat" id="healthTableCaveat"></div>
+          <div class="health-note">
+            <b>各列の根拠</b><br>
+            ・<b>あと何時間</b>／<b>実効容量</b> … 「1日の収支（発電−消費）」と「翌日の0時基準電圧の変化」の回帰から実効容量を出し、夜間の実測降下と日射予報を織り込んで10分ごとに計算しています。容量は<b>直近35日ぶん</b>で測り直しているので、劣化が進んだ拠点でも持ち時間が長く出ることはありません。<br>
+            ・<b>朝の最低電圧／下限までの余裕</b> … 実測そのもの。モデルを挟まないので最も信頼できます。下限は拠点ごとに異なります（北沢アンダーパス 9.5V／多呂樋管・梅名樋管2号・芝橋 10.5V／既定 11.5V）。<br>
+            ・<b>深放電した日</b> … 11.8V（残量30%相当）を下回った日数。鉛蓄電池の寿命を削る直接の原因なので、劣化の「進み具合」ではなく「進む勢い」を表します。<br>
+            ・<b>1日の収支・消費</b> … 直近35日の中央値。マイナスが続くと残量が戻りません。<br>
+            ・<b>放電の速さ</b> … 充電されない夜間（0:00〜4:00）の電圧降下[V/h] ÷ そのときの放電電流[A]。「1Ah取り出すと何V下がるか」で、容量に反比例します。<b>放電が速い＝弱っている</b>という、日射も季節も気温もほとんど効かない実測値なので、劣化の進み具合はこの列で見てください。ただし<b>よく晴れた日の夜は充電直後の表面電荷が抜ける分だけ余計に下がる</b>ため（実測で4割以上ずれます）、前日の発電量がその拠点の中央値以下だった夜だけを使っています。前の15夜より1割以上速くなっていれば▲（3割以上なら「要対応」）。<br>
+            ・<b>交換の可能性</b> … 現場でバッテリーを載せ替える運用のため、その日の収支では説明できないほど0時電圧が跳ね上がり、<b>かつその水準が翌日以降も続いている</b>日を検出しています（天気による一日限りの跳ねは翌日に戻るので区別できます）。<b>載せ替えた電池が新品とは限らず、臨時の予備で前より弱いこともある</b>ため、交換を「回復」とは扱いません。実効容量も放電の速さも、この日以降のデータだけで測り直すだけで、結果が前より悪くなることもあります（日数が足りない間は「測り直し中」と出ます）。放電の速さの「←」が交換をまたぐ場合は「（交換前）」と付くので、<b>載せ替えた電池のほうが弱ければ ▲ が付きます</b>。
+          </div>
+        </div>
+
         <div class="grid-power" id="sitesGrid"></div>
 
         <div class="table-section" id="tableSection">
@@ -1916,6 +1998,207 @@
       + (mains ? "（常時電源 " + mains + "拠点は対象外）" : "")
       + "。※印は日射予報や発電実績が足りず、日射ゼロの前提で出している拠点です。"
       + "10分ごとに計算し直しています" + (stamp ? "（最終計算 " + stamp + "）" : "") + "。";
+    renderHealthTable();
+  }
+  /* ---------------------------------------------------------------------
+   * バッテリー健全性の一覧(「健全性の一覧」ボタンで開閉)
+   * -----------------------------------------------------------------------
+   * 天気・夜間の電圧降下・実効容量をすべて織り込んだうえで「あと何時間もつか」を先頭に置き、
+   * 右へ行くほど「これから困りそうか」の手がかり(最低電圧・深放電・収支・容量の変化)が並ぶ。
+   *
+   * 【「劣化率○○%」を主役にしない理由】
+   * 観測は2026-06-13開始で、いま手元にあるのは夏→秋の3.5ヶ月だけ。容量を観測開始ごろと直近で
+   * 比べると全拠点が揃って2〜3割減という結果になるが、これは電池の劣化と季節(日射量の減少で
+   * 満充電に届かなくなること)を切り分けられていない。気温補正(25℃換算・0.6%/℃)を入れても
+   * 前半と後半の平均気温がほぼ同じ(25.5℃/25.4℃)なため結果はほとんど動かず、原因の説明にならない。
+   * そのため劣化率は「参考値」として但し書き付きで出し、判断は実測そのもの(最低電圧・下限までの
+   * 余裕・深放電の日数)を主役に行えるようにしている。1年たてば同じ季節どうしで比較できる。
+   * --------------------------------------------------------------------- */
+  var HEALTH_DEEP_V = 11.8;          // これを下回った日を「深放電した日」と数える(残量30%相当)
+  var HEALTH_DEEP_WINDOW = 30;       // 深放電を数える日数
+  // battery_health.json の vminDays(日付を揃えた最低電圧の並び)から、直近と その前 の深放電日数を数える。
+  function deepDischargeCounts(e) {
+    if (!e || !Array.isArray(e.vminDays)) return null;
+    var arr = e.vminDays;
+    var tail = arr.slice(-HEALTH_DEEP_WINDOW);
+    var prev = arr.slice(-HEALTH_DEEP_WINDOW * 2, -HEALTH_DEEP_WINDOW);
+    var count = function (list) {
+      var n = 0, seen = 0;
+      list.forEach(function (v) { if (typeof v === "number") { seen++; if (v < HEALTH_DEEP_V) n++; } });
+      return { days: n, seen: seen };
+    };
+    return { now: count(tail), prev: count(prev) };
+  }
+  // 直近30日の最低電圧の中央値。実測そのものなので、モデルを疑うときの基準になる。
+  function recentVminMedian(e) {
+    if (!e || !Array.isArray(e.vminDays)) return typeof e === "object" && e && typeof e.vmin === "number" ? e.vmin : null;
+    var v = e.vminDays.slice(-HEALTH_DEEP_WINDOW).filter(function (x) { return typeof x === "number"; });
+    if (!v.length) return typeof e.vmin === "number" ? e.vmin : null;
+    v.sort(function (a, b) { return a - b; });
+    var mid = Math.floor(v.length / 2);
+    return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
+  }
+  function healthTableRows() {
+    var rows = [];
+    POWER_SITES.forEach(function (site) {
+      var e = batteryHealthEntry(site.id);
+      if (!e || e.mains) return;
+      var o = batteryOutlook(site);
+      var noSun = noSunHoursFor(site.id, e);
+      var hours = null, sustain = false, forecast = false;
+      if (o) { forecast = true; if (o.hoursToReserve === null) sustain = true; else hours = o.hoursToReserve; }
+      else hours = noSun;
+      var floorV = batteryEmptyVoltageFor(site.id);
+      var vmin = recentVminMedian(e);
+      var deep = deepDischargeCounts(e);
+      var bal = (typeof e.genWhPerDay === "number" && typeof e.loadWhPerDay === "number")
+        ? Math.round(e.genWhPerDay - e.loadWhPerDay) : null;
+      rows.push({
+        id: site.id, name: site.name, e: e,
+        hours: hours, sustain: sustain, forecast: forecast,
+        floorV: floorV, vmin: vmin,
+        gap: (typeof vmin === "number") ? vmin - floorV : null,
+        deep: deep, bal: bal,
+        load: typeof e.loadWhPerDay === "number" ? Math.round(e.loadWhPerDay) : null,
+        pvPct: (typeof e.pvPeakNowW === "number" && typeof e.pvPeakInitialW === "number" && e.pvPeakInitialW > 0)
+          ? Math.round((e.pvPeakNowW / e.pvPeakInitialW - 1) * 100) : null
+      });
+    });
+    // 「今すぐ困る順」。継続可と未算出は後ろに回す。
+    rows.sort(function (a, b) {
+      var av = a.sustain ? 1e8 : (a.hours === null ? 1e9 : a.hours);
+      var bv = b.sustain ? 1e8 : (b.hours === null ? 1e9 : b.hours);
+      return av - bv;
+    });
+    return rows;
+  }
+  // 状態の判定。持ち時間・下限までの余裕・深放電の増え方のどれかが悪ければ格上げする。
+  var HEALTH_MV_WORSE_RATIO = 1.1;    // 放電の速さがこの倍率を超えて増えたら「へたりが進行中」
+  // 放電が速くなっている＝バッテリーが弱っている、という判定に使う。
+  function mvWorsening(e) {
+    return !!(e && typeof e.mvPerAhNow === "number" && typeof e.mvPerAhPrev === "number"
+      && e.mvPerAhNow > e.mvPerAhPrev * HEALTH_MV_WORSE_RATIO);
+  }
+  function healthStateOf(r) {
+    var deepNow = r.deep ? r.deep.now.days : 0;
+    var deepPrev = r.deep ? r.deep.prev.days : 0;
+    var mvBad = mvWorsening(r.e) && typeof r.e.mvPerAhPrev === "number"
+      && r.e.mvPerAhNow > r.e.mvPerAhPrev * 1.3;   // 3割以上速くなっていれば要対応
+    if ((r.hours !== null && r.hours < 12) || (r.gap !== null && r.gap < 0.3)
+      || deepNow >= 8 || mvBad) return ["要対応", "bad"];
+    if ((r.hours !== null && r.hours < 24) || (r.gap !== null && r.gap < 0.6)
+      || deepNow >= 1 || deepNow > deepPrev || (r.bal !== null && r.bal <= -20)
+      || mvWorsening(r.e)) return ["注意", "warn"];
+    return ["良好", "ok"];
+  }
+  function renderHealthTable() {
+    var body = document.getElementById("healthTableBody");
+    if (!body) return;
+    var rows = healthTableRows();
+    var html = rows.map(function (r) {
+      var st = healthStateOf(r);
+      var e = r.e;
+      var hTxt = r.sustain ? "継続可" : (r.hours === null ? "—" : fmtEndurance(r.hours));
+      var hCls = r.sustain ? "ht-ok" : (r.hours === null ? "ht-mute" : ({
+        critical: "ht-bad", warn: "ht-warn", ok: "ht-ok", muted: "ht-mute"
+      }[enduranceClass(r.hours)] || ""));
+      var hMark = (!r.forecast && r.hours !== null) ? '<span class="ht-small"> ※日射ゼロ時</span>' : "";
+      var vminTxt = typeof r.vmin === "number" ? r.vmin.toFixed(2) + " V" : "—";
+      var gapCell = "—";
+      if (typeof r.gap === "number") {
+        var gcls = r.gap < 0.3 ? "ht-bad" : r.gap < 0.6 ? "ht-warn" : "ht-ok";
+        var gcol = r.gap < 0.3 ? "var(--critical-border)" : r.gap < 0.6 ? "var(--warn-border)" : "var(--ok-border)";
+        var pct = Math.max(4, Math.min(100, r.gap / 1.5 * 100));
+        gapCell = '<span class="ht-barbg"><i style="width:' + pct + '%;background:' + gcol + '"></i></span>'
+          + '<span class="num ' + gcls + '">' + r.gap.toFixed(2) + "</span>"
+          + '<span class="ht-small">　下限' + r.floorV.toFixed(1) + "V</span>";
+      }
+      var deepCell = "—";
+      if (r.deep && r.deep.now.seen) {
+        var dn = r.deep.now.days, dp = r.deep.prev.days;
+        var dcls = dn >= 8 ? "ht-bad" : dn >= 1 ? "ht-warn" : "ht-mute";
+        var arrow = dn > dp ? '<span class="ht-bad">▲</span>' : dn < dp ? '<span class="ht-ok">▼</span>' : "";
+        deepCell = '<span class="num ' + dcls + '">' + dn + "日</span>" + arrow
+          + (r.deep.prev.seen ? '<span class="ht-small">　← ' + dp + "日</span>" : "");
+      }
+      var balCell = r.bal === null ? "—"
+        : '<span class="num ' + (r.bal <= -20 ? "ht-bad" : r.bal < 0 ? "ht-warn" : "ht-ok") + '">'
+          + (r.bal > 0 ? "+" : "") + r.bal + "</span>";
+      var capCell = "—";
+      if (typeof e.capacityNowAh === "number") {
+        capCell = '<span class="num">' + e.capacityNowAh + "Ah</span>"
+          + (e.ratedAh ? '<span class="ht-small">／定格 ' + e.ratedAh + "Ah</span>" : "");
+      } else if (typeof e.capacityAh === "number") {
+        capCell = '<span class="num">' + e.capacityAh + "Ah</span>";
+      }
+      var degCell = '<span class="ht-mute">—</span>';
+      if (typeof e.sohPct === "number") {
+        degCell = '<span class="num ' + (e.sohPct < 60 ? "ht-bad" : e.sohPct < 80 ? "ht-warn" : "ht-ok") + '">'
+          + e.sohPct + "%</span>";
+      }
+      // へたり: 1Ah取り出したときの電圧降下[mV]。増えていれば進行中。
+      var mvCell = '<span class="ht-mute">—</span>';
+      if (typeof e.mvPerAhNow === "number") {
+        var worse = mvWorsening(e);
+        var better = typeof e.mvPerAhPrev === "number" && e.mvPerAhNow < e.mvPerAhPrev * 0.9;
+        mvCell = '<span class="num ' + (worse ? "ht-bad" : "") + '">' + e.mvPerAhNow + "</span>"
+          + (worse ? '<span class="ht-bad">▲</span>' : better ? '<span class="ht-ok">▼</span>' : "")
+          + (typeof e.mvPerAhPrev === "number" ? '<span class="ht-small">　← ' + e.mvPerAhPrev
+            + (e.mvSpansSwap ? "（交換前）" : "") + "</span>" : "");
+      }
+      var swapCell = '<span class="ht-mute">—</span>';
+      if (e.lastSwapAt) {
+        // 載せ替えた電池が新品とは限らない(臨時の予備で前より弱いこともある)ので、
+        // 良し悪しの色は付けず、日付と「測り直しの状況」だけを出す。
+        swapCell = '<span class="num">' + e.lastSwapAt.slice(5).replace("-", "/") + "</span>"
+          + (e.capStale ? '<span class="ht-warn ht-small">　測り直し中</span>'
+            : e.capDaysAfterSwap ? '<span class="ht-small">　以降' + e.capDaysAfterSwap + "日で測定</span>" : "");
+      }
+      // 列数が多いので、拠点名の「（河川 / 地区）」は落として幅を稼ぐ(全体はtitleに残す)
+      var shortName = r.name.replace(/\s*[（(][^）)]*[）)]\s*$/, "");
+      return '<tr data-site="' + r.id + '">'
+        + '<td class="ht-name" title="' + r.name + '">' + shortName + "</td>"
+        + '<td><span class="ht-pill ' + st[1] + '">' + st[0] + "</span></td>"
+        + '<td class="num ' + hCls + '">' + hTxt + hMark + "</td>"
+        + "<td>" + vminTxt + "</td>"
+        + "<td>" + gapCell + "</td>"
+        + "<td>" + deepCell + "</td>"
+        + "<td>" + balCell + "</td>"
+        + '<td class="ht-mute">' + (r.load === null ? "—" : r.load) + "</td>"
+        + "<td>" + capCell + "</td>"
+        + "<td>" + degCell + "</td>"
+        + "<td>" + mvCell + "</td>"
+        + "<td>" + swapCell + "</td>"
+        + "</tr>";
+    }).join("");
+    body.innerHTML = html || '<tr><td colspan="11" class="ht-mute">まだ算出できていません。</td></tr>';
+
+    var note = document.getElementById("healthTableNote");
+    if (note) {
+      var stamp = batteryOutlookStamp();
+      note.textContent = "危ない順に並べています。左ほど「今すぐ困るか」、右ほど「これから困りそうか」です"
+        + (batteryHealthState.days ? "（日次データ " + batteryHealthState.days + "日分）" : "")
+        + (stamp ? "／持ち時間の最終計算 " + stamp : "") + "。";
+    }
+    var caveat = document.getElementById("healthTableCaveat");
+    if (caveat) {
+      var withDeg = rows.filter(function (r) { return typeof r.e.sohPct === "number"; });
+      var pcts = withDeg.map(function (r) { return r.e.sohPct; }).sort(function (a, b) { return a - b; });
+      var med = pcts.length ? pcts[Math.floor(pcts.length / 2)] : null;
+      caveat.innerHTML = "<b>「定格比」は参考値です（誤差±15%程度）。</b>"
+        + "定格容量（50Ah / 20Ah）の一覧が無いため、その拠点で測れた最大の容量から推定しています"
+        + (med !== null ? "。算出できた" + pcts.length + "拠点の中央値は " + med + "% です" : "")
+        + "。観測は2026年6月13日に始まったばかりで、いまの比較は<b>夏 → 秋</b>をまたぎます。"
+        + "日射が減ると満充電まで届かなくなり、電池が傷んでいなくても実効容量は小さく出ます"
+        + "（気温補正は25℃換算で入れてありますが、前半と後半の平均気温がほぼ同じため結果はほとんど変わりません）。"
+        + "<br><b>「同じ日射なのに満充電が速い＝劣化」という見方も実データで検証しましたが、数値にはできませんでした。</b>"
+        + "充電コントローラがMPPTで発電量をそのまま流し込むため充電電流が頭打ちにならず、"
+        + "充電中の端子電圧は残量を表さないためです（吸収電圧13.4Vには朝のうちに到達してしまいます）。"
+        + "<br><b>季節に左右されない指標は「放電の速さ」（1Ah取り出したときの電圧降下）です。</b>"
+        + "充電されない夜間の実測だけで出るので日射も気温もほとんど効きません。"
+        + "放電が速くなっている拠点（▲）はバッテリーが弱っています。"
+        + "あわせて左側の「下限までの余裕」と「深放電した日」（どちらも実測そのもの）で判断してください。";
+    }
   }
   // 見通しを最後に計算した時刻(JSTのhh:mm)。表の説明に添えて、更新されていることを分かるようにする。
   function batteryOutlookStamp() {
@@ -4956,7 +5239,13 @@
   function nightDeclineCapacityAh(siteId, balanceCapacityAh) {
     var days = powerDailyState.days || {};
     var ahPerV = [];
+    // 現場でバッテリーを載せ替えている拠点は、交換日以降の夜だけを使う。
+    // 載せ替えた電池が前より弱いこともあるため、交換をまたいだ夜を混ぜると
+    // 持ち時間を実態より長く見積もってしまう。
+    var health = batteryHealthEntry(siteId);
+    var since = (health && health.lastSwapAt) || null;
     Object.keys(days).forEach(function (k) {
+      if (since && k < since) return;
       var e = days[k] && days[k][siteId];
       if (!e || typeof e.nightVPerH !== "number" || typeof e.nightA !== "number") return;
       if (!(e.nightVPerH > 0.002) || !(e.nightA > 0.01)) return;   // 降下も電流も小さすぎる夜は使わない
@@ -5387,6 +5676,12 @@
     var file = evt.target.files && evt.target.files[0];
     if (file) importCsvFile(file);
     evt.target.value = "";
+  });
+  document.getElementById("healthTableBtn").addEventListener("click", function () {
+    var card = document.getElementById("healthTableCard");
+    var showing = card.classList.toggle("show");
+    this.textContent = showing ? "一覧を隠す" : "健全性の一覧";
+    if (showing) renderHealthTable();
   });
   document.getElementById("tableBtn").addEventListener("click", function () {
     var showing = tableSection.classList.toggle("show");
@@ -6065,6 +6360,9 @@
     OUTLOOK_REFRESH_MS: OUTLOOK_REFRESH_MS,
     refreshAllBatteryHealth: refreshAllBatteryHealth,
     createEnduranceChart: createEnduranceChart,
+    renderHealthTable: renderHealthTable, healthTableRows: healthTableRows,
+    healthStateOf: healthStateOf, deepDischargeCounts: deepDischargeCounts,
+    recentVminMedian: recentVminMedian, HEALTH_DEEP_V: HEALTH_DEEP_V,
     getHealthScatter: function () { return healthScatter; },
     batteryOutlookStamp: batteryOutlookStamp,
     ENDURANCE_CHART_CAP_H: ENDURANCE_CHART_CAP_H,
