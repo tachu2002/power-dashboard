@@ -278,6 +278,100 @@ export async function run() {
   r.check("p8-x3 日射ゼロ前提の拠点は※印で区別し、説明を添える",
     bars.values.every((v) => v.indexOf("※") > 0) && bars.note.indexOf("※印") >= 0, bars.values);
 
+  /* ===== バッテリー健全性の一覧(「健全性の一覧」ボタン) =====
+     天気・夜間降下を織り込んだ持ち時間を先頭に、実測(最低電圧・深放電)と
+     容量の変化を1つの表にまとめたもの。劣化率は季節の影響と切り分けられないため、
+     参考値である旨を画面に明記していることまで含めて検証する。 */
+  const pageHT = await newPage(null, {
+    nowMs: NOW, matsuhisaBody: NO_BAT_BODY, openMeteoStatus: 500,
+    batteryHealth: buildBatteryHealth({
+      nowMs: NOW, days: 109, longTermFrom: "2026-06-13", longTermTo: "2026-09-29",
+      sites: {
+        // 下限11.5V・深放電が増えている拠点(要対応)
+        cam11: { capacityAh: 50, nightA: 1.00, socPct: 80, vmin: 11.85, deep: 13, deepPrev: 2,
+          capacityInitialAh: 71, capacityNowAh: 50, genWhPerDay: 96, loadWhPerDay: 81,
+          pvPeakNowW: 18.0, pvPeakInitialW: 18.2 },
+        // 下限9.5V。余裕は大きいが持ち時間は短い
+        cam03: { capacityAh: 50, nightA: 0.96, socPct: 30, vmin: 12.05, deep: 0, deepPrev: 0,
+          capacityInitialAh: 62, capacityNowAh: 50, genWhPerDay: 75, loadWhPerDay: 88,
+          pvPeakNowW: 12.1, pvPeakInitialW: 15.3, mvPerAhNow: 31.4, mvPerAhPrev: 25.0 },
+        // 下限10.5V。持ちが12時間未満
+        cam09: { capacityAh: 15, nightA: 1.60, socPct: 50, vmin: 11.90, deep: 5, deepPrev: 9,
+          genWhPerDay: 90, loadWhPerDay: 117, lastSwapAt: "2026-09-11" },
+        // 良好
+        cam41: { capacityAh: 14, nightA: 0.07, socPct: 86, vmin: 12.46, deep: 0, deepPrev: 0,
+          capacityInitialAh: 19.7, capacityNowAh: 14, genWhPerDay: 28, loadWhPerDay: 16,
+          mvPerAhNow: 66.0, mvPerAhPrev: 65.0 },
+        cam12: { mains: true, v0: 13.45 },
+        cam13: { fitR: 0.41 }
+      }
+    })
+  });
+  await openDashboard(pageHT, () => {
+    const st = window.__dashboardDebug.getBatteryHealthState();
+    return st && Object.keys(st.sites || {}).length > 0;
+  });
+  await pageHT.evaluate(() => window.__dashboardDebug.showView("power"));
+  await pageHT.waitForTimeout(400);
+  const ht0 = await pageHT.evaluate(() => ({
+    hidden: !document.getElementById("healthTableCard").classList.contains("show"),
+    btn: document.getElementById("healthTableBtn").textContent
+  }));
+  r.check("p8-h1 一覧は既定では畳んである", ht0.hidden && ht0.btn === "健全性の一覧", ht0);
+  const ht = await pageHT.evaluate(() => {
+    document.getElementById("healthTableBtn").click();
+    const card = document.getElementById("healthTableCard");
+    const rows = Array.from(document.querySelectorAll("#healthTableBody tr"));
+    const cellsOf = (tr) => Array.from(tr.querySelectorAll("td")).map((td) => td.textContent.trim());
+    return {
+      shown: card.classList.contains("show"),
+      btn: document.getElementById("healthTableBtn").textContent,
+      order: rows.map((tr) => tr.getAttribute("data-site")),
+      pills: rows.map((tr) => tr.querySelector(".ht-pill") && tr.querySelector(".ht-pill").textContent),
+      cells: rows.map(cellsOf),
+      headers: Array.from(document.querySelectorAll(".health-table th")).map((th) => th.textContent),
+      caveat: document.getElementById("healthTableCaveat").textContent,
+      note: document.getElementById("healthTableNote").textContent,
+      explain: document.querySelector(".health-note").textContent
+    };
+  });
+  const rowOf = (id) => ht.cells[ht.order.indexOf(id)];
+  r.check("p8-h2 ボタンで開き、常時電源(cam12)を除いた拠点が並ぶ",
+    ht.shown && ht.btn === "一覧を隠す" && ht.order.indexOf("cam12") < 0 && ht.order.length === 5, ht.order);
+  r.check("p8-h3 危ない順(持ち時間の短い順)に並べる",
+    ht.order[0] === "cam09" && ht.order[1] === "cam03" && ht.order.indexOf("cam13") === ht.order.length - 1, ht.order);
+  r.check("p8-h4 下限までの余裕は拠点ごとの下限で出す(cam03は9.5V基準で2.55V)",
+    rowOf("cam03")[4].indexOf("2.55") >= 0 && rowOf("cam03")[4].indexOf("下限9.5V") > 0, rowOf("cam03").slice(3, 5));
+  r.check("p8-h5 深放電した日を前30日と比べて増減の向きを出す",
+    rowOf("cam11")[5].indexOf("13日") === 0 && rowOf("cam11")[5].indexOf("▲") > 0
+    && rowOf("cam11")[5].indexOf("2日") > 0 && rowOf("cam09")[5].indexOf("▼") > 0,
+    [rowOf("cam11")[5], rowOf("cam09")[5]]);
+  r.check("p8-h6 実効容量は実測値と推定定格を並べて出す",
+    rowOf("cam11")[8].indexOf("50Ah") === 0 && rowOf("cam11")[8].indexOf("定格 50Ah") > 0, rowOf("cam11")[8]);
+  r.check("p8-h7 定格比(SOH)を%で出す",
+    rowOf("cam11")[9] === "100%" && rowOf("cam41")[9] === "70%", [rowOf("cam11")[9], rowOf("cam41")[9]]);
+  r.check("p8-h8 1日の収支と消費を出す(cam09は−27Wh/117Wh)",
+    rowOf("cam09")[6] === "-27" && rowOf("cam09")[7] === "117", rowOf("cam09").slice(6, 8));
+  r.check("p8-h9 へたり(1Ahあたりの降下)は増えていれば▲を付ける",
+    rowOf("cam03")[10].indexOf("31") === 0 && rowOf("cam03")[10].indexOf("▲") > 0
+    && rowOf("cam03")[10].indexOf("25") > 0 && rowOf("cam41")[10].indexOf("▲") < 0,
+    [rowOf("cam03")[10], rowOf("cam41")[10]]);
+  r.check("p8-h9b 交換を検出した拠点は日付を出す",
+    rowOf("cam09")[11].indexOf("09/11") === 0 && rowOf("cam11")[11] === "—",
+    [rowOf("cam09")[11], rowOf("cam11")[11]]);
+  r.check("p8-h10 状態は要対応/注意/良好で示す",
+    ht.pills[ht.order.indexOf("cam11")] === "要対応" && ht.pills[ht.order.indexOf("cam41")] === "良好",
+    ht.pills);
+  r.check("p8-h11 劣化の目安が参考値であることと、季節の影響を画面に明記する",
+    ht.caveat.indexOf("参考値") >= 0 && ht.caveat.indexOf("夏") >= 0 && ht.caveat.indexOf("秋") >= 0
+    && ht.caveat.indexOf("下限までの余裕") >= 0 && ht.caveat.indexOf("深放電した日") >= 0, ht.caveat.slice(0, 120));
+  r.check("p8-h12 各列の根拠を説明する",
+    ht.explain.indexOf("直近35日") >= 0 && ht.explain.indexOf("11.8V") >= 0
+    && ht.explain.indexOf("下限は拠点ごとに異なります") >= 0, ht.explain.slice(0, 120));
+  r.check("p8-h13 日次データの日数を添える", ht.note.indexOf("109日分") >= 0, ht.note);
+  r.check("p8-h14 ページ例外にはならない", pageHT.errMsgs().length === 0, pageHT.errMsgs());
+  await pageHT.close();
+
   // グラフが枠に対して引き伸ばされていないこと(発電グラフを外して幅が広がった際の不具合対策)
   const aspect = await pageH.evaluate(() => {
     const box = document.getElementById("pchart-bat-cam02");

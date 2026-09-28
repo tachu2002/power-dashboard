@@ -310,6 +310,19 @@ export function buildBatteryHealth(opts = {}) {
     const cap = s.capacityAh ?? null, a = s.nightA ?? null, soc = s.socPct ?? null;
     const usable = (cap != null && soc != null) ? cap * Math.max(0, soc - reserve) / 100 : null;
     const hours = (usable != null && a) ? Math.round(usable / a * 10) / 10 : null;
+    // 健全性の一覧が使う日ごとの最低電圧。spec.deep / spec.deepPrev で
+    // 「直近30日」「その前30日」に深放電(11.8V未満)の日を何日入れるか指定する。
+    let vminDays = s.vminDays ?? null;
+    if (!vminDays && (s.deep != null || s.deepPrev != null)) {
+      const base = s.vmin ?? 12.1;
+      vminDays = [];
+      for (let i = 0; i < 60; i++) {
+        const inRecent = i >= 30;
+        const idxInWin = inRecent ? i - 30 : i;
+        const want = inRecent ? (s.deep ?? 0) : (s.deepPrev ?? 0);
+        vminDays.push(idxInWin < want ? 11.5 : base);
+      }
+    }
     sites[id] = {
       days: s.days ?? 28, mains: !!s.mains,
       v0: s.v0 ?? (soc != null ? 12.4 : null), socPct: soc,
@@ -317,13 +330,30 @@ export function buildBatteryHealth(opts = {}) {
       capacityAh: cap, fitR: s.fitR ?? (cap != null ? 0.93 : null),
       whPerV: cap != null ? Math.round(cap * 12.4 / 1.34) : null,
       usableAh: usable != null ? Math.round(usable * 100) / 100 : null,
-      enduranceH: s.mains ? null : hours
+      enduranceH: s.mains ? null : hours,
+      // ---- 健全性の一覧で使う列 ----
+      capacityNowAh: s.capacityNowAh ?? cap,
+      capacityInitialAh: s.capacityInitialAh ?? null,
+      degradePct: s.degradePct ?? ((s.capacityInitialAh && cap) ? Math.round(cap / s.capacityInitialAh * 100) : null),
+      spanDays: s.spanDays ?? (s.days ?? 28),
+      genWhPerDay: s.genWhPerDay ?? null, loadWhPerDay: s.loadWhPerDay ?? null,
+      pvPeakNowW: s.pvPeakNowW ?? null, pvPeakInitialW: s.pvPeakInitialW ?? null,
+      vminFrom: vminDays ? "2026-08-01" : null, vminDays: vminDays,
+      // 交換の検出と定格比、夜間実測のへたり具合
+      swaps: s.lastSwapAt ? [s.lastSwapAt] : [], lastSwapAt: s.lastSwapAt ?? null,
+      capAfterSwap: !!s.lastSwapAt, capDaysAfterSwap: s.capDaysAfterSwap ?? (s.lastSwapAt ? 17 : null),
+      ratedAh: s.ratedAh ?? (cap != null ? (cap > 32 ? 50 : 20) : null),
+      sohPct: s.sohPct ?? (cap != null ? Math.round(cap / (s.ratedAh ?? (cap > 32 ? 50 : 20)) * 100) : null),
+      mvPerAhNow: s.mvPerAhNow ?? null, mvPerAhPrev: s.mvPerAhPrev ?? null,
+      nightNights: s.nightNights ?? (s.mvPerAhNow != null ? 18 : null)
     };
   });
   return {
     generatedAt: new Date(opts.nowMs || Date.now()).toISOString(),
     method: "endurance", reserveSocPct: reserve, nightEndHourJst: 4,
-    days: opts.days ?? 28, sites
+    days: opts.days ?? 28, capWindowDays: 35, tempRefC: 25, tempCoefPerC: 0.006,
+    longTermFrom: opts.longTermFrom ?? null, longTermTo: opts.longTermTo ?? null,
+    sites
   };
 }
 

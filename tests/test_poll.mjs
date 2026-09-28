@@ -558,6 +558,175 @@ export async function run() {
   r.check("s19-n 1時間以内は再計算しない", health2.generatedAt === firstGeneratedAt, health2.generatedAt);
   fs.rmSync(healthSandbox, { recursive: true, force: true });
 
+  /* ====== 長期日次(中継サーバーの /api/power/daily)と劣化の目安 ======
+     5分CSVは30日で消えるが、長期APIは観測開始からの日次を返す。これを取り込むと
+     「観測開始ごろの35日」と「直近の35日」で同じ方法で容量を測って比べられる。
+     ここでは前半の容量500Wh/V・後半350Wh/V(=70%)のバッテリーを作り、
+     劣化の目安として70%前後が出ること、気温を25℃相当に直していることを見る。 */
+  const ltSandbox = makeSandbox("longterm");
+  fs.mkdirSync(path.join(ltSandbox, "data"), { recursive: true });
+  const LT_DAYS = 100;
+  const LT_BAL = [-60, 40, -55, 80, -70, 30, -45, 90, -65, 25, -50, 70, -60, 35];
+  // 中継側の拠点番号 → 名前(poll.mjs の対応表で cam11 / cam01 に落ちる)
+  const LT_NAMES = { 1: "祇園大橋", 2: "うるおい広場", 3: "こも池", 4: "白滝公園", 5: "芝橋",
+    9: "開発室" /* 対応表に無い＝対象外 */ };
+  const LT_SWAP_BACK = 43;                                  // こも池(cam41)はこの日に交換した想定
+  const ltSwapDate = dayKey(now - LT_SWAP_BACK * 24 * HOUR);
+  const ltFinalV = {};    // 当日(CSV由来)の0時電圧。長期側の並びと食い違わせないため引き継ぐ
+  function ltRowsFor(id) {
+    const rows = [];
+    let v = id === 3 ? 12.00 : 12.40;
+    for (let back = LT_DAYS; back >= 1; back--) {
+      const b = LT_BAL[(LT_DAYS - back) % LT_BAL.length] * (id === 2 ? 0.5 : 1);
+      // 前半は500Wh/V、後半は350Wh/V。同じ収支でも後半のほうが電圧が大きく動く=容量が小さい。
+      // こも池は途中で交換する想定: へたった150Wh/V → 交換日に電圧が跳ね、以後500Wh/Vに戻る。
+      // 白滝公園(cam42)は逆に、交換後のほうが弱い電池(臨時の予備)を入れた想定。
+      // 芝橋(cam43)は容量も電池も変わらず、一日だけ電圧が跳ねて翌日戻る(天気由来)。
+      const whPerV = id === 3 ? (back > LT_SWAP_BACK ? 150 : 500)
+        : id === 4 ? (back > LT_SWAP_BACK ? 500 : 200)
+        : id === 5 ? 500
+        : ((LT_DAYS - back) < LT_DAYS / 2 ? 500 : 350);
+      rows.push({
+        date: dayKey(now - back * 24 * HOUR),
+        bat_ref_v: Math.round(v * 1000) / 1000,
+        bat_min_v: Math.round((v - 0.30) * 1000) / 1000,
+        bat_max_v: Math.round((v + 0.80) * 1000) / 1000,
+        gen_wh: 100 + b, load_wh: 100, charge_wh: 90, pv_peak_w: 18.5
+      });
+      v += b / whPerV;
+      if (id === 3 && back === LT_SWAP_BACK + 1) v += 1.00;   // ここで新品に載せ替え
+      if (id === 4 && back === LT_SWAP_BACK + 1) v += 0.55;   // 充電済みだが弱い電池に載せ替え
+      if (id === 5 && back === 31) v += 0.50;                 // 一日だけ跳ねて…
+      if (id === 5 && back === 30) v -= 0.50;                 // …翌日には戻る
+    }
+    ltFinalV[id] = Math.round(v * 1000) / 1000;
+    rows.push({ date: dayKey(now), bat_ref_v: ltFinalV[id], bat_min_v: ltFinalV[id] - 0.3,
+      bat_max_v: ltFinalV[id] + 0.8, gen_wh: 20, load_wh: 60, charge_wh: 15, pv_peak_w: 6.0, partial: true });
+    return rows;
+  }
+  const ltV0By = { 1: {}, 2: {}, 3: {}, 4: {}, 5: {} };   // 日付 → その日の0時電圧(長期側の並びと一致させる)
+  const ltBalBy = { 1: {}, 2: {}, 3: {}, 4: {}, 5: {} };  // 日付 → その日の収支[Wh](同上)
+  [1, 2, 3, 4, 5].forEach((id) => {
+    ltRowsFor(id).forEach((r) => { ltV0By[id][r.date] = r.bat_ref_v; ltBalBy[id][r.date] = r.gen_wh - r.load_wh; });
+  });
+  const ltRelayName = { 1: "祇園大橋", 2: "うるおい広場", 3: "こも池", 4: "白滝公園", 5: "芝橋" };
+  // 遡って取りに行く日ぶんも、その日の電圧でCSVを返す(同じCSVを返すと日次集計が潰れるため)
+  function ltNightRowsFor(dateKey) {
+    const base = Date.parse(dateKey + "T00:00:00Z") - 9 * HOUR;
+    const rows = [];
+    [1, 2, 3, 4, 5].forEach((id) => {
+      const v0 = ltV0By[id][dateKey];
+      if (typeof v0 !== "number") return;
+      for (let m = 0; m < 4 * 60; m += 10) {
+        rows.push({ ts: new Date(base + m * 60000).toISOString(), name: ltRelayName[id],
+          pvW: "0.000", batMv: Math.round((v0 - 0.015 * (m / 60)) * 1000),
+          chgMa: 0, disMa: 1000, genWh: "0.0", useWh: (m / 60 * 12).toFixed(1) });
+      }
+      // 1日の終わりの積算値。日次集計はここから収支(発電−消費)を取る。
+      rows.push({ ts: new Date(base + 23 * 60 * 60000 + 50 * 60000).toISOString(), name: ltRelayName[id],
+        pvW: "0.000", batMv: Math.round(v0 * 1000), chgMa: 0, disMa: 1000,
+        genWh: (100 + ltBalBy[id][dateKey]).toFixed(1), useWh: "100.0" });
+    });
+    return rows;
+  }
+  const ltHandler = (u) => {
+    const m = u.match(/\/api\/power\/daily\?id=(\d+)/);
+    if (m) {
+      const id = Number(m[1]);
+      if (!LT_NAMES[id]) return { ok: false, status: 404 };
+      return { json: async () => ({ id, name: LT_NAMES[id], rows: ltRowsFor(id) }) };
+    }
+    if (u.includes("archive-api.open-meteo.com")) {
+      const time = [], temp = [];
+      for (let back = LT_DAYS; back >= 1; back--) { time.push(dayKey(now - back * 24 * HOUR)); temp.push(25.0); }
+      return { json: async () => ({ daily: { time, temperature_2m_mean: temp } }) };
+    }
+    const dm = u.match(/\/power\/logs\/power-(\d{4}-\d{2}-\d{2})\.csv/);
+    if (dm) return { text: async () => powerCsv(ltNightRowsFor(dm[1])) };
+    return handler(u);
+  };
+  const ltp = await runPoll(ltSandbox, ltHandler, "lt1");
+  const ltPath = path.join(ltSandbox, "data", "power_longterm.json");
+  const lt = fs.existsSync(ltPath) ? JSON.parse(fs.readFileSync(ltPath, "utf8")) : null;
+  const ltHealth = JSON.parse(fs.readFileSync(path.join(ltSandbox, "data", "battery_health.json"), "utf8"));
+  const L11 = ltHealth.sites.cam11;
+  r.check("s20-a data/power_longterm.jsonが作られる",
+    lt && Object.keys(lt.days || {}).length === LT_DAYS, lt && Object.keys(lt.days || {}).length);
+  r.check("s20-b 中継の拠点名でカメラIDに突き合わせる(対応表に無い拠点は対象外)",
+    lt && lt.days[dayKey(now - 24 * HOUR)].cam11 && lt.days[dayKey(now - 24 * HOUR)].cam01
+    && lt.sites === 5, lt && lt.sites);
+  r.check("s20-c 収支[Wh]は発電−消費で持つ",
+    lt && lt.days[dayKey(now - LT_DAYS * 24 * HOUR)].cam11.balWh === LT_BAL[0],
+    lt && lt.days[dayKey(now - LT_DAYS * 24 * HOUR)].cam11);
+  r.check("s20-d 途中集計(partial)の当日は容量の回帰に使わない",
+    lt && !lt.days[dayKey(now)], lt && Object.keys(lt.days).slice(-1));
+  r.check("s20-e 日平均気温も一緒に保存する",
+    lt && Object.keys(lt.tempC || {}).length >= LT_DAYS - 1, lt && Object.keys(lt.tempC || {}).length);
+  r.check("s20-f 長期APIは1拠点1リクエストで取りに行く",
+    ltp.calls.filter((u) => u.includes("/api/power/daily")).length >= 28,
+    ltp.calls.filter((u) => u.includes("/api/power/daily")).length);
+  r.check("s20-g 観測開始ごろと直近の実効容量を両方出す",
+    L11 && L11.capacityInitialAh > L11.capacityNowAh && L11.capacityInitialAh > 40,
+    L11 && { 初期: L11.capacityInitialAh, 直近: L11.capacityNowAh });
+  r.check("s20-h 劣化の目安は 直近 ÷ 初期(前半500Wh/V・後半350Wh/V → 70%前後)",
+    L11 && Math.abs(L11.degradePct - 70) <= 8, L11 && L11.degradePct);
+  r.check("s20-i 持ち時間に使う容量は直近の値(全期間で均さない)",
+    L11 && Math.abs(L11.capacityAh - L11.capacityNowAh) < 0.6 && L11.capWindow
+    && L11.capWindow.whole === false, L11 && { cap: L11.capacityAh, now: L11.capacityNowAh, w: L11.capWindow });
+  r.check("s20-j 気温は25℃相当に直してから比べる(25℃固定なら補正前後で同じ)",
+    L11 && L11.capWindow.tempC === 25 && L11.initialWindow.tempC === 25,
+    L11 && [L11.capWindow.tempC, L11.initialWindow.tempC]);
+  r.check("s20-k 画面側が深放電を数えられるよう、日ごとの最低電圧を60日ぶん渡す",
+    L11 && L11.vminDays && L11.vminDays.length === 60 && typeof L11.vminFrom === "string"
+    && L11.vminDays.filter((x) => typeof x === "number").length >= 55,
+    L11 && { from: L11.vminFrom, n: L11.vminDays && L11.vminDays.length });
+  r.check("s20-l 1日あたりの発電量・消費量(直近の中央値)を持つ",
+    L11 && L11.loadWhPerDay === 100 && typeof L11.genWhPerDay === "number",
+    L11 && { gen: L11.genWhPerDay, load: L11.loadWhPerDay });
+  r.check("s20-m 発電ピークも初期と直近で持つ",
+    L11 && L11.pvPeakNowW === 18.5 && L11.pvPeakInitialW === 18.5, L11 && [L11.pvPeakInitialW, L11.pvPeakNowW]);
+  // ---- バッテリー交換の検出(現場で載せ替えている運用への対応) ----
+  const L41 = ltHealth.sites.cam41;
+  r.check("s20-o 収支で説明できない電圧の跳ねをバッテリー交換として検出する",
+    L41 && L41.swaps.length === 1 && L41.lastSwapAt === ltSwapDate, L41 && { swaps: L41.swaps, want: ltSwapDate });
+  r.check("s20-p 交換していない拠点は検出しない",
+    L11 && L11.swaps.length === 0, L11 && L11.swaps);
+  r.check("s20-q 容量は交換以降のデータだけで測り直す(交換後の500Wh/Vを拾う)",
+    L41 && L41.capAfterSwap === true && L41.capacityNowAh > L11.capacityNowAh * 1.2,
+    L41 && { こも池: L41.capacityNowAh, 祇園: L11.capacityNowAh, 交換後: L41.capDaysAfterSwap });
+  r.check("s20-r 交換した拠点は「観測開始ごろとの比」を出さない(比較にならないため)",
+    L41 && L41.degradePct === null && L41.capacityInitialAh === null, L41 && L41.degradePct);
+  // ---- 定格容量(50Ah/20Ah)の自動判定と定格比 ----
+  r.check("s20-s 測れた最大の容量から定格(50Ah/20Ah)を推定する",
+    L11 && L11.ratedAh === 50 && L41 && L41.ratedAh === 50, [L11 && L11.ratedAh, L41 && L41.ratedAh]);
+  r.check("s20-t 定格比(SOH)を出す。劣化した拠点ほど低い",
+    L11 && L11.sohPct > 40 && L11.sohPct < 110 && L41 && L41.sohPct > L11.sohPct,
+    { 祇園: L11 && L11.sohPct, こも池: L41 && L41.sohPct });
+  // ---- へたり具合(1Ah取り出したときの電圧降下) ----
+  r.check("s20-u 夜間の実測から 1Ahあたりの電圧降下[mV/Ah] を出す",
+    L11 && Math.abs(L11.mvPerAhNow - 15) < 1.5 && L11.nightNights >= 2,
+    L11 && { mv: L11.mvPerAhNow, nights: L11.nightNights });
+  r.check("s20-v 表面電荷の影響を避けるため、前日が晴れた夜は放電の速さに使わない",
+    L11 && typeof L11.nightGenMaxWh === "number"
+    && L11.nightNights < ltHealth.sites.cam11.spanDays,
+    L11 && { 上限: L11.nightGenMaxWh, 使った夜: L11.nightNights });
+
+  // 交換した電池が新品とは限らない(臨時の予備で前より弱いこともある)
+  const L42 = ltHealth.sites.cam42, L43 = ltHealth.sites.cam43;
+  r.check("s20-w 交換後のほうが弱い電池でも検出し、容量はその日以降で測り直す(小さくなる)",
+    L42 && L42.swaps.length === 1 && L42.lastSwapAt === ltSwapDate
+    && L42.capAfterSwap === true && L42.capacityNowAh < L11.capacityNowAh,
+    L42 && { swaps: L42.swaps, 容量: L42.capacityNowAh, 祇園: L11.capacityNowAh });
+  r.check("s20-x 一日だけ跳ねて翌日戻る変化は交換とみなさない(天気由来)",
+    L43 && L43.swaps.length === 0, L43 && L43.swaps);
+
+  // 2回目は12時間たっていないので取りに行かない
+  const ltp2 = await runPoll(ltSandbox, ltHandler, "lt2");
+  r.check("s20-n 長期APIは12時間に1回だけ取りに行く",
+    ltp2.calls.filter((u) => u.includes("/api/power/daily")).length === 0,
+    ltp2.calls.filter((u) => u.includes("/api/power/daily")).length);
+  fs.rmSync(ltSandbox, { recursive: true, force: true });
+
   /* ---- 後片付け ---- */
   fs.rmSync(sandbox, { recursive: true, force: true });
   fs.rmSync(sandbox2, { recursive: true, force: true });
