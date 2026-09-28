@@ -441,7 +441,8 @@
   .battery-health .health-sub { font-size: 10px; color: var(--text-secondary); margin-top: 1px; }
   /* 劣化の比較(散布図)。横軸=夜間の消費電力、縦軸=夜間の電圧降下。 */
   .health-scatter-card { margin-bottom: 10px; }
-  .health-scatter-card .chart-box { height: 280px; }
+  /* 高さは拠点数に合わせてJS側で決める(横棒が1拠点1行のため) */
+  .health-scatter-card .chart-box { height: 280px; min-height: 160px; }
   .health-scatter-card h2 { font-size: 14px; margin: 0; }
   .health-scatter-card .subtitle { font-size: 11px; margin: 2px 0 0; }
   /* バッテリー残量ゲージ(スマートフォンの電池表示のイメージ)。
@@ -716,7 +717,7 @@
         <div class="card health-scatter-card" id="healthScatterCard">
           <div class="site-card-header">
             <div class="site-title-wrap">
-              <h2>バッテリーの持ち比較（実効容量 × 夜間の消費電流）</h2>
+              <h2>バッテリーの持ち比較（あと何時間もつか）</h2>
               <p class="subtitle" id="healthScatterNote">算出中…</p>
             </div>
           </div>
@@ -1656,7 +1657,7 @@
      打ち切っていたため、下限の低い拠点(北沢など)の持ち時間が実態より大幅に短く出ていた。 */
   function reserveSocFor(siteId) {
     var v = batteryEmptyVoltageFor(siteId);
-    var pct = socFromVoltage(v);
+    var pct = socFromVoltage(v);   // 11.36V未満の下限はマイナスの残量として返る
     return typeof pct === "number" ? pct : 20;
   }
   // 日射がゼロのまま続いた場合に、その拠点の下限まで何時間もつか。
@@ -1745,29 +1746,20 @@
     if (holder) holder.title = title;
   }
   /* ---------------------------------------------------------------------
-   * 持ちの比較(散布図)
+   * バッテリーの持ち比較(横棒)
    * -----------------------------------------------------------------------
-   * 横軸=夜間の消費電流[A]、縦軸=実効容量[Ah]。点が拠点。
-   * 曲線は「持ち時間が同じになる線」(容量 = 電流 × 時間 ÷ 使える割合)で、
-   * 12時間・24時間・48時間の3本を引く。**左上ほど余裕があり、右下ほど危ない**。
-   * 容量が小さいのか消費が大きいのか、どちらが効いているかが一目で分かる。
+   * 拠点ごとに「あと何時間もつか」を横棒で並べ、短い順に上から置く。
+   * 目盛りは12時間・24時間・48時間。色はカードと同じ(12h未満=危険 / 24h未満=注意 /
+   * 48h以上=良好)。7日先まで下限に達しない拠点は右端まで伸ばして「継続可」と出す。
+   * 値は日射予報を織り込んだ見通しで、10分ごとに計算し直される。
    * --------------------------------------------------------------------- */
-  function createHealthScatter(containerId) {
+  var ENDURANCE_CHART_CAP_H = 72;     // 横軸の上限。これを超える拠点は右端で打ち切って実値を添える
+  function createEnduranceChart(containerId) {
     var container = document.getElementById(containerId);
     if (!container) return { render: function () {} };
     var svgNS = "http://www.w3.org/2000/svg";
     var FONT = "system-ui, -apple-system, sans-serif";
     function el(tag, attrs) { var e = document.createElementNS(svgNS, tag); for (var k in attrs) e.setAttribute(k, attrs[k]); return e; }
-    function niceScale(lo, hi) {
-      if (lo === hi) { lo -= 1; hi += 1; }
-      var rawStep = (hi - lo) / 4;
-      var mag = Math.pow(10, Math.floor(Math.log(rawStep) / Math.LN10));
-      var norm = rawStep / mag;
-      var step = (norm < 1.5 ? 1 : norm < 2.25 ? 2 : norm < 3.5 ? 2.5 : norm < 7.5 ? 5 : 10) * mag;
-      var ticks = [];
-      for (var v = Math.ceil(lo / step) * step; v <= hi + step / 1000; v += step) ticks.push(Math.round(v * 100000) / 100000);
-      return { ticks: ticks };
-    }
     var svg = document.createElementNS(svgNS, "svg");
     svg.setAttribute("width", "100%"); svg.setAttribute("height", "100%"); svg.style.display = "block";
     container.appendChild(svg);
@@ -1778,111 +1770,118 @@
     container.appendChild(tooltip);
 
     function render() {
-      var W = Math.max(320, container.clientWidth || 640), H = container.clientHeight || 280;
-      var marginLeft = 46, marginRight = 14, marginTop = 14, marginBottom = 34;
-      var plotW = W - marginLeft - marginRight, plotH = H - marginTop - marginBottom;
+      var rows = [];
+      POWER_SITES.forEach(function (site) {
+        var e = batteryHealthEntry(site.id);
+        if (!e || e.mains) return;
+        var o = batteryOutlook(site);
+        var name = site.name.replace(/（.*$/, "");
+        if (o) {
+          rows.push({ id: site.id, name: name, hours: o.hoursToReserve,
+            sustain: o.hoursToReserve === null, soc: o.socNow, src: "予報込み",
+            capacityAh: e.capacityAh, nightA: e.nightA, floorV: batteryEmptyVoltageFor(site.id) });
+          return;
+        }
+        var noSun = noSunHoursFor(site.id, e);
+        if (typeof noSun === "number") {
+          rows.push({ id: site.id, name: name, hours: noSun, sustain: false, soc: e.socPct,
+            src: "日射ゼロ時", capacityAh: e.capacityAh, nightA: e.nightA,
+            floorV: batteryEmptyVoltageFor(site.id) });
+        }
+      });
+      // 短い順(危ない順)に上から。継続可はいちばん下。
+      rows.sort(function (a, b) {
+        if (a.sustain !== b.sustain) return a.sustain ? 1 : -1;
+        return (a.hours || 0) - (b.hours || 0);
+      });
+
+      var rowH = 19, marginTop = 26, marginBottom = 24, marginLeft = 118, marginRight = 58;
+      var H = Math.max(160, marginTop + marginBottom + rows.length * rowH);
+      container.style.height = H + "px";
+      var W = Math.max(360, container.clientWidth || 720);
+      var plotW = W - marginLeft - marginRight;
       while (svg.firstChild) svg.removeChild(svg.firstChild);
       svg.setAttribute("viewBox", "0 0 " + W + " " + H);
       svg.setAttribute("preserveAspectRatio", "none");
       tooltip.style.opacity = 0;
+      if (!rows.length) return;
       var pal = palette();
-      var points = [];
-      POWER_SITES.forEach(function (site) {
-        var e = batteryHealthEntry(site.id);
-        if (!e || e.mains || typeof e.capacityAh !== "number" || typeof e.nightA !== "number") return;
-        points.push({ id: site.id, name: site.name.replace(/（.*$/, ""),
-          x: e.nightA, y: e.capacityAh, h: e.enduranceH, soc: e.socPct });
-      });
-      if (points.length < 2) return;
-      var xMax = Math.max.apply(null, points.map(function (p) { return p.x; })) * 1.12;
-      var yMax = Math.max.apply(null, points.map(function (p) { return p.y; })) * 1.12;
-      function xAt(v) { return marginLeft + (v / (xMax || 1)) * plotW; }
-      function yAt(v) { return marginTop + plotH - (v / (yMax || 1)) * plotH; }
+      var maxH = rows.reduce(function (m, r) { return Math.max(m, r.sustain ? 0 : (r.hours || 0)); }, 0);
+      var cap = Math.min(ENDURANCE_CHART_CAP_H, Math.max(24, Math.ceil(maxH / 12) * 12));
+      function xAt(h) { return marginLeft + Math.min(1, h / cap) * plotW; }
 
-      niceScale(0, yMax).ticks.forEach(function (t) {
-        if (t < 0 || t > yMax) return;
-        var y = yAt(t);
-        svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: y, y2: y, stroke: pal.gridline, "stroke-width": 1 }));
-        var lbl = el("text", { x: marginLeft - 7, y: y, "text-anchor": "end", "dominant-baseline": "middle",
-          fill: pal.textMuted, "font-size": 10, "font-family": FONT });
-        lbl.textContent = String(Math.round(t)); svg.appendChild(lbl);
-      });
-      niceScale(0, xMax).ticks.forEach(function (t) {
-        if (t < 0 || t > xMax) return;
+      // 目盛り(12時間ごと)と、しきい値の線
+      for (var t = 0; t <= cap; t += 12) {
         var x = xAt(t);
-        svg.appendChild(el("line", { x1: x, x2: x, y1: marginTop, y2: marginTop + plotH, stroke: pal.gridline, "stroke-width": 1, opacity: 0.6 }));
-        var xl = el("text", { x: x, y: H - 12, "text-anchor": "middle", fill: pal.textMuted, "font-size": 10, "font-family": FONT });
-        xl.textContent = (Math.round(t * 100) / 100).toFixed(1); svg.appendChild(xl);
-      });
-      var xTitle = el("text", { x: marginLeft + plotW / 2, y: H - 1, "text-anchor": "middle", fill: pal.textSecondary, "font-size": 10, "font-family": FONT });
-      xTitle.textContent = "夜間の消費電流（A）"; svg.appendChild(xTitle);
-      var yTitle = el("text", { x: 11, y: marginTop + plotH / 2, "text-anchor": "middle", fill: pal.textSecondary,
-        "font-size": 10, "font-family": FONT, transform: "rotate(-90 11 " + (marginTop + plotH / 2) + ")" });
-      yTitle.textContent = "実効容量（Ah）"; svg.appendChild(yTitle);
+        var isThreshold = (t === 12 || t === 24 || t === 48);
+        svg.appendChild(el("line", { x1: x, x2: x, y1: marginTop - 6, y2: H - marginBottom,
+          stroke: isThreshold ? (t === 12 ? (pal.critical || "#d03b3b") : t === 24 ? (pal.warn || "#c98a00") : (pal.ok || "#2e9e63")) : pal.gridline,
+          "stroke-width": 1, "stroke-dasharray": isThreshold ? "4 3" : "", opacity: isThreshold ? 0.6 : 1 }));
+        var lbl = el("text", { x: x, y: marginTop - 11, "text-anchor": "middle",
+          fill: isThreshold ? (t === 12 ? (pal.critical || "#d03b3b") : t === 24 ? (pal.warn || "#c98a00") : (pal.ok || "#2e9e63")) : pal.textMuted,
+          "font-size": 10, "font-weight": isThreshold ? 600 : 400, "font-family": FONT });
+        lbl.textContent = t === 0 ? "今" : (t >= 24 ? (t / 24) + "日" : t + "h");
+        svg.appendChild(lbl);
+      }
 
-      // 等持ち時間の線。満充電から空まで使ったときに、ちょうどその時間もつ組み合わせ。
-      // 下限は拠点ごとに違うため、線の基準は「満充電から空まで使った場合」に統一する。
-      var usableFrac = 1;
-      [{ h: 12, c: pal.critical || "#d03b3b" }, { h: 24, c: pal.warn || "#c98a00" }, { h: 48, c: pal.ok || "#2e9e63" }]
-        .forEach(function (iso) {
-          var d = "", drawn = false;
-          for (var i = 0; i <= 40; i++) {
-            var a = xMax * i / 40;
-            if (a <= 0) continue;
-            var cap = a * iso.h / usableFrac;
-            if (cap > yMax * 1.4) continue;
-            d += (drawn ? "L" : "M") + xAt(a) + " " + yAt(cap); drawn = true;
-          }
-          if (!drawn) return;
-          svg.appendChild(el("path", { d: d, fill: "none", stroke: iso.c, "stroke-width": 1.2, "stroke-dasharray": "5 4", opacity: 0.7 }));
-          // 線の右端にラベルを添える
-          var aEnd = Math.min(xMax, yMax * usableFrac / iso.h);
-          var capEnd = aEnd * iso.h / usableFrac;
-          var lx = xAt(aEnd), ly = yAt(capEnd);
-          var t = el("text", { x: Math.min(lx - 3, W - marginRight - 2), y: Math.max(ly - 6, marginTop + 9),
-            "text-anchor": "end", fill: iso.c, "font-size": 10, "font-weight": 600, "font-family": FONT });
-          t.textContent = iso.h + "時間"; svg.appendChild(t);
-        });
-
-      // 点。持ちが短い順に3拠点と、長い順に2拠点だけ名前を添える。
-      var sorted = points.slice().sort(function (a, b) { return (a.h || 0) - (b.h || 0); });
-      var labelled = {};
-      sorted.slice(0, 3).forEach(function (p) { labelled[p.id] = 1; });
-      sorted.slice(-2).forEach(function (p) { labelled[p.id] = 1; });
-      points.forEach(function (p) {
-        var cx = xAt(p.x), cy = yAt(p.y);
-        var cls = enduranceClass(p.h);
-        var fill = cls === "critical" ? (pal.critical || "#d03b3b")
+      rows.forEach(function (r, i) {
+        var y = marginTop + i * rowH;
+        var cy = y + rowH / 2;
+        var cls = r.sustain ? "ok" : enduranceClass(r.hours);
+        var color = cls === "critical" ? (pal.critical || "#d03b3b")
           : cls === "warn" ? (pal.warn || "#c98a00")
             : cls === "ok" ? (pal.ok || "#2e9e63") : pal.bat;
-        var dot = el("circle", { cx: cx, cy: cy, r: 5, fill: fill, stroke: pal.surface, "stroke-width": 2 });
-        dot.style.cursor = "pointer";
-        svg.appendChild(dot);
-        if (labelled[p.id]) {
-          var right = cx > marginLeft + plotW * 0.7;
-          var t = el("text", { x: cx + (right ? -10 : 10), y: cy + 4, "text-anchor": right ? "end" : "start",
-            fill: pal.textSecondary, "font-size": 10, "font-family": FONT });
-          t.textContent = p.name; svg.appendChild(t);
+        // 拠点名
+        var nameEl = el("text", { class: "endurance-name", x: marginLeft - 8, y: cy,
+          "text-anchor": "end", "dominant-baseline": "middle",
+          fill: pal.textSecondary, "font-size": 11, "font-family": FONT });
+        nameEl.textContent = r.name; svg.appendChild(nameEl);
+        // 棒
+        var over = !r.sustain && r.hours > cap;
+        var barW = Math.max(2, (r.sustain ? plotW : xAt(r.hours) - marginLeft));
+        // 日射予報を使えない拠点(日射ゼロ前提)は、塗りを薄くし枠線を点線にして区別する。
+        var noSunRow = r.src === "日射ゼロ時";
+        var bar = el("rect", { class: "endurance-bar", "data-site": r.id,
+          x: marginLeft, y: y + 3, width: barW, height: rowH - 7, rx: 3,
+          fill: color, opacity: noSunRow ? 0.3 : 0.85,
+          stroke: noSunRow ? color : "none", "stroke-width": noSunRow ? 1 : 0,
+          "stroke-dasharray": noSunRow ? "3 2" : "" });
+        bar.style.cursor = "pointer";
+        svg.appendChild(bar);
+        // 打ち切った棒・継続可の棒には右端に印を付ける
+        if (over || r.sustain) {
+          var tip = el("path", { d: "M" + (marginLeft + plotW + 2) + " " + (cy - 4) +
+            "L" + (marginLeft + plotW + 8) + " " + cy + "L" + (marginLeft + plotW + 2) + " " + (cy + 4) + "Z",
+            fill: color, opacity: 0.85 });
+          svg.appendChild(tip);
         }
+        // 値
+        var vEl = el("text", { class: "endurance-value", x: W - marginRight + 12, y: cy,
+          "text-anchor": "start", "dominant-baseline": "middle",
+          fill: color, "font-size": 11, "font-weight": 700, "font-family": FONT });
+        vEl.textContent = (r.sustain ? "継続可" : fmtEndurance(r.hours)) + (noSunRow ? " ※" : "");
+        svg.appendChild(vEl);
+
         function show() {
           while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
           var l0 = document.createElement("div");
-          l0.style.cssText = "color:var(--text-primary);font-weight:600;"; l0.textContent = p.name;
+          l0.style.cssText = "color:var(--text-primary);font-weight:600;";
+          l0.textContent = r.name + "　" + (r.sustain ? "継続可" : fmtEndurance(r.hours));
           var l1 = document.createElement("div");
           l1.style.cssText = "color:var(--text-secondary);";
-          l1.textContent = "容量 " + p.y + "Ah ／ 夜間 " + p.x + "A ／ 残量 " + p.soc + "%";
+          l1.textContent = "残量 " + r.soc + "% ／ 容量 " + r.capacityAh + "Ah ／ 夜間 " + r.nightA + "A";
           var l2 = document.createElement("div");
-          l2.style.cssText = "color:var(--text-primary);";
-          l2.textContent = "日射ゼロで " + fmtEndurance(p.h) + " もつ";
+          l2.style.cssText = "color:var(--text-secondary);";
+          l2.textContent = "下限 " + r.floorV.toFixed(2) + "V ／ " + r.src;
           tooltip.appendChild(l0); tooltip.appendChild(l1); tooltip.appendChild(l2);
           var rect = container.getBoundingClientRect();
-          tooltip.style.left = Math.max(4, Math.min((cx / W) * rect.width + 12, rect.width - 170)) + "px";
-          tooltip.style.top = Math.max(4, (cy / H) * rect.height - 56) + "px";
+          tooltip.style.left = Math.max(4, Math.min(marginLeft / W * rect.width, rect.width - 230)) + "px";
+          tooltip.style.top = Math.max(4, (cy / H) * rect.height - 52) + "px";
           tooltip.style.opacity = 1;
         }
-        dot.addEventListener("pointerenter", show);
-        dot.addEventListener("pointermove", show);
-        dot.addEventListener("pointerleave", function () { tooltip.style.opacity = 0; });
+        bar.addEventListener("pointerenter", show);
+        bar.addEventListener("pointermove", show);
+        bar.addEventListener("pointerleave", function () { tooltip.style.opacity = 0; });
       });
     }
     return { render: render };
@@ -1891,12 +1890,12 @@
   var healthScatter = null;
   function refreshAllBatteryHealth() {
     POWER_SITES.forEach(function (site) { updateBatteryHealth(site); });
-    if (!healthScatter) healthScatter = createHealthScatter("healthScatter");
+    if (!healthScatter) healthScatter = createEnduranceChart("healthScatter");
     healthScatter.render();
     var note = document.getElementById("healthScatterNote");
     if (!note) return;
     var ids = Object.keys(batteryHealthState.sites);
-    var rated = ids.filter(function (id) { return typeof batteryHealthState.sites[id].enduranceH === "number"; }).length;
+    var rated = ids.filter(function (id) { return typeof batteryHealthState.sites[id].capacityAh === "number"; }).length;
     var mains = ids.filter(function (id) { return batteryHealthState.sites[id].mains; }).length;
     if (!rated) {
       note.textContent = "実効容量は「1日の収支（発電−消費）」と「翌日の0時基準電圧の変化」の回帰から出します。"
@@ -1904,10 +1903,23 @@
         + (batteryHealthState.days ? "（現在 " + batteryHealthState.days + "日分）" : "") + "。";
       return;
     }
-    note.textContent = "横軸が夜間の消費電流、縦軸が実効容量。破線は「ちょうどその時間もつ」線で、"
-      + "右下へ行くほど余裕がありません。容量が小さいのか消費が大きいのか、どちらが効いているかが分かります"
-      + "（" + rated + "拠点／" + (batteryHealthState.days || "–") + "日分の実測"
-      + (mains ? "・常時電源 " + mains + "拠点は対象外" : "") + "）。";
+    var stamp = batteryOutlookStamp();
+    note.textContent = "日射予報を織り込んで「下限電圧に達するまであと何時間もつか」を、短い順に並べています。"
+      + "12時間・24時間・48時間の位置に線を引いてあります"
+      + (mains ? "（常時電源 " + mains + "拠点は対象外）" : "")
+      + "。※印は日射予報や発電実績が足りず、日射ゼロの前提で出している拠点です。"
+      + "10分ごとに計算し直しています" + (stamp ? "（最終計算 " + stamp + "）" : "") + "。";
+  }
+  // 見通しを最後に計算した時刻(JSTのhh:mm)。表の説明に添えて、更新されていることを分かるようにする。
+  function batteryOutlookStamp() {
+    var latest = null;
+    POWER_SITES.forEach(function (site) {
+      var hit = outlookCache[site.id];
+      if (hit && (latest === null || hit.at > latest)) latest = hit.at;
+    });
+    if (latest === null) return null;
+    var d = new Date(latest + 9 * 60 * 60 * 1000);
+    return String(d.getUTCHours()).padStart(2, "0") + ":" + String(d.getUTCMinutes()).padStart(2, "0");
   }
   function serverLatestWaterReading(site) {
     var entry = serverLatestState.sites[site.id];
@@ -2098,7 +2110,7 @@
   // unit: 値の単位("W" / "V" など。既定は"V")。
   // points[i]に t(ミリ秒またはDate) があれば時間軸で、無ければ従来通り等間隔(インデックス)で描画する。
   // points[i].predicted === true の区間は「未来の予測値」として点線で描画する。
-  function createPowerSeriesChart(containerId, seriesKey, ratedValue, ratedLabel, unit) {
+  function createPowerSeriesChart(containerId, seriesKey, ratedValue, ratedLabel, unit, floorValue, floorLabel) {
     var svgNS = "http://www.w3.org/2000/svg";
     var container = document.getElementById(containerId);
     var svg = document.createElementNS(svgNS, "svg");
@@ -2169,6 +2181,8 @@
       var vals = points.map(function (p) { return p.value; });
       var allVals = vals.slice();
       if (typeof ratedValue === "number") allVals.push(ratedValue);
+      // 拠点ごとの下限電圧も範囲に含める。「あとどれだけ余裕があるか」を目で読めるようにする。
+      if (typeof floorValue === "number") allVals.push(floorValue);
       var scale = niceScale(Math.min.apply(null, allVals), Math.max.apply(null, allVals));
       var xs = computeXPositions(points, marginLeft, plotW);
       function xAt(i) { return xs[i]; }
@@ -2199,6 +2213,21 @@
         svg.appendChild(el("rect", { x: rlabelX, y: ry - 17, width: rlabelWidth, height: 16, rx: 3, fill: pal.surface, opacity: 0.85 }));
         var rlabel = el("text", { x: rlabelX + rlabelWidth - 4, y: ry - 9, "text-anchor": "end", "dominant-baseline": "middle", fill: pal.rated, "font-size": 11, "font-family": "system-ui, -apple-system, sans-serif" });
         rlabel.textContent = rtext; svg.appendChild(rlabel);
+      }
+      // 拠点ごとの下限電圧。ここに触れたら機器が止まる。定格線より目立つ赤の実線にする。
+      if (typeof floorValue === "number" && floorValue >= scale.min && floorValue <= scale.max) {
+        var fy = yAt(floorValue);
+        svg.appendChild(el("line", { x1: marginLeft, x2: W - marginRight, y1: fy, y2: fy,
+          stroke: pal.critical || "#d03b3b", "stroke-width": 1.5, opacity: 0.9 }));
+        var ftext = floorLabel || ("下限" + floorValue.toFixed(2) + "V");
+        var fwide = (ftext.match(/[^\x00-\x7F]/g) || []).length;
+        var fw = (ftext.length - fwide) * 6.4 + fwide * 11 + 8;
+        var fx = W - marginRight - fw;
+        svg.appendChild(el("rect", { x: fx, y: fy + 1, width: fw, height: 15, rx: 3, fill: pal.surface, opacity: 0.85 }));
+        var flabel = el("text", { x: fx + fw - 4, y: fy + 9, "text-anchor": "end", "dominant-baseline": "middle",
+          fill: pal.critical || "#d03b3b", "font-size": 10, "font-weight": 600,
+          "font-family": "system-ui, -apple-system, sans-serif" });
+        flabel.textContent = ftext; svg.appendChild(flabel);
       }
       var split = buildSplitPathData(points, xs, yAt);
       // 実測と予測の境界(=現在時刻)に縦線を引き、どこから先が予測かを明示する。
@@ -2776,7 +2805,10 @@
     sitesGrid.appendChild(card);
 
     var s = siteStates[site.id];
-    s.batChart = createPowerSeriesChart("pchart-bat-" + site.id, "bat", RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(2) + "V", "V");
+    var floorV = batteryEmptyVoltageFor(site.id);
+    s.batChart = createPowerSeriesChart("pchart-bat-" + site.id, "bat",
+      RATED_BAT_VOLTAGE, "定格" + RATED_BAT_VOLTAGE.toFixed(2) + "V", "V",
+      floorV, "下限" + floorV.toFixed(2) + "V");
     s.powerCardEl = card;
     s.powerStatusDotEl = statusEl.querySelector(".dot");
     s.powerStatusTextEl = statusEl.querySelector(".status-text");
@@ -4857,10 +4889,23 @@
   var OUTLOOK_V_NOM = 12.5;                           // Ah↔Wh の換算に使う公称電圧
   var OUTLOOK_SURFACE_TAU_MS = 3 * 60 * 60 * 1000;    // 表面電荷(充電中の電圧の下駄)が抜ける時定数
   var outlookCache = {};
-  // 残量[%] → 休止時の開回路電圧。OCV表の逆引き。
+  /* OCV表は 11.36V = 残量0% までしか表現していないが、機器の下限が 9.5V(北沢) や
+     10.5V(多呂樋管など)の拠点では、そこまで引っ張った区間も持ち時間に含めたい。
+     そこで表の下に「放電末期」の直線を継ぎ足し、残量をマイナスまで延ばせるようにする。
+       11.36V(残量0%) → DEEP_DISCHARGE_V(9.0V) の間に、定格容量の DEEP_DISCHARGE_PCT(5%)
+       ぶんだけ残っているものとして直線で結ぶ。
+     鉛蓄電池は11.3Vを下回るとほぼ空で、そこから先は電圧が急に落ちるだけなので
+     取り出せる量は小さい。5%は控えめな見積りで、根拠のある固定値ではない。
+     これにより 9.5V と 10.5V の差が数字に出るようになる(それぞれ約 −3.9% / −1.8%)。 */
+  var DEEP_DISCHARGE_V = 9.0;
+  var DEEP_DISCHARGE_PCT = -5;
+  // 残量[%] → 休止時の開回路電圧。OCV表の逆引き＋放電末期の延長。
   function voltageFromSoc(pct) {
     var t = BATTERY_OCV_TABLE_CLIENT;
-    if (pct <= t[0][1]) return t[0][0];
+    if (pct <= 0) {
+      var f = Math.max(DEEP_DISCHARGE_PCT, pct) / DEEP_DISCHARGE_PCT;   // 0→1
+      return t[0][0] + f * (DEEP_DISCHARGE_V - t[0][0]);
+    }
     if (pct >= t[t.length - 1][1]) return t[t.length - 1][0];
     for (var i = 1; i < t.length; i++) {
       if (pct <= t[i][1]) {
@@ -4873,7 +4918,10 @@
   function socFromVoltage(v) {
     var t = BATTERY_OCV_TABLE_CLIENT;
     if (!isFinite(v)) return null;
-    if (v <= t[0][0]) return 0;
+    if (v <= t[0][0]) {
+      if (v <= DEEP_DISCHARGE_V) return DEEP_DISCHARGE_PCT;
+      return (t[0][0] - v) / (t[0][0] - DEEP_DISCHARGE_V) * DEEP_DISCHARGE_PCT;
+    }
     if (v >= t[t.length - 1][0]) return 100;
     for (var i = 1; i < t.length; i++) {
       if (v <= t[i][0]) {
@@ -4965,7 +5013,7 @@
     for (var j = 1; j <= steps; j++) {
       var t = nowMs + j * OUTLOOK_STEP_MS;
       var pvW = k * radiationAt(lat, lon, t - OUTLOOK_STEP_MS / 2, cloud);
-      soc = Math.max(0, Math.min(100, soc + (pvW - loadW) * stepH / capWh * 100));
+      soc = Math.max(DEEP_DISCHARGE_PCT, Math.min(100, soc + (pvW - loadW) * stepH / capWh * 100));
       if (soc < minSoc) { minSoc = soc; minSocAt = t; }
       if (hoursToReserve === null && soc <= reserve) hoursToReserve = j * stepH;
       // グラフ用は12時間先まで(それ以降は描かないので持たない)
@@ -5950,6 +5998,7 @@
     // --- バッテリーの持ち(無日射で何時間もつか) ---
     loadBatteryHealth: loadBatteryHealth, fmtEndurance: fmtEndurance,
     reserveSocFor: reserveSocFor, noSunHoursFor: noSunHoursFor,
+    DEEP_DISCHARGE_V: DEEP_DISCHARGE_V, DEEP_DISCHARGE_PCT: DEEP_DISCHARGE_PCT,
     enduranceClass: enduranceClass, updateBatteryHealth: updateBatteryHealth,
     // --- 残量の見通し(日の出日の入り＋日射予報＋発電実績、10分ごと) ---
     solarAltitudeDeg: solarAltitudeDeg, clearSkyRadiation: clearSkyRadiation, sunTimesFor: sunTimesFor,
@@ -5963,8 +6012,10 @@
     OUTLOOK_HORIZON_MS: OUTLOOK_HORIZON_MS, OUTLOOK_STEP_MS: OUTLOOK_STEP_MS,
     OUTLOOK_REFRESH_MS: OUTLOOK_REFRESH_MS,
     refreshAllBatteryHealth: refreshAllBatteryHealth,
-    createHealthScatter: createHealthScatter,
+    createEnduranceChart: createEnduranceChart,
     getHealthScatter: function () { return healthScatter; },
+    batteryOutlookStamp: batteryOutlookStamp,
+    ENDURANCE_CHART_CAP_H: ENDURANCE_CHART_CAP_H,
     getBatteryHealthState: function () { return batteryHealthState; },
     SERVER_BATTERY_HEALTH_URL: SERVER_BATTERY_HEALTH_URL,
     getServerLatestState: function () { return serverLatestState; },
