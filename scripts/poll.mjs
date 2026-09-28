@@ -882,6 +882,10 @@ const BATTERY_SWAP_MAD_K = 5;           // 残差のばらつきの何倍を異�
 const BATTERY_SWAP_MAX_BAL_WH = 20;     // この収支を超える日は充電で説明できるので除く
 const BATTERY_SWAP_LEVEL_V = 0.20;      // 段差が続いたと認める電圧差
 const BATTERY_SWAP_LEVEL_DAYS = 5;      // 段差の前後を平均する日数
+// 段差が「続いた」と言うには、その日以降に最低これだけの日数が要る。
+// 直近1〜2日の跳ねは続くかどうかまだ分からないので、確定するまで交換とみなさない
+// (運用初日に、当日の跳ねを交換と誤判定した拠点が2つ出たための対策)。
+const BATTERY_SWAP_CONFIRM_DAYS = 3;
 const BATTERY_SWAP_MERGE_DAYS = 2;      // 連続した検出は1回の交換にまとめる
 function detectBatterySwaps(series) {
   const pairs = [];
@@ -898,20 +902,21 @@ function detectBatterySwaps(series) {
   const mad = medianOf(res.map(Math.abs)) || 0;
   const thr = Math.max(BATTERY_SWAP_MIN_JUMP_V, BATTERY_SWAP_MAD_K * mad);
   // 前後それぞれ数日の平均をとって、跳ねが「その日だけ」か「水準の変化」かを見分ける
-  const meanV0 = function (from, to) {
+  const v0sIn = function (from, to) {
     const v = [];
     for (let i = Math.max(0, from); i < Math.min(series.length, to); i++) {
       if (typeof series[i].d.v0 === "number") v.push(series[i].d.v0);
     }
-    return v.length ? v.reduce(function (a, b) { return a + b; }, 0) / v.length : null;
+    return v;
   };
+  const mean = function (v) { return v.reduce(function (a, b) { return a + b; }, 0) / v.length; };
   const hits = [];
   pairs.forEach(function (p, i) {
     if (!(res[i] > thr) || p.x > BATTERY_SWAP_MAX_BAL_WH) return;
-    const after = meanV0(p.at, p.at + BATTERY_SWAP_LEVEL_DAYS);
-    const before = meanV0(p.at - BATTERY_SWAP_LEVEL_DAYS, p.at);
-    if (after === null || before === null) return;
-    if (after - before >= BATTERY_SWAP_LEVEL_V) hits.push(p.day);
+    const after = v0sIn(p.at, p.at + BATTERY_SWAP_LEVEL_DAYS);
+    const before = v0sIn(p.at - BATTERY_SWAP_LEVEL_DAYS, p.at);
+    if (after.length < BATTERY_SWAP_CONFIRM_DAYS || !before.length) return;   // まだ続くか分からない
+    if (mean(after) - mean(before) >= BATTERY_SWAP_LEVEL_V) hits.push(p.day);
   });
   const events = [];
   hits.forEach(function (d) {
