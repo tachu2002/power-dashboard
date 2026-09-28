@@ -628,6 +628,21 @@ function summarizePowerDay(rows) {
       ah += (a1 + a0) / 2 * dt;
       hours += dt;
     }
+    // 夜間の電圧降下の速さ[V/h]。最小二乗の傾きで出す(端点2点の引き算だとノイズが乗るため)。
+    // 「充電されない夜間に実際どれだけ電圧が落ちるか」で、持ち時間の見通しを実測に合わせるのに使う。
+    let vPerH = null;
+    const vs = nights.filter(function (r) { return typeof r.bat === "number"; });
+    if (vs.length >= 10) {
+      const n2 = vs.length;
+      const mx = vs.reduce(function (a, r) { return a + r.fetchedAt.getTime(); }, 0) / n2;
+      const my = vs.reduce(function (a, r) { return a + r.bat; }, 0) / n2;
+      let num = 0, den = 0;
+      vs.forEach(function (r) {
+        const dx = r.fetchedAt.getTime() - mx;
+        num += dx * (r.bat - my); den += dx * dx;
+      });
+      if (den > 0) vPerH = -(num / den) * 3600000;   // 下がっていればプラス
+    }
     const last = seg[seg.length - 1];
     const bal = (last && typeof last.genWh === "number" && typeof last.useWh === "number")
       ? last.genWh - last.useWh : null;
@@ -636,6 +651,8 @@ function summarizePowerDay(rows) {
       v0: v0s.length ? r3(v0s.reduce(function (a, b) { return a + b; }, 0) / v0s.length) : null,
       balWh: bal === null ? null : Math.round(bal * 10) / 10,
       nightA: hours > 2 ? r3(ah / hours) : null,
+      // 夜間の電圧降下[V/h]。小さい値なので桁を多めに残す。
+      nightVPerH: (hours > 2 && vPerH !== null) ? Math.round(vPerH * 100000) / 100000 : null,
       vmin: vmin === null ? null : r3(vmin)
     };
   });
@@ -652,11 +669,18 @@ async function updatePowerDailyFile(todayRows) {
   if (todayRows && todayRows.length) store.days[todayKey] = summarizePowerDay(todayRows);
 
   // 過去日の穴埋め(1回の実行で数日ぶんだけ)。昨日より前で、まだ無い日を古い順に埋めていく。
+  // 集計項目を増やしたときは、古い形式の日も取り直す(needsRefill)。
+  const needsRefill = function (day) {
+    if (!day) return true;
+    const ids = Object.keys(day);
+    if (!ids.length) return false;                       // データ自体が無い日は空のまま
+    return ids.every(function (id) { return day[id].nightVPerH === undefined; });
+  };
   let filled = 0;
   for (let back = 1; back <= POWER_DAILY_KEEP_DAYS && filled < POWER_DAILY_BACKFILL_PER_RUN; back++) {
     const d = new Date(nowMs - back * 24 * 3600000);
     const k = keyFor(d);
-    if (store.days[k]) continue;
+    if (!needsRefill(store.days[k])) continue;
     try {
       const res = await fetchWithTimeout(powerCsvUrlFor(d));
       const text = await res.text();
