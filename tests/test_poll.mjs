@@ -598,6 +598,7 @@ export async function run() {
       if (id === 4 && back === LT_SWAP_BACK + 1) v += 0.55;   // 充電済みだが弱い電池に載せ替え
       if (id === 5 && back === 31) v += 0.50;                 // 一日だけ跳ねて…
       if (id === 5 && back === 30) v -= 0.50;                 // …翌日には戻る
+      if (id === 5 && back === 2) v += 0.55;                  // 昨日跳ねたばかり(続くかまだ分からない)
     }
     ltFinalV[id] = Math.round(v * 1000) / 1000;
     rows.push({ date: dayKey(now), bat_ref_v: ltFinalV[id], bat_min_v: ltFinalV[id] - 0.3,
@@ -718,7 +719,9 @@ export async function run() {
     && L42.capAfterSwap === true && L42.capacityNowAh < L11.capacityNowAh,
     L42 && { swaps: L42.swaps, 容量: L42.capacityNowAh, 祇園: L11.capacityNowAh });
   r.check("s20-x 一日だけ跳ねて翌日戻る変化は交換とみなさない(天気由来)",
-    L43 && L43.swaps.length === 0, L43 && L43.swaps);
+    L43 && L43.swaps.indexOf(dayKey(now - 30 * 24 * HOUR)) < 0, L43 && L43.swaps);
+  r.check("s20-y 直近1〜2日の跳ねは、続くかどうか分かるまで交換と確定しない",
+    L43 && L43.swaps.length === 0 && L43.lastSwapAt === null, L43 && L43.swaps);
 
   // 2回目は12時間たっていないので取りに行かない
   const ltp2 = await runPoll(ltSandbox, ltHandler, "lt2");
