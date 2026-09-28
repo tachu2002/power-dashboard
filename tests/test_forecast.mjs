@@ -445,14 +445,14 @@ export async function run() {
   /* ====== f7: 日の出・日の入り＋日射予報からの残量の見通し ====== */
   // 太陽の位置は暦と数分以内で合っているか(三島 35.1216N / 138.9107E)
   const page3 = await newPage(null, {
-    nowMs: NOW, hourly: buildHourly({ nowMs: NOW, realisticSun: true, rain: false }),
+    nowMs: NOW, hourly: buildHourly({ nowMs: NOW, realisticSun: true, rain: false, nightRad: 30 }),
     // 当日の収支: 祇園大橋は 0時 12.24V(=60%) から +100Wh 充電された状態
     powerDaily: buildPowerDaily({ nowMs: NOW, today: {
       cam11: { v0: 12.24, balWh: 100 }, cam03: { v0: 11.81, balWh: -20 }, cam41: { v0: 12.62, balWh: 5 }
     } }),
     batteryHealth: buildBatteryHealth({ nowMs: NOW, sites: {
       cam11: { capacityAh: 50, nightA: 1.0, socPct: 80 },    // 標準
-      cam03: { capacityAh: 20, nightA: 1.5, socPct: 30 },    // すぐ落ちる
+      cam03: { capacityAh: 6, nightA: 2.0, socPct: 10 },     // 容量が小さく消費が大きい(すぐ落ちる)
       cam41: { capacityAh: 40, nightA: 0.07, socPct: 90 },   // 余裕たっぷり
       cam13: { fitR: 0.4 }                                   // 容量が出ていない
     } })
@@ -619,14 +619,19 @@ export async function run() {
   });
   r.check("f7-z1 拠点ごとの下限電圧を読む(北沢9.5V / 既定11.5V)",
     limits.北沢の下限V === 9.5 && limits.既定の下限V === 11.5, limits);
-  r.check("f7-z2 下限電圧を残量に換算する(9.5Vは0% / 11.5Vは約9%)",
-    limits.北沢の下限SOC === 0 && limits.既定の下限SOC >= 8 && limits.既定の下限SOC <= 11, limits);
+  // 11.36V未満は放電末期として直線で延長するため、下限が低い拠点はマイナスの残量になる
+  r.check("f7-z2 下限電圧を残量に換算する(9.5V=約−4% / 10.5V=約−2% / 11.5V=約9%)",
+    limits.北沢の下限SOC === -4 && limits.多呂の下限SOC === -2
+    && limits.既定の下限SOC >= 8 && limits.既定の下限SOC <= 11, limits);
+  r.check("f7-z2b 下限9.5Vと10.5Vの差が数字に出る",
+    limits.北沢の下限SOC < limits.多呂の下限SOC, limits);
   r.check("f7-z3 下限が低い拠点ほど長くもつ（同じ容量・同じ消費でも）",
     limits.北沢の持ち > limits.既定の持ち * 1.1, { 北沢: limits.北沢の持ち, 既定: limits.既定の持ち });
-  r.check("f7-z4 持ち時間は容量×(残量−下限)÷消費（北沢: 50×60%÷1.0=30h）",
-    Math.abs(limits.北沢の持ち - 30) < 0.5, limits.北沢の持ち);
+  // 北沢: 50Ah × (60% − (−3.9%)) ÷ 1.0A = 32.0h
+  r.check("f7-z4 持ち時間は容量×(残量−下限)÷消費（北沢: 50×63.9%÷1.0=32h）",
+    Math.abs(limits.北沢の持ち - 32) < 0.5, limits.北沢の持ち);
   r.check("f7-z5 見通しも拠点ごとの下限を使う",
-    limits.見通しの下限 && limits.見通しの下限.v === 9.5 && limits.見通しの下限.socPct === 0, limits.見通しの下限);
+    limits.見通しの下限 && limits.見通しの下限.v === 9.5 && limits.見通しの下限.socPct === -4, limits.見通しの下限);
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();
 

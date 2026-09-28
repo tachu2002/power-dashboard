@@ -206,10 +206,10 @@ export async function run() {
   // 50Ah × (80% − 下限11.5V相当の9.3%) ÷ 1.00A = 35h
   r.check("p8-e 持ち時間を時間で出す（丸一日以上は既定色）",
     health.ok.text === "35h" && health.ok.sub === "日射ゼロ時" && health.ok.cls === "", health.ok);
-  // 北沢は下限9.5V(=残量0%)なので 50Ah × 45% ÷ 0.96A = 23h → 24h未満は注意色
-  r.check("p8-f 丸一日もたない拠点は注意色", health.warn.text === "23h" && health.warn.cls === "warn", health.warn);
-  // 梅名2号は下限10.5V(=残量0%)なので 15Ah × 50% ÷ 1.60A = 4.7h → 12h未満は危険色
-  r.check("p8-g 一晩もたない拠点は危険色", health.bad.text === "4.7h" && health.bad.cls === "critical", health.bad);
+  // 北沢は下限9.5V(=残量−3.9%)なので 50Ah × (30+3.9)% ÷ 0.96A = 18h → 24h未満は注意色
+  r.check("p8-f 丸一日もたない拠点は注意色", health.warn.text === "18h" && health.warn.cls === "warn", health.warn);
+  // 梅名2号は下限10.5V(=残量−1.8%)なので 15Ah × (50+1.8)% ÷ 1.60A = 4.9h → 12h未満は危険色
+  r.check("p8-g 一晩もたない拠点は危険色", health.bad.text === "4.9h" && health.bad.cls === "critical", health.bad);
   // 14Ah × (86-20)% ÷ 0.07A = 132h → 48時間を超えたら「日」表記
   r.check("p8-h 2日以上もつ拠点は「日」表記で良好色",
     health.long.text.endsWith("日") && health.long.cls === "ok", health.long);
@@ -241,27 +241,42 @@ export async function run() {
   r.check("p8-o 色分けの境目(12h未満=危険・24h未満=注意・48h以上=良好)",
     JSON.stringify(fmt.c) === JSON.stringify(["critical", "warn", "warn", "", "", "ok", "muted"]), fmt.c);
 
-  // 散布図(横軸=夜間の消費電流 / 縦軸=実効容量 / 破線=等持ち時間の線)
-  const scatter = await pageH.evaluate(() => {
+  // 上段の「バッテリーの持ち比較」= あと何時間もつかの横棒。短い順に並べる。
+  const bars = await pageH.evaluate(() => {
     const box = document.getElementById("healthScatter");
     const svg = box.querySelector("svg");
     const texts = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent);
+    const barEls = Array.from(svg.querySelectorAll("rect.endurance-bar"));
     return {
-      dots: svg.querySelectorAll("circle").length,
-      isoLines: svg.querySelectorAll('path[stroke-dasharray]').length,
-      isoLabels: ["12時間", "24時間", "48時間"].filter((t) => texts.includes(t)).length,
-      axisX: texts.includes("夜間の消費電流（A）"),
-      axisY: texts.includes("実効容量（Ah）"),
-      note: document.getElementById("healthScatterNote").textContent
+      bars: barEls.length,
+      order: barEls.map((b) => b.getAttribute("data-site")),
+      widths: barEls.map((b) => Math.round(Number(b.getAttribute("width")))),
+      names: Array.from(svg.querySelectorAll("text.endurance-name")).map((t) => t.textContent),
+      values: Array.from(svg.querySelectorAll("text.endurance-value")).map((t) => t.textContent),
+      thresholds: ["12h", "1日", "2日"].filter((t) => texts.includes(t)).length,
+      hasNow: texts.includes("今"),
+      note: document.getElementById("healthScatterNote").textContent,
+      boxH: Math.round(box.getBoundingClientRect().height)
     };
   });
-  r.check("p8-s 散布図に拠点の点が描かれる(容量が出ている4拠点)", scatter.dots === 4, scatter.dots);
-  r.check("p8-t 等持ち時間の線を3本引く", scatter.isoLines === 3 && scatter.isoLabels === 3, scatter);
-  r.check("p8-u 軸の意味を明記する", scatter.axisX && scatter.axisY, scatter);
-  r.check("p8-v 読み方を説明する",
-    scatter.note.indexOf("右下へ行くほど") >= 0 && scatter.note.indexOf("実効容量") >= 0, scatter.note.slice(0, 120));
-  r.check("p8-x 常時電源の拠点は散布図の対象外と明記する",
-    scatter.note.indexOf("常時電源") >= 0, scatter.note.slice(-70));
+  r.check("p8-s 値が出ている拠点ぶんの横棒が並ぶ(4拠点)", bars.bars === 4, bars);
+  r.check("p8-t 危ない順(短い順)に上から並べる",
+    JSON.stringify(bars.order) === JSON.stringify(["cam09", "cam03", "cam11", "cam41"]), bars.order);
+  r.check("p8-t2 持ちが短い拠点ほど棒が短い",
+    bars.widths[0] < bars.widths[1] && bars.widths[1] < bars.widths[2], bars.widths);
+  r.check("p8-u 12時間・24時間・48時間の目盛りがある",
+    bars.thresholds === 3 && bars.hasNow, bars);
+  r.check("p8-u2 拠点名と値を並べて出す",
+    bars.names.length === 4 && bars.values.length === 4
+    && bars.values[0].indexOf("4.9h") === 0 && bars.values[3].indexOf("日") > 0, bars);
+  r.check("p8-v 読み方と更新間隔を説明する",
+    bars.note.indexOf("あと何時間もつか") >= 0 && bars.note.indexOf("短い順") >= 0
+    && bars.note.indexOf("10分ごとに計算し直しています") >= 0, bars.note.slice(0, 140));
+  r.check("p8-x 常時電源の拠点は対象外と明記する",
+    bars.note.indexOf("常時電源") >= 0, bars.note.slice(-60));
+  r.check("p8-x2 拠点数に合わせて高さを決める", bars.boxH >= 160, bars.boxH);
+  r.check("p8-x3 日射ゼロ前提の拠点は※印で区別し、説明を添える",
+    bars.values.every((v) => v.indexOf("※") > 0) && bars.note.indexOf("※印") >= 0, bars.values);
 
   // グラフが枠に対して引き伸ばされていないこと(発電グラフを外して幅が広がった際の不具合対策)
   const aspect = await pageH.evaluate(() => {

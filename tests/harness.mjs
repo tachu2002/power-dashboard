@@ -67,10 +67,14 @@ export function buildHourly(opts) {
     time.push(`${jst.getUTCFullYear()}-${p2(jst.getUTCMonth() + 1)}-${p2(jst.getUTCDate())}T${p2(jst.getUTCHours())}:00`);
     precipitation.push(opts.rain === false ? 0 : (h >= 2 && h <= 5 ? 3.0 : 0));
     if (opts.realisticSun) {
-      // 夜は0、日中は正午を頂点の山にする(残量の見通しの検証に使う)
+      // 日中は正午を頂点の山、夜は nightRad(既定0)。
+      // 発電係数は「実測の発電W × 予報日射」の回帰で求めるため、夜だけのデータでは引けない。
+      // 実行時刻に関係なく係数が引けるようにしたいテストでは nightRad に小さい値を入れる。
       const jh = jst.getUTCHours();
       const peak = opts.peakRad ?? 700;
-      shortwave_radiation.push(jh >= 6 && jh <= 17 ? Math.round(peak * Math.cos((jh - 12) / 6 * Math.PI / 2)) : 0);
+      const night = opts.nightRad ?? 0;
+      shortwave_radiation.push(jh >= 6 && jh <= 17
+        ? Math.max(night, Math.round(peak * Math.cos((jh - 12) / 6 * Math.PI / 2))) : night);
     } else {
       shortwave_radiation.push(Math.max(20, 500 - Math.abs(((h % 24) + 24) % 24 - 12) * 40));
     }
@@ -295,7 +299,7 @@ export function buildBatteryHealth(opts = {}) {
   // 持ち時間はその下限までで測るため、同じ容量でも拠点で変わる。
   const spec = opts.sites || {
     cam11: { capacityAh: 50, nightA: 1.00, socPct: 80 },   // 下限11.5V → 35h(既定色)
-    cam03: { capacityAh: 50, nightA: 0.96, socPct: 45 },   // 下限 9.5V → 23h(注意)
+    cam03: { capacityAh: 50, nightA: 0.96, socPct: 30 },   // 下限 9.5V → 18h(注意)
     cam09: { capacityAh: 15, nightA: 1.60, socPct: 50 },   // 下限10.5V → 4.7h(危険)
     cam41: { capacityAh: 14, nightA: 0.07, socPct: 86 },   // 下限11.5V → 6.4日(良好)
     cam12: { mains: true, v0: 13.45 },                     // 常時電源
