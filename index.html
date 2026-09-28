@@ -1664,7 +1664,10 @@
   function noSunHoursFor(siteId, e) {
     if (!e || typeof e.capacityAh !== "number" || typeof e.socPct !== "number"
       || typeof e.nightA !== "number" || !(e.nightA > 0.01)) return null;
-    var usable = e.capacityAh * Math.max(0, e.socPct - reserveSocFor(siteId)) / 100;
+    // 放電し続ける前提の値なので、夜間の実測から出した容量があればそちらを使う。
+    var nightCap = nightDeclineCapacityAh(siteId, e.capacityAh);
+    var cap = nightCap ? nightCap.capacityAh : e.capacityAh;
+    var usable = cap * Math.max(0, e.socPct - reserveSocFor(siteId)) / 100;
     return Math.round(usable / e.nightA * 10) / 10;
   }
   // 見通しの補助表示。時刻は「今日 18:20」「明日 06:10」「9/30 12:00」のように出す。
@@ -1682,7 +1685,11 @@
       ? "0時の電圧から求めた残量に、当日の収支 " +
         (o.balWhToday >= 0 ? "+" : "") + o.balWhToday + "Wh（発電−消費）を足した値"
       : "0時の " + e.socPct + "% から実測の発電で更新した値";
-    return "現在の残量 " + o.socNow + "%（" + how + "）\n" +
+    var capLine = o.nightCapacityAh
+      ? "放電時の実効容量 " + o.nightCapacityAh + "Ah（充電されない夜間の実測 " + o.nightCapacityNights +
+        "夜ぶん／充電時は " + e.capacityAh + "Ah）\n"
+      : "";
+    return "現在の残量 " + o.socNow + "%（" + how + "）\n" + capLine +
       "発電の見積り: 日射 × " + o.pvCoef + "（過去の発電実績から）／曇り具合 " +
       Math.round(o.cloudFactor * 100) + "%\n" +
       "消費 " + o.loadW + "W\n" +
@@ -4931,6 +4938,41 @@
     }
     return 100;
   }
+  /* 充電されない夜間に、電圧が実際どれだけ落ちるか。
+     -------------------------------------------------------------------
+     日次集計の nightVPerH(0:00〜4:00の電圧降下[V/h])と nightA(同じ時間帯の放電電流)から、
+     「1V下げるのに何Ah必要か」を実測で出し、それを容量に直したものを返す。
+
+       夜間の実効容量[Ah] = (夜間電流[A] ÷ 夜間降下[V/h]) × OCV幅(1.34V)
+
+     収支の回帰から出した実効容量(capacityAh)は "実際に出入りしたエネルギー" の容量で、
+     こちらは "電圧がどう動くか" の容量。2026-09-28の実測では後者が **約2.3倍** 大きい
+     (19拠点の中央値。祇園大橋 77Ah/V に対しモデル 33Ah/V)。
+     日中の充電で入った表面電荷が夜のあいだ抜けきらず、電圧の落ち方を押し上げているためで、
+     放電側の見通しは実測に合わせたほうが実態に近い。
+     そのため **放電側は夜間の実効容量、充電側は収支の実効容量** を使う。 */
+  var NIGHT_DECLINE_MIN_NIGHTS = 5;        // 中央値を取るのに必要な夜数
+  var NIGHT_DECLINE_RATIO_RANGE = [0.3, 6];  // 収支容量に対する比がこの範囲を外れたら使わない
+  function nightDeclineCapacityAh(siteId, balanceCapacityAh) {
+    var days = powerDailyState.days || {};
+    var ahPerV = [];
+    Object.keys(days).forEach(function (k) {
+      var e = days[k] && days[k][siteId];
+      if (!e || typeof e.nightVPerH !== "number" || typeof e.nightA !== "number") return;
+      if (!(e.nightVPerH > 0.002) || !(e.nightA > 0.01)) return;   // 降下も電流も小さすぎる夜は使わない
+      ahPerV.push(e.nightA / e.nightVPerH);
+    });
+    if (ahPerV.length < NIGHT_DECLINE_MIN_NIGHTS) return null;
+    ahPerV.sort(function (a, b) { return a - b; });
+    var mid = Math.floor(ahPerV.length / 2);
+    var med = ahPerV.length % 2 ? ahPerV[mid] : (ahPerV[mid - 1] + ahPerV[mid]) / 2;
+    var cap = med * (BATTERY_OCV_TABLE_CLIENT[BATTERY_OCV_TABLE_CLIENT.length - 1][0]
+      - BATTERY_OCV_TABLE_CLIENT[0][0]);
+    if (!(cap > 0) || !balanceCapacityAh) return null;
+    var ratio = cap / balanceCapacityAh;
+    if (ratio < NIGHT_DECLINE_RATIO_RANGE[0] || ratio > NIGHT_DECLINE_RATIO_RANGE[1]) return null;
+    return { capacityAh: Math.round(cap * 10) / 10, ratio: Math.round(ratio * 100) / 100, nights: ahPerV.length };
+  }
   // 発電W = 係数 × 日射[W/m2]。過去の実測(発電Wと予報日射)から原点を通る比例で求める。
   function pvCoefficient(site) {
     var s = siteStates[site.id];
@@ -4968,7 +5010,10 @@
     if (k === null) return null;
     var lat = typeof site.lat === "number" ? site.lat : WEATHER_LAT;
     var lon = typeof site.lon === "number" ? site.lon : WEATHER_LON;
-    var capWh = e.capacityAh * OUTLOOK_V_NOM;
+    var capWh = e.capacityAh * OUTLOOK_V_NOM;                 // 充電側(収支から出した実効容量)
+    // 放電側は「充電されない夜間に実際どれだけ電圧が落ちるか」から出した容量を使う。
+    var nightCap = nightDeclineCapacityAh(site.id, e.capacityAh);
+    var dischargeCapWh = (nightCap ? nightCap.capacityAh : e.capacityAh) * OUTLOOK_V_NOM;
     var loadW = e.nightA * OUTLOOK_V_NOM;
     var nowMs = Date.now();
     var reserve = reserveSocFor(site.id);          // 拠点ごとの下限電圧を残量に換算したもの
@@ -5013,7 +5058,10 @@
     for (var j = 1; j <= steps; j++) {
       var t = nowMs + j * OUTLOOK_STEP_MS;
       var pvW = k * radiationAt(lat, lon, t - OUTLOOK_STEP_MS / 2, cloud);
-      soc = Math.max(DEEP_DISCHARGE_PCT, Math.min(100, soc + (pvW - loadW) * stepH / capWh * 100));
+      var netW = pvW - loadW;
+      // 減るときは夜間の実測に合わせた容量、増えるときは収支から出した容量で換算する。
+      var useWh = netW < 0 ? dischargeCapWh : capWh;
+      soc = Math.max(DEEP_DISCHARGE_PCT, Math.min(100, soc + netW * stepH / useWh * 100));
       if (soc < minSoc) { minSoc = soc; minSocAt = t; }
       if (hoursToReserve === null && soc <= reserve) hoursToReserve = j * stepH;
       // グラフ用は12時間先まで(それ以降は描かないので持たない)
@@ -5026,6 +5074,9 @@
     return {
       computedAt: nowMs, socNow: Math.round(socNow), socSource: socSource,
       reserveSocPct: Math.round(reserve), reserveV: reserveV,
+      nightCapacityAh: nightCap ? nightCap.capacityAh : null,
+      nightCapacityRatio: nightCap ? nightCap.ratio : null,
+      nightCapacityNights: nightCap ? nightCap.nights : null,
       minSocPct: Math.round(minSoc), minSocAt: minSocAt, balWhToday: today ? today.balWh : null,
       hoursToReserve: hoursToReserve, cloudFactor: Math.round(cloud * 100) / 100,
       pvCoef: Math.round(k * 1000) / 1000, loadW: Math.round(loadW * 100) / 100,
@@ -6006,6 +6057,7 @@
     voltageFromSoc: voltageFromSoc, socFromVoltage: socFromVoltage,
     batteryOutlook: batteryOutlook, computeBatteryOutlook: computeBatteryOutlook,
     loadPowerDaily: loadPowerDaily, todayPowerDaily: todayPowerDaily,
+    nightDeclineCapacityAh: nightDeclineCapacityAh,
     getPowerDailyState: function () { return powerDailyState; },
     SERVER_POWER_DAILY_URL: SERVER_POWER_DAILY_URL,
     refreshBatteryOutlook: refreshBatteryOutlook,
