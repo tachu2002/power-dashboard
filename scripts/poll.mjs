@@ -610,6 +610,36 @@ function fitLine(points) {
   };
 }
 
+/* その日のうちのバッテリー載せ替えを、5分ごとの電圧から見つける(画面側と同じ判定)。
+ * 実データ(9/28〜9/29)の交換はどれも「発電が増えていないのに、1回の計測の間に電圧が
+ * 0.5〜1V跳ね上がる」形で残っていた(北沢 9/29 15:58→16:03 11.34→12.30V、梅名樋管2号
+ * 16:19〜17:03 は作業中0V→12.48V、清住緑地 9/28 15:41→15:44 11.90→12.71V など)。
+ * 発電が増えずに電圧だけ上がるのは載せ替え以外に起こらない。0V付近は作業中の欠測として飛ばし、
+ * 20分を超えて間が空いた2点は、途中が0Vでつながっている場合だけ比べる。 */
+const SWAP_STEP_V = 0.35;
+const SWAP_MAX_PV_RISE_W = 1;
+const SWAP_NORMAL_GAP_MS = 20 * 60 * 1000;
+const SWAP_WORK_GAP_MS = 3 * 60 * 60 * 1000;
+const SWAP_MIN_VALID_V = 5;
+function findIntradaySwap(rows) {
+  let found = null, prev = null, sawDropout = false;
+  rows.forEach(function (p) {
+    if (typeof p.bat !== "number") return;
+    if (p.bat < SWAP_MIN_VALID_V) { if (prev) sawDropout = true; return; }
+    if (prev) {
+      const gap = p.fetchedAt - prev.fetchedAt;
+      const gapOk = gap <= SWAP_NORMAL_GAP_MS || (sawDropout && gap <= SWAP_WORK_GAP_MS);
+      const pvA = typeof prev.pv === "number" ? prev.pv : 0;
+      const pvB = typeof p.pv === "number" ? p.pv : 0;
+      if (gapOk && p.bat - prev.bat >= SWAP_STEP_V && pvB - pvA <= SWAP_MAX_PV_RISE_W) {
+        found = { at: p.fetchedAt.toISOString(), vBefore: prev.bat, vAfter: p.bat };
+      }
+    }
+    prev = p; sawDropout = false;
+  });
+  return found;
+}
+
 // 中継サーバーの1日ぶんのCSV行から、拠点ごとの日次集計を作る。
 //   v0     … 0:00〜0:40 JST の平均電圧(充電の下駄が抜けた素の電圧)
 //   balWh  … その日の収支(発電Wh − 消費Wh)。積算の最終値どうしの差
@@ -666,7 +696,13 @@ function summarizePowerDay(rows) {
     const bal = (last && typeof last.genWh === "number" && typeof last.useWh === "number")
       ? last.genWh - last.useWh : null;
     const r3 = function (x) { return Math.round(x * 1000) / 1000; };
+    const swap = findIntradaySwap(seg);
     out[id] = {
+      // その日のうちにバッテリーを載せ替えた時刻(5分データの電圧の跳ねから)。無ければ付けない。
+      swapChecked: true,
+      swapAt: swap ? swap.at : undefined,
+      swapVBefore: swap ? r3(swap.vBefore) : undefined,
+      swapVAfter: swap ? r3(swap.vAfter) : undefined,
       v0: v0s.length ? r3(v0s.reduce(function (a, b) { return a + b; }, 0) / v0s.length) : null,
       balWh: bal === null ? null : Math.round(bal * 10) / 10,
       nightA: hours > 2 ? r3(ah / hours) : null,
@@ -693,7 +729,8 @@ async function updatePowerDailyFile(todayRows) {
     if (!day) return true;
     const ids = Object.keys(day);
     if (!ids.length) return false;                       // データ自体が無い日は空のまま
-    return ids.every(function (id) { return day[id].nightVPerH === undefined; });
+    // nightVPerH(夜間の電圧降下)・swapChecked(当日の載せ替え検出)を持たない古い形式の日は取り直す
+    return ids.every(function (id) { return day[id].nightVPerH === undefined || day[id].swapChecked !== true; });
   };
   let filled = 0;
   for (let back = 1; back <= POWER_DAILY_KEEP_DAYS && filled < POWER_DAILY_BACKFILL_PER_RUN; back++) {
@@ -990,7 +1027,8 @@ function computeBatteryEndurance(store, longTerm) {
       loadWhPerDay: null, genWhPerDay: null,
       vminFrom: null, vminDays: null,
       // バッテリー交換(現場で載せ替えている)の検出と、定格容量に対する比
-      swaps: [], lastSwapAt: null, capAfterSwap: false, capStale: false, capDaysAfterSwap: null,
+      swaps: [], lastSwapAt: null, lastSwapTime: null, lastSwapVBefore: null, lastSwapVAfter: null,
+      capAfterSwap: false, capStale: false, capDaysAfterSwap: null,
       mvSpansSwap: false,
       ratedAh: null, sohPct: null,
       // 「1Ah取り出すと何V下がるか」= 夜間の実測だけで出る、季節に左右されないへたり具合
@@ -999,9 +1037,31 @@ function computeBatteryEndurance(store, longTerm) {
     if (entry.vmin !== null) entry.vmin = Math.round(entry.vmin * 1000) / 1000;
 
     // 現場でのバッテリー交換をまたぐと容量がでたらめになるので、交換以降だけで測る。
-    const swaps = detectBatterySwaps(series);
+    // 交換日は2通りで見つける。
+    //  ・5分データの電圧の跳ね(当日中に時刻まで分かる。確認を待たずにすぐ確定)
+    //  ・日次の0時電圧の段差(5分データが残っていない古い日のため。続くのを3日確かめてから確定)
+    // 前者で見つけた交換の前後2日にある後者は、同じ交換の二重検出なので捨てる。
+    const DAY = 86400000;
+    const keyOfMs = function (ms) {
+      const d = new Date(ms);
+      return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-"
+        + String(d.getUTCDate()).padStart(2, "0");
+    };
+    // 当日中の交換は「翌日」から新しい電池の日として数える(その日の0時電圧は交換前の電池のもの)
+    const intraday = series.filter(function (p) { return typeof p.d.swapAt === "string"; })
+      .map(function (p) { return { day: keyOfMs(Date.parse(p.day) + DAY), at: p.d.swapAt,
+        vBefore: p.d.swapVBefore, vAfter: p.d.swapVAfter }; });
+    const daily = detectBatterySwaps(series).filter(function (d) {
+      return !intraday.some(function (x) { return Math.abs(Date.parse(x.day) - Date.parse(d)) <= 2 * DAY; });
+    }).map(function (d) { return { day: d, at: null }; });
+    const events = intraday.concat(daily).sort(function (a, b) { return a.day < b.day ? -1 : 1; });
+    const swaps = events.map(function (x) { return x.day; });
     entry.swaps = swaps;
     entry.lastSwapAt = swaps.length ? swaps[swaps.length - 1] : null;
+    const lastEv = events.length ? events[events.length - 1] : null;
+    entry.lastSwapTime = lastEv && lastEv.at ? lastEv.at : null;          // 時刻まで分かっている場合
+    entry.lastSwapVBefore = lastEv && lastEv.at ? lastEv.vBefore : null;
+    entry.lastSwapVAfter = lastEv && lastEv.at ? lastEv.vAfter : null;
     const afterSwap = entry.lastSwapAt
       ? series.filter(function (p) { return p.day >= entry.lastSwapAt; }) : series;
     entry.capDaysAfterSwap = entry.lastSwapAt ? afterSwap.length : null;
@@ -1640,6 +1700,6 @@ export {
   BATTERY_TEMP_COEF, BATTERY_TEMP_REF_C,
   fetchLongTermDaily, fetchDailyMeanTemps, updatePowerLongTermFile,
   mergeDailyStores, capacityFromSeries,
-  detectBatterySwaps, snapRatedAh, bestCapacityAh,
+  detectBatterySwaps, snapRatedAh, bestCapacityAh, findIntradaySwap,
   BATTERY_RATED_CANDIDATES, BATTERY_NIGHT_WINDOW
 };
