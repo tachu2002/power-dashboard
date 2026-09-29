@@ -1071,8 +1071,13 @@ function computeBatteryEndurance(store, longTerm) {
     // 交換後の電池が前より弱いこともあるため、交換後の日数が足りないうちは
     // 交換前の値で代用していることを画面に伝える(capStale)。
     const afterCap = capacityFromSeries(afterSwap.slice(-BATTERY_WINDOW_DAYS), tempC);
-    const recent = afterCap || capacityFromSeries(series.slice(-BATTERY_WINDOW_DAYS), tempC);
-    const whole = recent ? null : capacityFromSeries(series, tempC);
+    // 仮置きの容量は「交換より前」の日だけで測る。交換をまたぐと、交換日の電圧の跳ね(+1V前後)が
+    // 回帰を壊して当てはまりが0.6を切り、容量が出せなくなる。実際に9/30 0時の電圧(交換後)が
+    // 届いた時点で、前日に交換した4拠点(北沢・梅名2号・中村橋・中郷第１)が持ち比較から消えた。
+    const beforeSwap = entry.lastSwapAt
+      ? series.filter(function (p) { return p.day < entry.lastSwapAt; }) : series;
+    const recent = afterCap || capacityFromSeries(beforeSwap.slice(-BATTERY_WINDOW_DAYS), tempC);
+    const whole = recent ? null : capacityFromSeries(beforeSwap, tempC);
     const cap = recent || whole;
     entry.capAfterSwap = !!afterCap;
     entry.capStale = !!(entry.lastSwapAt && !afterCap);
