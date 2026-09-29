@@ -616,6 +616,9 @@ function fitLine(points) {
  * 16:19〜17:03 は作業中0V→12.48V、清住緑地 9/28 15:41→15:44 11.90→12.71V など)。
  * 発電が増えずに電圧だけ上がるのは載せ替え以外に起こらない。0V付近は作業中の欠測として飛ばし、
  * 20分を超えて間が空いた2点は、途中が0Vでつながっている場合だけ比べる。 */
+// 日次集計の「当日の載せ替え検出」の版。2 = 電池切れで負荷が切れた形を交換とみなさない。
+// これより古い版で集計した日は取り直す(負荷切れを交換と誤判定したまま残っているため)。
+const SWAP_CHECK_VERSION = 2;
 const SWAP_STEP_V = 0.35;
 const SWAP_MAX_PV_RISE_W = 1;
 const SWAP_NORMAL_GAP_MS = 20 * 60 * 1000;
@@ -719,7 +722,7 @@ function summarizePowerDay(rows) {
     const swap = findIntradaySwap(seg);
     out[id] = {
       // その日のうちにバッテリーを載せ替えた時刻(5分データの電圧の跳ねから)。無ければ付けない。
-      swapChecked: true,
+      swapChecked: SWAP_CHECK_VERSION,
       swapAt: swap ? swap.at : undefined,
       swapVBefore: swap ? r3(swap.vBefore) : undefined,
       swapVAfter: swap ? r3(swap.vAfter) : undefined,
@@ -750,7 +753,9 @@ async function updatePowerDailyFile(todayRows) {
     const ids = Object.keys(day);
     if (!ids.length) return false;                       // データ自体が無い日は空のまま
     // nightVPerH(夜間の電圧降下)・swapChecked(当日の載せ替え検出)を持たない古い形式の日は取り直す
-    return ids.every(function (id) { return day[id].nightVPerH === undefined || day[id].swapChecked !== true; });
+    return ids.every(function (id) {
+      return day[id].nightVPerH === undefined || !(Number(day[id].swapChecked) >= SWAP_CHECK_VERSION);
+    });
   };
   let filled = 0;
   for (let back = 1; back <= POWER_DAILY_KEEP_DAYS && filled < POWER_DAILY_BACKFILL_PER_RUN; back++) {
@@ -1048,7 +1053,7 @@ function computeBatteryEndurance(store, longTerm) {
       vminFrom: null, vminDays: null,
       // バッテリー交換(現場で載せ替えている)の検出と、定格容量に対する比
       swaps: [], lastSwapAt: null, lastSwapTime: null, lastSwapVBefore: null, lastSwapVAfter: null,
-      capAfterSwap: false, capStale: false, capDaysAfterSwap: null,
+      capAfterSwap: false, capStale: false, capPlaceholder: false, capDaysAfterSwap: null,
       mvSpansSwap: false,
       ratedAh: null, sohPct: null,
       // 「1Ah取り出すと何V下がるか」= 夜間の実測だけで出る、季節に左右されないへたり具合
@@ -1090,22 +1095,46 @@ function computeBatteryEndurance(store, longTerm) {
     // 全期間で均すと持ち時間を実態より長く見積もってしまうため、必ず直近の値を使う。
     // 交換後の電池が前より弱いこともあるため、交換後の日数が足りないうちは
     // 交換前の値で代用していることを画面に伝える(capStale)。
-    const afterCap = capacityFromSeries(afterSwap.slice(-BATTERY_WINDOW_DAYS), tempC);
-    // 仮置きの容量は「交換より前」の日だけで測る。交換をまたぐと、交換日の電圧の跳ね(+1V前後)が
-    // 回帰を壊して当てはまりが0.6を切り、容量が出せなくなる。実際に9/30 0時の電圧(交換後)が
-    // 届いた時点で、前日に交換した4拠点(北沢・梅名2号・中村橋・中郷第１)が持ち比較から消えた。
-    const beforeSwap = entry.lastSwapAt
-      ? series.filter(function (p) { return p.day < entry.lastSwapAt; }) : series;
-    const recent = afterCap || capacityFromSeries(beforeSwap.slice(-BATTERY_WINDOW_DAYS), tempC);
-    const whole = recent ? null : capacityFromSeries(beforeSwap, tempC);
-    const cap = recent || whole;
-    entry.capAfterSwap = !!afterCap;
-    entry.capStale = !!(entry.lastSwapAt && !afterCap);
+    /* 容量を測る期間は、どの交換もまたがない(交換日の電圧の跳ねが回帰を壊すため)。
+       系列を交換日で区切り、いまの電池の区間 → それが測れなければ、1つ前の電池の区間 → …と
+       新しい順に探し、当てはまりの良い(r≥0.6)最初の区間を使う。
+       ・9/30 0時の電圧(交換後)が届いた時点で、前日に交換した4拠点が持ち比較から消えた(交換をまたいだ)
+       ・中島樋管3号は9/22の交換前の35日が9/11の交換をまたぎ、当てはまりが0.567で容量が出なかった */
+    const segments = [];
+    let segStart = 0;
+    swaps.forEach(function (b) {
+      let idx = series.findIndex(function (p) { return p.day >= b; });
+      if (idx < 0) idx = series.length;
+      if (idx > segStart) segments.push(series.slice(segStart, idx));
+      segStart = Math.max(segStart, idx);
+    });
+    segments.push(series.slice(segStart));   // いまの電池(交換後)。交換当日の夜なら空のこともある
+    const goodFit = function (c) {
+      return c && c.r >= BATTERY_MIN_R && c.capAh >= BATTERY_CAP_RANGE_AH[0] && c.capAh <= BATTERY_CAP_RANGE_AH[1];
+    };
+    const current = segments[segments.length - 1];
+    const afterCap = capacityFromSeries(current.slice(-BATTERY_WINDOW_DAYS), tempC);
+    let cap = null, placeholder = false;
+    if (goodFit(afterCap)) {
+      cap = afterCap;
+    } else {
+      for (let k = segments.length - 2; k >= 0 && !cap; k--) {
+        const c = capacityFromSeries(segments[k].slice(-BATTERY_WINDOW_DAYS), tempC);
+        if (goodFit(c)) { cap = c; placeholder = true; }
+      }
+    }
+    // どの区間でも測れなければ、いまの電池の区間の結果(当てはまりが悪くても)を「測定中」の表示用に残す
+    if (!cap) cap = afterCap || (swaps.length ? null : capacityFromSeries(series, tempC));
+    const recent = cap;
+    entry.capAfterSwap = !!(entry.lastSwapAt && goodFit(afterCap));
+    entry.capStale = !!(entry.lastSwapAt && !goodFit(afterCap));
+    entry.capPlaceholder = placeholder;       // 前の電池の区間で仮置きしているか
     if (cap && !entry.mains) {
       const capAh = cap.capAh;
       entry.fitR = Math.round(cap.r * 1000) / 1000;
       entry.whPerV = Math.round(capAh * (v0s.reduce(function (a, b) { return a + b; }, 0) / v0s.length) / BATTERY_OCV_SPAN_V);
-      entry.capWindow = { from: cap.from, to: cap.to, days: cap.pairs, tempC: cap.tempC, whole: !recent };
+      entry.capWindow = { from: cap.from, to: cap.to, days: cap.pairs, tempC: cap.tempC,
+        whole: cap !== afterCap && !placeholder, placeholder: placeholder };
       if (cap.r >= BATTERY_MIN_R && capAh >= BATTERY_CAP_RANGE_AH[0] && capAh <= BATTERY_CAP_RANGE_AH[1]) {
         entry.capacityAh = Math.round(capAh * 10) / 10;
         entry.capacityNowAh = Math.round(cap.cap25Ah * 10) / 10;
