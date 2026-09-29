@@ -1769,7 +1769,7 @@
     if (dayDiff === 1) return "明日 " + hm;
     return (d.getUTCMonth() + 1) + "/" + d.getUTCDate() + " " + hm;
   }
-  function outlookDetail(o, e) {
+  function outlookDetail(o, e, siteId) {
     var how = o.socSource === "voltage"
       ? "充電が止まっているので、実測の電圧 " + o.measuredV.toFixed(2) + "V（" +
         fmtOutlookWhen(o.measuredAt) + "）から求めた残量" +
@@ -1781,12 +1781,12 @@
       : o.socSource === "balance"
       ? "0時の電圧から求めた残量に、当日の収支 " +
         (o.balWhToday >= 0 ? "+" : "") + o.balWhToday + "Wh（発電−消費）を足した値"
-      : "0時の " + e.socPct + "% から実測の発電で更新した値";
+      : "0時の " + siteSocPct(siteId, e.socPct) + "% から実測の発電で更新した値";
     var capLine = o.nightCapacityAh
       ? "放電時の実効容量 " + o.nightCapacityAh + "Ah（充電されない夜間の実測 " + o.nightCapacityNights +
         "夜ぶん／充電時は " + e.capacityAh + "Ah）\n"
       : "";
-    return "現在の残量 " + o.socNow + "%（" + how + "）\n" + capLine +
+    return "現在の残量 " + o.siteSocNow + "%（下限 " + o.reserveV.toFixed(2) + "V を0%・12.70V を100%として。" + how + "）\n" + capLine +
       "発電の見積り: 日射 × " + o.pvCoef + "（過去の発電実績から）／曇り具合 " +
       Math.round(o.cloudFactor * 100) + "%\n" +
       "消費 " + o.loadW + "W\n" +
@@ -1801,7 +1801,12 @@
     // サーバー側の enduranceH は一律20%下限のため使わず、拠点ごとの下限で出し直す。
     var hours = noSunHoursFor(site.id, e);
     var text, cls, sub, title;
-    if (!e) {
+    var em = e && !e.mains ? currentEmpty(site.id) : null;
+    if (em) {
+      // 実測の電圧が下限に達した(=電池切れ)。持ち時間を出しても意味がないので、止まっていることを出す。
+      text = "電池切れ"; cls = "critical"; sub = fmtOutlookWhen(em.at).replace(/^今日 /, "") + "〜";
+      title = emptyTitle(site.id, em);
+    } else if (!e) {
       text = "—"; cls = "muted"; sub = "データなし";
       title = "バッテリーの持ち: この拠点は中継サーバーの電源データに出ていません。";
     } else if (e.mains) {
@@ -1827,20 +1832,20 @@
       if (!o) {
         // 予報や発電実績がまだ足りない間は、日射ゼロの前提の値を出しておく
         text = fmtEndurance(hours); cls = enduranceClass(hours); sub = "日射ゼロ時";
-        title = "日射がゼロのまま続いた場合、残量 " + e.socPct + "% から下限 " +
+        title = "日射がゼロのまま続いた場合、残量 " + siteSocPct(site.id, e.socPct) + "% から下限 " +
           batteryEmptyVoltageFor(site.id).toFixed(2) + "V まで " + fmtEndurance(hours) + " もちます。\n" + base +
           "\n（日射予報または発電実績がまだ足りないため、予報込みの見通しは出せていません）";
       } else if (o.hoursToReserve === null) {
-        text = "継続可"; cls = "ok"; sub = "最低 " + o.minSocPct + "%";
+        text = "継続可"; cls = "ok"; sub = "最低 " + o.siteMinSoc + "%";
         title = "日射予報を織り込むと、7日先まで下限 " + o.reserveV.toFixed(2) +
-          "V に達しません（期間中の最低は 残量" + o.minSocPct + "%／" + fmtOutlookWhen(o.minSocAt) + "）。\n" +
-          "日射ゼロが続いた場合は " + fmtEndurance(hours) + " です。\n" + outlookDetail(o, e);
+          "V に達しません（期間中の最低は 残量" + o.siteMinSoc + "%／" + fmtOutlookWhen(o.minSocAt) + "）。\n" +
+          "日射ゼロが続いた場合は " + fmtEndurance(hours) + " です。\n" + outlookDetail(o, e, site.id);
       } else {
         text = fmtEndurance(o.hoursToReserve); cls = enduranceClass(o.hoursToReserve); sub = "予報込み";
         title = "日射予報を織り込むと、" + fmtEndurance(o.hoursToReserve) + "後（" +
           fmtOutlookWhen(o.computedAt + o.hoursToReserve * HOUR_MS) + "）に下限 " +
           o.reserveV.toFixed(2) + "V に達する見通しです。\n" +
-          "日射ゼロが続いた場合は " + fmtEndurance(hours) + " です。\n" + outlookDetail(o, e);
+          "日射ゼロが続いた場合は " + fmtEndurance(hours) + " です。\n" + outlookDetail(o, e, site.id);
       }
     }
     s.healthValueEl.textContent = text;
@@ -1878,11 +1883,18 @@
       POWER_SITES.forEach(function (site) {
         var e = batteryHealthEntry(site.id);
         if (!e || e.mains) return;
-        var o = batteryOutlook(site);
         var name = site.name.replace(/（.*$/, "");
+        // 電池切れで負荷が切れたまま(機器が止まっている)なら、持ち時間ではなく「電池切れ」を先頭に出す
+        var emNow = currentEmpty(site.id);
+        if (emNow) {
+          rows.push({ id: site.id, name: name, hours: 0, sustain: false, cut: emNow, minSoc: null, soc: 0,
+            src: "電池切れ", capacityAh: e.capacityAh, nightA: e.nightA, floorV: batteryEmptyVoltageFor(site.id) });
+          return;
+        }
+        var o = batteryOutlook(site);
         if (o) {
           rows.push({ id: site.id, name: name, hours: o.hoursToReserve,
-            sustain: o.hoursToReserve === null, soc: o.socNow, minSoc: o.minSocPct,
+            sustain: o.hoursToReserve === null, soc: o.siteSocNow, minSoc: o.siteMinSoc24,
             src: o.swapAt ? "予報込み・" + fmtOutlookWhen(o.swapAt) + " 交換後" : "予報込み",
             swapped: !!o.swapAt,
             capacityAh: e.capacityAh, nightA: e.nightA, floorV: batteryEmptyVoltageFor(site.id) });
@@ -1892,14 +1904,14 @@
         if (typeof noSun === "number") {
           var swNow = sameDaySwap(site.id);
           rows.push({ id: site.id, name: name, hours: noSun, sustain: false, minSoc: null,
-            soc: swNow ? Math.round(socFromVoltage(swNow.vAfter)) : e.socPct,
+            soc: swNow ? siteSocPct(site.id, socFromVoltage(swNow.vAfter)) : siteSocPct(site.id, e.socPct),
             src: swNow ? "日射ゼロ時・" + fmtOutlookWhen(swNow.at) + " 交換後" : "日射ゼロ時",
             swapped: !!swNow, capacityAh: e.capacityAh, nightA: e.nightA,
             floorV: batteryEmptyVoltageFor(site.id) });
         }
       });
       // 短い順(危ない順)に上から。継続可はいちばん下。
-      // 継続可どうしは、7日間でいちばん下がったときの残量が少ない順に並べる。
+      // 継続可どうしは、24時間以内にいちばん下がったときの残量(下限=0%)が少ない順に並べる。
       // (以前は同順位のまま動かず、交換で残量が増えても順位が入れ替わらなかった)
       rows.sort(function (a, b) {
         if (a.sustain !== b.sustain) return a.sustain ? 1 : -1;
@@ -1952,7 +1964,7 @@
         var over = !r.sustain && r.hours > cap;
         var barW = Math.max(2, (r.sustain ? plotW : xAt(r.hours) - marginLeft));
         // 日射予報を使えない拠点(日射ゼロ前提)は、塗りを薄くし枠線を点線にして区別する。
-        var noSunRow = r.src === "日射ゼロ時";
+        var noSunRow = r.src.indexOf("日射ゼロ時") === 0;
         var bar = el("rect", { class: "endurance-bar", "data-site": r.id,
           x: marginLeft, y: y + 3, width: barW, height: rowH - 7, rx: 3,
           fill: color, opacity: noSunRow ? 0.3 : 0.85,
@@ -1972,20 +1984,22 @@
           "text-anchor": "start", "dominant-baseline": "middle",
           fill: color, "font-size": 11, "font-weight": 700, "font-family": FONT });
         // 今日載せ替えた拠点は、交換後の電池で数えていることが分かるようにする
-        // 継続可の拠点は、並び順の根拠になっている「7日間の最低残量」を添える
-        vEl.textContent = (r.sustain ? "継続可" + (typeof r.minSoc === "number" ? "（最低" + r.minSoc + "%）" : "")
-          : fmtEndurance(r.hours)) + (noSunRow ? " ※" : "") + (r.swapped ? " 交換後" : "");
+        // 継続可の拠点は、並び順の根拠になっている「24時間以内の最低残量」を添える
+        vEl.textContent = r.cut ? "電池切れ（" + fmtOutlookWhen(r.cut.at).replace(/^今日 /, "") + "〜）"
+          : (r.sustain ? "継続可" + (typeof r.minSoc === "number" ? "（24h内最低" + r.minSoc + "%）" : "")
+            : fmtEndurance(r.hours)) + (noSunRow ? " ※" : "") + (r.swapped ? " 交換後" : "");
         svg.appendChild(vEl);
 
         function show() {
           while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
           var l0 = document.createElement("div");
           l0.style.cssText = "color:var(--text-primary);font-weight:600;";
-          l0.textContent = r.name + "　" + (r.sustain
-            ? "継続可（7日間の最低 " + r.minSoc + "%）" : fmtEndurance(r.hours));
+          l0.textContent = r.name + "　" + (r.cut
+            ? "電池切れ（" + fmtOutlookWhen(r.cut.at) + " に下限 " + r.cut.floor.toFixed(2) + "V に達した）"
+            : r.sustain ? "継続可（24時間以内の最低 " + r.minSoc + "%）" : fmtEndurance(r.hours));
           var l1 = document.createElement("div");
           l1.style.cssText = "color:var(--text-secondary);";
-          l1.textContent = "残量 " + r.soc + "% ／ 容量 " + r.capacityAh + "Ah ／ 夜間 " + r.nightA + "A";
+          l1.textContent = "残量 " + r.soc + "%（下限を0%） ／ 容量 " + r.capacityAh + "Ah ／ 夜間 " + r.nightA + "A";
           var l2 = document.createElement("div");
           l2.style.cssText = "color:var(--text-secondary);";
           l2.textContent = "下限 " + r.floorV.toFixed(2) + "V ／ " + r.src;
@@ -2077,13 +2091,16 @@
       var hours = null, sustain = false, forecast = false;
       if (o) { forecast = true; if (o.hoursToReserve === null) sustain = true; else hours = o.hoursToReserve; }
       else hours = noSun;
+      // 電池切れで負荷が切れたまま(機器停止中)なら、持ち時間0として先頭に並べる
+      var cut = currentEmpty(site.id);     // 下限電圧に達している(電池切れ)
+      if (cut) { hours = 0; sustain = false; forecast = true; }
       var floorV = batteryEmptyVoltageFor(site.id);
       var vmin = recentVminMedian(e);
       var deep = deepDischargeCounts(e);
       var bal = (typeof e.genWhPerDay === "number" && typeof e.loadWhPerDay === "number")
         ? Math.round(e.genWhPerDay - e.loadWhPerDay) : null;
       rows.push({
-        id: site.id, name: site.name, e: e,
+        id: site.id, name: site.name, e: e, cut: cut,
         hours: hours, sustain: sustain, forecast: forecast,
         floorV: floorV, vmin: vmin,
         gap: (typeof vmin === "number") ? vmin - floorV : null,
@@ -2127,7 +2144,8 @@
     var html = rows.map(function (r) {
       var st = healthStateOf(r);
       var e = r.e;
-      var hTxt = r.sustain ? "継続可" : (r.hours === null ? "—" : fmtEndurance(r.hours));
+      var hTxt = r.cut ? "電池切れ（" + fmtOutlookWhen(r.cut.at).replace(/^今日 /, "") + "〜）"
+        : r.sustain ? "継続可" : (r.hours === null ? "—" : fmtEndurance(r.hours));
       var hCls = r.sustain ? "ht-ok" : (r.hours === null ? "ht-mute" : ({
         critical: "ht-bad", warn: "ht-warn", ok: "ht-ok", muted: "ht-mute"
       }[enduranceClass(r.hours)] || ""));
@@ -5224,21 +5242,35 @@
   var OUTLOOK_SURFACE_TAU_MS = 3 * 60 * 60 * 1000;    // 表面電荷(充電中の電圧の下駄)が抜ける時定数
   var outlookCache = {};
   /* OCV表は 11.36V = 残量0% までしか表現していないが、機器の下限が 9.5V(北沢) や
-     10.5V(多呂樋管など)の拠点では、そこまで引っ張った区間も持ち時間に含めたい。
-     そこで表の下に「放電末期」の直線を継ぎ足し、残量をマイナスまで延ばせるようにする。
-       11.36V(残量0%) → DEEP_DISCHARGE_V(9.0V) の間に、定格容量の DEEP_DISCHARGE_PCT(5%)
-       ぶんだけ残っているものとして直線で結ぶ。
-     鉛蓄電池は11.3Vを下回るとほぼ空で、そこから先は電圧が急に落ちるだけなので
-     取り出せる量は小さい。5%は控えめな見積りで、根拠のある固定値ではない。
-     これにより 9.5V と 10.5V の差が数字に出るようになる(それぞれ約 −3.9% / −1.8%)。 */
+     10.5V(多呂樋管・芝橋・梅名樋管2号)の拠点では、そこまで引っ張った区間も持ち時間に含めたい。
+     そこで表の下に「放電末期」を継ぎ足し、残量をマイナスまで延ばせるようにする。
+
+     【実測に合わせて見直した(2026-09-30)】
+     以前は 11.36V→9.0V の間に容量の5%しか残っていない(1Vあたり2.1%)と仮定していたが、
+     中継サーバーの5分データで11.3Vを下回った夜を調べると、実際にはもっと長くもっていた。
+       多呂樋管 9/30  11.28→10.55V を 2.6時間・4.1Ah (容量47.6Ah) → 1Vあたり11.6%
+       芝橋     9/23  11.27→10.93V を 7.8時間・11.5Ah(容量31.2Ah) → 1Vあたり109%
+       芝橋     9/24  10.93→10.53V を 4.5時間・7.5Ah (容量31.2Ah) → 1Vあたり61%
+     電池によって大きく違うため、いちばん早く落ちた多呂樋管に合わせる(=早めに警告する側)。
+       11.36V = 0% → 10.5V = −10%
+     10.5Vより下は観測が無い。鉛蓄電池はここから急に電圧が落ちるので、9.0Vまでで −2% だけ足す
+     (北沢アンダーパスの下限9.5Vに対しては控えめ=短めに出る)。 */
+  var DEEP_DISCHARGE_TAIL = [[11.36, 0], [10.5, -10], [9.0, -12]];
   var DEEP_DISCHARGE_V = 9.0;
-  var DEEP_DISCHARGE_PCT = -5;
+  var DEEP_DISCHARGE_PCT = -12;
   // 残量[%] → 休止時の開回路電圧。OCV表の逆引き＋放電末期の延長。
   function voltageFromSoc(pct) {
     var t = BATTERY_OCV_TABLE_CLIENT;
     if (pct <= 0) {
-      var f = Math.max(DEEP_DISCHARGE_PCT, pct) / DEEP_DISCHARGE_PCT;   // 0→1
-      return t[0][0] + f * (DEEP_DISCHARGE_V - t[0][0]);
+      var tail = DEEP_DISCHARGE_TAIL;
+      var q = Math.max(DEEP_DISCHARGE_PCT, pct);
+      for (var j = 1; j < tail.length; j++) {
+        if (q >= tail[j][1]) {
+          var a = tail[j - 1], b = tail[j];
+          return a[0] + (q - a[1]) / (b[1] - a[1]) * (b[0] - a[0]);
+        }
+      }
+      return DEEP_DISCHARGE_V;
     }
     if (pct >= t[t.length - 1][1]) return t[t.length - 1][0];
     for (var i = 1; i < t.length; i++) {
@@ -5254,7 +5286,14 @@
     if (!isFinite(v)) return null;
     if (v <= t[0][0]) {
       if (v <= DEEP_DISCHARGE_V) return DEEP_DISCHARGE_PCT;
-      return (t[0][0] - v) / (t[0][0] - DEEP_DISCHARGE_V) * DEEP_DISCHARGE_PCT;
+      var tail = DEEP_DISCHARGE_TAIL;
+      for (var j = 1; j < tail.length; j++) {
+        if (v >= tail[j][0]) {
+          var a = tail[j - 1], b = tail[j];
+          return a[1] + (v - a[0]) / (b[0] - a[0]) * (b[1] - a[1]);
+        }
+      }
+      return DEEP_DISCHARGE_PCT;
     }
     if (v >= t[t.length - 1][0]) return 100;
     for (var i = 1; i < t.length; i++) {
@@ -5359,15 +5398,40 @@
   // 中継サーバーの5分データの取得経路名。サーバー経由(「サーバー(mini.lhlab-vps.net 電源CSV)」)と
   // 画面から直接(「mini.lhlab-vps.net」)の2通りの名前で入ってくるので、部分一致で拾う。
   var SWAP_SOURCE_VIA = "mini.lhlab-vps.net";
-  function detectIntradaySwap(points, sinceMs) {
+  /* 電圧の跳ねが「交換」ではなく「電池切れで負荷が切れた」ものかを見分ける。
+     多呂樋管(9/30)は夜通し放電して 3:13 に下限の10.5V付近(10.546V)に達し、4:34 に負荷が
+     約16W→2Wに落ちると同時に電圧が11.32Vへ戻った。コントローラーが下限で負荷を切ると、
+     電流が止まったぶん電圧が戻るため、発電なしで電圧が跳ねる点は交換と同じに見える。
+     違いは負荷で、交換なら機器は動き続けるが、負荷が切れた場合は消費がほぼ止まったままになる。
+     跳ねの直後から数点(最大3点)の負荷がすべて跳ねる前の4割未満なら、負荷が切れたとみなす。 */
+  var LOAD_CUT_RATIO = 0.4;
+  var LOAD_CUT_MIN_BEFORE_W = 5;
+  var LOAD_CUT_LOOKAHEAD = 3;
+  function loadCollapsedAt(list, i, loadBefore) {
+    if (!(typeof loadBefore === "number" && loadBefore >= LOAD_CUT_MIN_BEFORE_W)) return false;
+    var seen = 0;
+    for (var k = i; k < list.length && seen < LOAD_CUT_LOOKAHEAD; k++) {
+      var q = list[k];
+      if (q.bat < SWAP_MIN_VALID_V) continue;
+      if (typeof q.loadW !== "number") return false;
+      if (q.loadW >= loadBefore * LOAD_CUT_RATIO) return false;
+      seen++;
+    }
+    return seen > 0;
+  }
+  function relayListSince(points, sinceMs) {
     // 比べるのは中継サーバーの5分データどうしだけ。別の取得経路(拠点の機器から直接など)の
     // 電圧は計り方が違ってずれることがあり、混ぜると経路の差を「跳ね」と誤認するため。
-    var list = (points || []).filter(function (p) {
+    return (points || []).filter(function (p) {
       return p.fetchedAt.getTime() >= sinceMs && typeof p.bat === "number"
         && String(p.via || "").indexOf(SWAP_SOURCE_VIA) >= 0;
     }).sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
-    var found = null, prev = null, sawDropout = false;
-    list.forEach(function (p) {
+  }
+  // 発電なしで電圧が跳ねた点を拾い、交換(swap)と負荷切れ(cut)に分けて返す(それぞれ最新のもの)。
+  function scanVoltageSteps(points, sinceMs) {
+    var list = relayListSince(points, sinceMs);
+    var swap = null, cut = null, prev = null, sawDropout = false;
+    list.forEach(function (p, idx) {
       if (p.bat < SWAP_MIN_VALID_V) { if (prev) sawDropout = true; return; }
       if (prev) {
         var gap = p.fetchedAt - prev.fetchedAt;
@@ -5375,12 +5439,82 @@
         var pvA = typeof prev.pv === "number" ? prev.pv : 0;
         var pvB = typeof p.pv === "number" ? p.pv : 0;
         if (gapOk && p.bat - prev.bat >= SWAP_STEP_V && pvB - pvA <= SWAP_MAX_PV_RISE_W) {
-          found = { at: p.fetchedAt.getTime(), vBefore: prev.bat, vAfter: p.bat, pvAfter: pvB };
+          var ev = { at: p.fetchedAt.getTime(), vBefore: prev.bat, vAfter: p.bat, pvAfter: pvB,
+            loadBefore: prev.loadW, loadAfter: p.loadW };
+          if (loadCollapsedAt(list, idx, prev.loadW)) cut = ev; else swap = ev;
         }
       }
       prev = p; sawDropout = false;
     });
-    return found;
+    return { swap: swap, cut: cut };
+  }
+  function detectIntradaySwap(points, sinceMs) {
+    return scanVoltageSteps(points, sinceMs).swap;
+  }
+  /* ---------------------------------------------------------------------
+   * 残量と電池切れは「拠点ごとの下限電圧」を基準にする(利用者の指定)
+   * -----------------------------------------------------------------------
+   * 画面に出す残量%は、カードの電池ゲージと同じく「下限電圧=0%・12.70V=100%」で表す。
+   * 以前は見通しの文面や持ち比較だけ、鉛蓄電池の一般的な目安(11.36V=0%)で表していたため、
+   * 下限10.5Vの多呂樋管が 11.25V で「残量0%」と出るなど、ゲージと食い違っていた。
+   * 内部の計算(何Ah残っているか)には引き続き電池の電圧と残量の関係を使うが、表示と
+   * 「電池切れ」の判断はすべて下限電圧を基準にする。 */
+  function siteSocPct(siteId, internalSoc) {
+    if (typeof internalSoc !== "number" || !isFinite(internalSoc)) return null;
+    var pct = batteryPercentFor(siteId, voltageFromSoc(internalSoc));
+    return pct === null ? null : Math.round(pct);
+  }
+  var EMPTY_MARGIN_V = 0.05;     // 下限+0.05V 以下なら下限に達したとみなす(計測の丸め分)
+  var EMPTY_RECOVER_V = 0.8;     // 負荷の値が無い拠点は、下限+0.8V を超えたら充電で戻ったとみなす
+  /* 電池切れ = 実測の電圧が下限電圧に達した(直近24時間)。負荷(カメラ等)が戻るまで電池切れとする。
+     多呂樋管 9/30: 3:13 に 10.546V(下限10.5V)に達し、4:34 に負荷が切れて電圧は11.3Vに戻ったが、
+     負荷は2Wのまま = 機器は止まったまま、なので電池切れのまま扱う。 */
+  function currentEmpty(siteId) {
+    var s = siteStates[siteId];
+    if (!s) return null;
+    var floor = batteryEmptyVoltageFor(siteId);
+    var list = relayListSince(s.points, Date.now() - 24 * HOUR_MS)
+      .filter(function (p) { return p.bat >= SWAP_MIN_VALID_V; });
+    if (!list.length) return null;
+    var hitIdx = -1;
+    for (var i = list.length - 1; i >= 0; i--) { if (list[i].bat <= floor + EMPTY_MARGIN_V) { hitIdx = i; break; } }
+    if (hitIdx < 0) return null;
+    var first = hitIdx;                                   // 下限に張り付いていた区間の始まり
+    while (first - 1 >= 0 && list[first - 1].bat <= floor + EMPTY_MARGIN_V) first--;
+    var hit = list[first], last = list[list.length - 1];
+    var loadRef = null;                                   // 下限に達したときに動いていた負荷
+    for (var k = first; k >= 0; k--) { if (typeof list[k].loadW === "number") { loadRef = list[k].loadW; break; } }
+    if (last.bat > floor + EMPTY_MARGIN_V) {
+      if (typeof loadRef === "number" && loadRef >= LOAD_CUT_MIN_BEFORE_W && typeof last.loadW === "number") {
+        if (last.loadW >= loadRef * LOAD_CUT_RATIO) return null;      // 負荷が戻った=復帰
+      } else if (last.bat >= floor + EMPTY_RECOVER_V) {
+        return null;                                                  // 充電で十分戻った
+      }
+    }
+    var cut = scanVoltageSteps(s.points, hit.fetchedAt.getTime()).cut;
+    return { at: hit.fetchedAt.getTime(), v: hit.bat, floor: floor, cut: cut,
+      lastV: last.bat, lastLoad: typeof last.loadW === "number" ? last.loadW : null, loadRef: loadRef };
+  }
+  function emptyTitle(siteId, em) {
+    return "下限 " + em.floor.toFixed(2) + "V に達しました（" + fmtOutlookWhen(em.at) + "・" + em.v.toFixed(3) + "V）。" +
+      (em.cut ? "\n" + fmtOutlookWhen(em.cut.at) + " に負荷が約" + Math.round(em.cut.loadBefore) + "W → " +
+        Math.round(em.cut.loadAfter) + "W に落ち、電圧が " + em.cut.vAfter.toFixed(2) + "V に戻っています" +
+        "（下限で負荷(カメラ等)が切れたとみられます）。" : "") +
+      "\n日射で充電されて負荷が戻れば、この表示は消えます。";
+  }
+  /* 電池切れで負荷が切れたまま(=機器が止まっている)か。直近24時間に負荷の切断があり、
+     その後の最新の実測でも負荷が戻っていなければ「電池切れ」として扱う。 */
+  function currentLoadCut(siteId) {
+    var s = siteStates[siteId];
+    if (!s) return null;
+    var cut = scanVoltageSteps(s.points, Date.now() - 24 * HOUR_MS).cut;
+    if (!cut) return null;
+    var list = relayListSince(s.points, cut.at);
+    var last = null;
+    for (var i = list.length - 1; i >= 0; i--) { if (list[i].bat >= SWAP_MIN_VALID_V) { last = list[i]; break; } }
+    if (!last || typeof last.loadW !== "number") return null;
+    if (last.loadW >= cut.loadBefore * LOAD_CUT_RATIO) return null;   // 負荷が戻った(復帰した)
+    return cut;
   }
   function jstMidnightMs(nowMs) {
     var jst = new Date(nowMs + 9 * HOUR_MS);
@@ -5558,6 +5692,9 @@
     var cloud = cloudFactorFromForecast(lat, lon, nowMs);
     var series = [];
     var hoursToReserve = null, minSoc = socNow, minSocAt = nowMs;
+    // 並び順に使う「24時間以内の最低残量」。7日間の最低は、途中の晴れの日で満充電に戻ると
+    // 今の残量に関係なく同じ値になり、交換で残量が増えても順位が動かなかったため。
+    var minSoc24 = socNow;
     var steps = Math.round(OUTLOOK_HORIZON_MS / OUTLOOK_STEP_MS);
     var stepH = OUTLOOK_STEP_MS / HOUR_MS;
     for (var j = 1; j <= steps; j++) {
@@ -5568,6 +5705,7 @@
       var useWh = netW < 0 ? dischargeCapWh : capWh;
       soc = Math.max(DEEP_DISCHARGE_PCT, Math.min(100, soc + netW * stepH / useWh * 100));
       if (soc < minSoc) { minSoc = soc; minSocAt = t; }
+      if (t - nowMs <= 24 * HOUR_MS && soc < minSoc24) minSoc24 = soc;
       if (hoursToReserve === null && soc <= reserve) hoursToReserve = j * stepH;
       // グラフ用は12時間先まで(それ以降は描かないので持たない)
       if (t - nowMs <= PREDICTION_HORIZON_MS) {
@@ -5578,6 +5716,9 @@
     var sun = sunTimesFor(lat, lon, nowMs);
     return {
       computedAt: nowMs, socNow: Math.round(socNow), socSource: socSource,
+      // 画面に出す残量(下限電圧=0%・12.70V=100%。カードの電池ゲージと同じ基準)
+      siteSocNow: siteSocPct(site.id, socNow), siteMinSoc: siteSocPct(site.id, minSoc),
+      siteMinSoc24: siteSocPct(site.id, minSoc24),
       measuredV: lastBat ? lastBat.bat : null, measuredAt: lastBat ? lastBat.fetchedAt.getTime() : null,
       swapAt: cur.swap ? cur.swap.at : null, swapVBefore: cur.swap ? cur.swap.vBefore : null,
       swapVAfter: cur.swap ? cur.swap.vAfter : null,
@@ -6563,7 +6704,7 @@
     // --- バッテリーの持ち(無日射で何時間もつか) ---
     loadBatteryHealth: loadBatteryHealth, fmtEndurance: fmtEndurance,
     reserveSocFor: reserveSocFor, noSunHoursFor: noSunHoursFor,
-    DEEP_DISCHARGE_V: DEEP_DISCHARGE_V, DEEP_DISCHARGE_PCT: DEEP_DISCHARGE_PCT,
+    DEEP_DISCHARGE_V: DEEP_DISCHARGE_V, DEEP_DISCHARGE_PCT: DEEP_DISCHARGE_PCT, DEEP_DISCHARGE_TAIL: DEEP_DISCHARGE_TAIL,
     enduranceClass: enduranceClass, updateBatteryHealth: updateBatteryHealth,
     // --- 残量の見通し(日の出日の入り＋日射予報＋発電実績、10分ごと) ---
     solarAltitudeDeg: solarAltitudeDeg, clearSkyRadiation: clearSkyRadiation, sunTimesFor: sunTimesFor,
@@ -6580,6 +6721,8 @@
     refreshAllBatteryHealth: refreshAllBatteryHealth,
     createEnduranceChart: createEnduranceChart,
     detectIntradaySwap: detectIntradaySwap, sameDaySwap: sameDaySwap, currentSocFor: currentSocFor,
+    scanVoltageSteps: scanVoltageSteps, currentLoadCut: currentLoadCut,
+    currentEmpty: currentEmpty, siteSocPct: siteSocPct,
     getHealthRenderCount: function () { return healthRenderCount; },
     renderHealthTable: renderHealthTable, healthTableRows: healthTableRows,
     healthStateOf: healthStateOf, deepDischargeCounts: deepDischargeCounts,
