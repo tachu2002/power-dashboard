@@ -10,6 +10,21 @@ import { fileURLToPath } from "node:url";
 import { startServer, PORT } from "./server.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/* 時刻をずらして試す(任意)。TEST_CLOCK_OFFSET_H=6 のように指定すると、テスト側(フィクスチャの時刻)と
+   ページ側(Date.now / new Date())の「今」を同じだけずらす。時刻によって結果が変わる不具合
+   (0時またぎ・夜/昼・差し込んだ点と元の点の重なり)を、実行する時間帯に頼らず確かめるため。
+   指定しなければ何も変えない。 */
+export const CLOCK_OFFSET_MS = Number(process.env.TEST_CLOCK_OFFSET_H || 0) * 3600000;
+if (CLOCK_OFFSET_MS) {
+  // Date.now() も new Date()(引数なし) も同じだけずらす(poll.mjs は new Date() で生成時刻を書く)
+  const RealDate = Date;
+  class ShiftedDate extends RealDate {
+    constructor(...a) { if (a.length) super(...a); else super(RealDate.now() + CLOCK_OFFSET_MS); }
+    static now() { return RealDate.now() + CLOCK_OFFSET_MS; }
+  }
+  globalThis.Date = ShiftedDate;
+}
 export const BASE = "http://127.0.0.1:" + PORT;
 
 const fakeLeafletJs = fs.readFileSync(path.join(__dirname, "fake-leaflet.js"), "utf8");
@@ -123,6 +138,20 @@ export async function teardown() {
 export async function newPage(viewport, opts) {
   opts = opts || {};
   const page = await browser.newPage({ viewport: viewport || { width: 1400, height: 1000 } });
+  if (CLOCK_OFFSET_MS) {
+    await page.addInitScript((off) => {
+      const RealDate = Date;
+      function FakeDate(...a) {
+        if (!(this instanceof FakeDate)) return new RealDate(RealDate.now() + off).toString();
+        return a.length ? new RealDate(...a) : new RealDate(RealDate.now() + off);
+      }
+      FakeDate.prototype = RealDate.prototype;
+      FakeDate.now = () => RealDate.now() + off;
+      FakeDate.UTC = RealDate.UTC;
+      FakeDate.parse = RealDate.parse;
+      window.Date = FakeDate;
+    }, CLOCK_OFFSET_MS);
+  }
   const errMsgs = [];
   page.on("pageerror", (err) => { errMsgs.push(err.message); console.log("PAGE EXCEPTION:", err.message); });
   page.errMsgs = () => errMsgs;

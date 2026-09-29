@@ -686,6 +686,9 @@ export async function run() {
      梅名樋管2号 16:19〜17:03 は作業中0V→12.48V)と同じ形の5分データを入れて確かめる。
      時刻に依存しないよう、ページ内の Date.now を「次の17:30(JST)」に固定して計算する。 */
   const swapCheck = await page3.evaluate(() => {
+      // 元からある点は「別の取得経路」として扱い、差し込んだ中継サーバーの点と混ざらないようにする
+      // (実行時刻によって元の点と差し込んだ点が同じ時間帯に重なり、電圧の段差を取り違えるため)
+      const asOther = (arr) => arr.map((p) => Object.assign({}, p, { via: "試験用の元データ" }));
     const d = window.__dashboardDebug;
     const realNow = Date.now;
     const HOUR = 3600000, MIN = 60000;
@@ -715,7 +718,7 @@ export async function run() {
       const before = { order: order(), o: d.computeBatteryOutlook(d.SITE_CATALOG.cam03) };
       // 5分おきに11.34V → 12.60Vへ跳ね上がる(発電はほぼ0のまま。充電済みの電池に載せ替えた形)
       // 発電は null にしておく(発電の見積りの回帰に、日射予報と合わない点を混ぜないため)
-      s03.points = keep.concat([pt(95, 11.36, null), pt(90, 11.35, null), pt(85, 11.34, null),
+      s03.points = asOther(keep).concat([pt(95, 11.36, null), pt(90, 11.35, null), pt(85, 11.34, null),
         pt(80, 12.60, null), pt(75, 12.59, null), pt(70, 12.58, null)]);
       const sw = d.detectIntradaySwap(s03.points, jstMid(fixed));
       const after = { order: order(), o: d.computeBatteryOutlook(d.SITE_CATALOG.cam03) };
@@ -739,7 +742,8 @@ export async function run() {
       const direct = d.detectIntradaySwap([pt(30, 11.80, 0.2, "mini.lhlab-vps.net"),
         pt(25, 12.40, 0.2, "mini.lhlab-vps.net")], jstMid(fixed));
       // 0時より前(=0時の電圧に反映済み)の跳ねは今日の交換として扱わない
-      const yesterday = d.detectIntradaySwap([pt(18.5 * 60, 11.40, 0.2), pt(18.4 * 60, 12.40, 0.2)], jstMid(fixed));
+      const toMid = (fixed - jstMid(fixed)) / MIN;      // 0時まで何分さかのぼるか(実行時刻に依らない)
+      const yesterday = d.detectIntradaySwap([pt(toMid + 60, 11.40, 0.2), pt(toMid + 55, 12.40, 0.2)], jstMid(fixed));
       s03.points = keep;
       e03.capacityAh = keepE.capacityAh; e03.nightA = keepE.nightA;
       d.refreshBatteryOutlook();
@@ -777,12 +781,17 @@ export async function run() {
   // 7日間でいちばん下がったときの残量が少ない順に並べ、その値を添える。
   const lows = swapCheck.barText.filter((t) => t.indexOf("継続可（最低") === 0)
     .map((t) => Number((t.match(/最低(-?\d+)%/) || [])[1]));
+  // 何拠点が継続可になるかは時間帯(日射の予報)で変わるので、1拠点以上あればよい
   r.check("f8-i 継続可どうしは7日間の最低残量が少ない順に並べ、その値を添える",
-    lows.length >= 2 && lows.every((v, i) => i === 0 || lows[i - 1] <= v), swapCheck.barText);
+    lows.length >= 1 && lows.every((v, i) => i === 0 || lows[i - 1] <= v)
+    && swapCheck.barText.every((t) => t.indexOf("継続可") !== 0 || t.indexOf("継続可（最低") === 0), swapCheck.barText);
   r.check("f8-g 健全性の一覧に今日の交換時刻と前後の電圧を出す",
     (swapCheck.table[11] || "").indexOf(swapCheck.swapClock) >= 0 && (swapCheck.table[11] || "").indexOf("11.34→12.60V") >= 0,
     swapCheck.table[11]);
   const staleCache = await page3.evaluate(() => {
+      // 元からある点は「別の取得経路」として扱い、差し込んだ中継サーバーの点と混ざらないようにする
+      // (実行時刻によって元の点と差し込んだ点が同じ時間帯に重なり、電圧の段差を取り違えるため)
+      const asOther = (arr) => arr.map((p) => Object.assign({}, p, { via: "試験用の元データ" }));
     // 10分のキャッシュの途中でも、交換が見つかれば計算し直す
     const d = window.__dashboardDebug;
     const realNow = Date.now, HOUR = 3600000, MIN = 60000;
@@ -794,7 +803,7 @@ export async function run() {
       const s03 = d.siteStates.cam03, keep = s03.points.slice();
       d.refreshBatteryOutlook();
       const a = d.batteryOutlook(d.SITE_CATALOG.cam03);
-      s03.points = keep.concat([
+      s03.points = asOther(keep).concat([
         { fetchedAt: new Date(fixed - 10 * MIN), pv: 0.1, bat: 11.35, loadW: 24, via: "mini.lhlab-vps.net" },
         { fetchedAt: new Date(fixed - 5 * MIN), pv: 0.1, bat: 12.35, loadW: 24, via: "mini.lhlab-vps.net" }]);
       const b = d.batteryOutlook(d.SITE_CATALOG.cam03);
@@ -808,6 +817,9 @@ export async function run() {
   /* 昨日の午後に交換し、日付が変わった直後(今日の0時の電圧がまだ届いていない間)。
      以前はこの間だけ、交換前の電池の残量(昨日の0時の電圧)に戻ってしまっていた。 */
   const overnight = await page3.evaluate(() => {
+      // 元からある点は「別の取得経路」として扱い、差し込んだ中継サーバーの点と混ざらないようにする
+      // (実行時刻によって元の点と差し込んだ点が同じ時間帯に重なり、電圧の段差を取り違えるため)
+      const asOther = (arr) => arr.map((p) => Object.assign({}, p, { via: "試験用の元データ" }));
     const d = window.__dashboardDebug;
     const realNow = Date.now, HOUR = 3600000, MIN = 60000;
     const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
@@ -820,12 +832,12 @@ export async function run() {
     const out = {};
     try {
       // (1) 翌日の0:20。翌日の0時の電圧はまだ無い → 交換後の電圧から出す
-      s03.points = keep.concat(mk(D0 + 15.9 * HOUR));
+      s03.points = asOther(keep).concat(mk(D0 + 15.9 * HOUR));
       Date.now = () => D0 + 24 * HOUR + 20 * MIN;
       const o1 = d.computeBatteryOutlook(d.SITE_CATALOG.cam03);
       out.noV0 = { src: o1 && o1.socSource, soc: o1 && o1.socNow };
       // (2) 前日の午後に交換し、当日の0時の電圧が届いている → それが交換後の電池の値なので0時基準
-      s03.points = keep.concat(mk(D0 - 8.1 * HOUR));
+      s03.points = asOther(keep).concat(mk(D0 - 8.1 * HOUR));
       Date.now = () => D0 + 3 * HOUR;
       const o2 = d.computeBatteryOutlook(d.SITE_CATALOG.cam03);
       out.withV0 = { src: o2 && o2.socSource, swap: d.sameDaySwap("cam03") };
@@ -854,6 +866,63 @@ export async function run() {
     rerender.c1 === rerender.c0 && rerender.c2 === rerender.c0 + 1, rerender);
   r.check("f8-m 並べ直しが並べ直しを呼んで止まらなくなることはない",
     rerender.c3 === rerender.c2, rerender);
+
+  /* ====== f9: 夜間は実測の電圧を残量の起点にする ======
+     以前は夜でも「0時の電圧＋収支」の計算値を起点にし、実測とのずれ(実測のほうが0.2V前後低い)を
+     「3時間で抜ける浮き」として扱っていたため、充電の無い夜中に予測の電圧が上がり、持ち時間も
+     長く出ていた(本番 9/30 1:00 祇園大橋: 実測11.92V、計算値51%=12.11V、予測 11.95→12.01V)。 */
+  const nightFix = await page3.evaluate(() => {
+      // 元からある点は「別の取得経路」として扱い、差し込んだ中継サーバーの点と混ざらないようにする
+      // (実行時刻によって元の点と差し込んだ点が同じ時間帯に重なり、電圧の段差を取り違えるため)
+      const asOther = (arr) => arr.map((p) => Object.assign({}, p, { via: "試験用の元データ" }));
+    const d = window.__dashboardDebug;
+    const realNow = Date.now, HOUR = 3600000, MIN = 60000;
+    const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
+      return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
+    const D0 = jstMid(realNow());
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const run = (id, fixed, pts) => {
+      const s = d.siteStates[id], keep = s.points.slice();
+      s.points = asOther(keep).concat(pts).sort((a, b) => a.fetchedAt - b.fetchedAt);
+      Date.now = () => fixed;
+      try { return d.computeBatteryOutlook(d.SITE_CATALOG[id]); }
+      finally { Date.now = realNow; s.points = keep; }
+    };
+    // 4時間分、10分おき。発電0で 12.02V → 11.92V と下がってきた夜(祇園大橋の実例に近い形)
+    const nightPts = (fixed, v0, v1, ageMin) => Array.from({ length: 25 }, (_, i) => ({
+      fetchedAt: new Date(fixed - (ageMin || 0) * MIN - (24 - i) * 10 * MIN), pv: 0,
+      bat: v0 + (v1 - v0) * i / 24, loadW: 12, via: VIA }));
+    const out = {};
+    try {
+      const t1 = D0 + 2.5 * HOUR;                        // 2:30
+      const a = run("cam11", t1, nightPts(t1, 12.02, 11.92));
+      const up = a && a.series.slice(0, 18).some((p, i, arr) => i > 0 && p.v > arr[i - 1].v + 1e-9);
+      out.night = { src: a && a.socSource, soc: a && a.socNow, want: Math.round(d.socFromVoltage(11.92)),
+        first: a && +a.series[0].v.toFixed(3), after3h: a && +a.series[17].v.toFixed(3), rises: up };
+      // 昼の充電中(発電8W・13.2V)は、計算値(0時の電圧＋収支)を起点にしたまま、浮きが抜けて下がっていく
+      const t2 = D0 + 13 * HOUR;
+      const b = run("cam11", t2, Array.from({ length: 19 }, (_, i) => ({
+        fetchedAt: new Date(t2 - (18 - i) * 10 * MIN), pv: 8, bat: 13.2, loadW: 12, via: VIA })));
+      out.day = { src: b && b.socSource, first: b && b.series[0].v, soc: b && b.socNow };
+      // 下限9.5Vの北沢で10.50Vまで下がっている夜は、残量0%で切らずにマイナスの残量で数える
+      const c = run("cam03", t1, nightPts(t1, 10.60, 10.50));
+      out.deep = { src: c && c.socSource, soc: c && c.socNow };
+      // 実測が45分前で止まっている(通信が途切れている)ときは起点に使わない
+      const e = run("cam11", t1, nightPts(t1, 12.02, 11.92, 45));
+      out.stale = { src: e && e.socSource };
+    } finally { Date.now = realNow; d.refreshBatteryOutlook(); }
+    return out;
+  });
+  r.check("f9-a 充電が3時間以上止まっている夜は、実測の電圧から残量を出す(計算値ではなく)",
+    nightFix.night.src === "voltage" && Math.abs(nightFix.night.soc - nightFix.night.want) <= 1, nightFix.night);
+  r.check("f9-b 充電の無い夜中に、予測の電圧が上がらない(次の3時間)",
+    nightFix.night.rises === false && nightFix.night.after3h < nightFix.night.first, nightFix.night);
+  r.check("f9-c 昼の充電中は計算値を起点にし、充電による電圧の浮きは時間とともに抜けていく",
+    nightFix.day.src === "balance" && nightFix.day.first > 12.6, nightFix.day);
+  r.check("f9-d 下限が低い拠点は、11.36V(残量0%)を下回ってもマイナスの残量で数える",
+    nightFix.deep.src === "voltage" && nightFix.deep.soc < 0, nightFix.deep);
+  r.check("f9-e 実測が30分以上前で止まっていれば起点に使わない",
+    nightFix.stale.src !== "voltage", nightFix.stale);
 
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();

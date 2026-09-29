@@ -766,6 +766,28 @@ export async function run() {
     && sw03.lastSwapVAfter === 12.3, sw03 && { at: sw03.lastSwapAt, time: sw03.lastSwapTime });
   r.check("s21-f 交換直後は容量を測り直し中として扱う(交換前の値で仮置き)",
     sw03 && sw03.capStale === true, sw03 && { stale: sw03.capStale, cap: sw03.capacityAh });
+  /* 本番 9/30 1:29 の再計算で、前日に交換した4拠点が持ち比較から消えた。
+     交換後の0時電圧(+1V前後の跳ね)が届いたことで、仮置きの容量の回帰が交換をまたいで壊れ、
+     当てはまりが0.6を切って容量が出せなくなったため。交換より前の日だけで測ることを確かめる。 */
+  const goodStore = { days: {} };
+  let gv = 12.2;
+  for (let back = 40; back >= 1; back--) {
+    const k = dayKey(now - back * 24 * HOUR);
+    const b = LT_BAL[back % LT_BAL.length];
+    goodStore.days[k] = { cam03: { v0: Math.round(gv * 1000) / 1000, balWh: b, nightA: 1, nightVPerH: 0.015,
+      vmin: 11.8, swapChecked: true } };
+    gv += b / 400;                                    // 400Wh/V の電池(当てはまりは良い)
+  }
+  const yk = dayKey(now - 24 * HOUR);
+  Object.assign(goodStore.days[yk].cam03, { swapAt: at(16, 3).toISOString(), swapVBefore: 11.34, swapVAfter: 12.3 });
+  // 今日の0時電圧は交換後の電池の値(前日より1V高い)
+  goodStore.days[dayKey(now)] = { cam03: { v0: Math.round((gv + 1.0) * 1000) / 1000, balWh: -30, nightA: 1,
+    nightVPerH: 0.015, vmin: 12.2, swapChecked: true } };
+  const g03 = M.computeBatteryEndurance(goodStore, null).cam03;
+  r.check("s21-g 交換後の0時電圧が届いても、仮置きの容量は交換より前の日だけで測る(持ち比較から消えない)",
+    g03 && typeof g03.capacityAh === "number" && g03.capStale === true && g03.fitR >= 0.9
+    && g03.capWindow && g03.capWindow.to < g03.lastSwapAt,
+    g03 && { cap: g03.capacityAh, r: g03.fitR, win: g03.capWindow, swap: g03.lastSwapAt });
 
   // 2回目は12時間たっていないので取りに行かない
   const ltp2 = await runPoll(ltSandbox, ltHandler, "lt2");
