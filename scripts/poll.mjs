@@ -621,9 +621,28 @@ const SWAP_MAX_PV_RISE_W = 1;
 const SWAP_NORMAL_GAP_MS = 20 * 60 * 1000;
 const SWAP_WORK_GAP_MS = 3 * 60 * 60 * 1000;
 const SWAP_MIN_VALID_V = 5;
+// 電池切れで負荷が切れた(カメラ等が止まった)ときも、電流が止まったぶん電圧が跳ね上がるので、
+// 交換と見分ける必要がある(多呂樋管 9/30 4:34: 10.546V→11.319V、負荷 15.3W→2.0W)。
+// 交換なら機器は動き続けるが、負荷が切れると消費がほぼ止まったままになる。
+// 跳ねの直後から数点(最大3点)の負荷がすべて跳ねる前の4割未満なら、負荷が切れたとみなす。
+const LOAD_CUT_RATIO = 0.4;
+const LOAD_CUT_MIN_BEFORE_W = 5;
+const LOAD_CUT_LOOKAHEAD = 3;
+function loadCollapsedAt(list, i, loadBefore) {
+  if (!(typeof loadBefore === "number" && loadBefore >= LOAD_CUT_MIN_BEFORE_W)) return false;
+  let seen = 0;
+  for (let k = i; k < list.length && seen < LOAD_CUT_LOOKAHEAD; k++) {
+    const q = list[k];
+    if (typeof q.bat !== "number" || q.bat < SWAP_MIN_VALID_V) continue;
+    if (typeof q.loadW !== "number") return false;
+    if (q.loadW >= loadBefore * LOAD_CUT_RATIO) return false;
+    seen++;
+  }
+  return seen > 0;
+}
 function findIntradaySwap(rows) {
   let found = null, prev = null, sawDropout = false;
-  rows.forEach(function (p) {
+  rows.forEach(function (p, idx) {
     if (typeof p.bat !== "number") return;
     if (p.bat < SWAP_MIN_VALID_V) { if (prev) sawDropout = true; return; }
     if (prev) {
@@ -631,7 +650,8 @@ function findIntradaySwap(rows) {
       const gapOk = gap <= SWAP_NORMAL_GAP_MS || (sawDropout && gap <= SWAP_WORK_GAP_MS);
       const pvA = typeof prev.pv === "number" ? prev.pv : 0;
       const pvB = typeof p.pv === "number" ? p.pv : 0;
-      if (gapOk && p.bat - prev.bat >= SWAP_STEP_V && pvB - pvA <= SWAP_MAX_PV_RISE_W) {
+      if (gapOk && p.bat - prev.bat >= SWAP_STEP_V && pvB - pvA <= SWAP_MAX_PV_RISE_W
+        && !loadCollapsedAt(rows, idx, prev.loadW)) {
         found = { at: p.fetchedAt.toISOString(), vBefore: prev.bat, vAfter: p.bat };
       }
     }
