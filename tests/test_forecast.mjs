@@ -720,7 +720,9 @@ export async function run() {
       // 5分おきに11.34V → 12.70Vへ跳ね上がる(発電はほぼ0のまま。満充電の電池に載せ替えた形)
       // 発電は null にしておく(発電の見積りの回帰に、日射予報と合わない点を混ぜないため)
       s03.points = asOther(keep).concat([pt(95, 11.36, null), pt(90, 11.35, null), pt(85, 11.34, null),
-        pt(80, 12.70, null), pt(75, 12.69, null), pt(70, 12.68, null)]);
+        pt(80, 12.70, null), pt(75, 12.69, null), pt(70, 12.68, null),
+        // 交換後も計測は続いている(途切れると「データ停止」になるため)
+        pt(55, 12.67, null), pt(40, 12.66, null), pt(25, 12.65, null), pt(10, 12.64, null), pt(3, 12.63, null)]);
       const sw = d.detectIntradaySwap(s03.points, jstMid(fixed));
       const after = { order: order(), o: d.computeBatteryOutlook(d.SITE_CATALOG.cam03) };
       const table = (() => { document.getElementById("healthTableBtn").click();
@@ -769,8 +771,10 @@ export async function run() {
     { charging: swapCheck.charging, longGap: swapCheck.longGap, mixed: swapCheck.mixed, yesterday: swapCheck.yesterday });
   r.check("f8-c2 中継サーバーの点は、サーバー経由・画面から直接のどちらの名前でも拾う",
     swapCheck.sw && swapCheck.direct, { server: swapCheck.sw, direct: swapCheck.direct });
+  // 交換後に計測が続いていれば、交換後の実測電圧(充電していないとき)がそのまま起点になる
   r.check("f8-d 交換後は、交換直後の電圧から残量を出し直す(0時基準ではなく)",
-    swapCheck.before.src === "balance" && swapCheck.after.src === "swap"
+    swapCheck.before.src === "balance" && (swapCheck.after.src === "swap" || swapCheck.after.src === "voltage")
+    && !!swapCheck.after.swapAt
     && swapCheck.after.soc > swapCheck.before.soc + 20, { 前: swapCheck.before, 後: swapCheck.after });
   // 並びは「24時間以内の最低残量(下限電圧=0%)」で決まる。いちばん危ない北沢に満充電の電池を
   // 載せ替えると、順位が下がる(安全側へ移る)ことを確かめる。
@@ -787,26 +791,40 @@ export async function run() {
     const order = () => { d.refreshBatteryOutlook();
       return Array.from(document.querySelectorAll("#healthScatter rect.endurance-bar")).map((b) => b.getAttribute("data-site")); };
     const s11 = d.siteStates.cam03, keep = s11.points.slice();
-    // 北沢(下限9.5V)を、祇園大橋と同じ50Ah・1.0Aの電池にしておく
+    // 北沢(下限9.5V)を50Ah・消費の小さい(0.1A)電池にしておく。交換前は24時間以内の最低残量が
+    // こも池より低く、満充電に載せ替えると、こも池より高くなる(=順位が入れ替わる)。
     const e03 = d.getBatteryHealthState().sites.cam03;
     const keepE = { capacityAh: e03.capacityAh, nightA: e03.nightA };
-    e03.capacityAh = 50; e03.nightA = 1.0;
+    e03.capacityAh = 50; e03.nightA = 0.1;
+    // 比べる相手(祇園大橋・こも池)にも「今」の計測を足す。固定した時刻が元の点より大きく先だと、
+    // 相手が「データ停止」と判定されて先頭に来てしまい、順位の比較にならないため。
+    const keepOthers = {};
+    [["cam11", 12.2, 12], ["cam41", 12.45, 0.8]].forEach(([id, v, w]) => {
+      keepOthers[id] = d.siteStates[id].points.slice();
+      d.siteStates[id].points = asOther(keepOthers[id]).concat([40, 25, 10, 3].map((m) =>
+        ({ fetchedAt: new Date(fixed - m * MIN), pv: null, bat: v - m * 0.0001, loadW: w, via: VIA })));
+    });
     Date.now = () => fixed;
     try {
-      s11.points = asOther(keep);
+      // 交換前: 10.3V まで下がっている(下限9.5Vの手前。いちばん危ない)
+      s11.points = asOther(keep).concat([pt(95, 10.31), pt(80, 10.30), pt(60, 10.30), pt(40, 10.29),
+        pt(20, 10.29), pt(3, 10.28)]);
       const before = order();
-      s11.points = asOther(keep).concat([pt(95, 11.36, null), pt(90, 11.35), pt(85, 11.34),
-        pt(80, 12.70), pt(75, 12.69), pt(70, 12.68)]);
+      // 満充電の電池に載せ替え(10.30V → 12.70V)、その後も計測が続く
+      s11.points = asOther(keep).concat([pt(95, 10.31), pt(90, 10.30), pt(85, 10.30),
+        pt(80, 12.70), pt(75, 12.69), pt(70, 12.68), pt(50, 12.67), pt(30, 12.66), pt(10, 12.65), pt(3, 12.64)]);
       const after = order();
       return { before, after };
     } finally {
       Date.now = realNow; s11.points = keep;
+      Object.keys(keepOthers).forEach((id) => { d.siteStates[id].points = keepOthers[id]; });
       e03.capacityAh = keepE.capacityAh; e03.nightA = keepE.nightA;
       d.refreshBatteryOutlook();
     }
   });
   r.check("f8-e 交換で残量が増えると、持ち比較の順位が入れ替わる(下限電圧を基準に並べる)",
-    rankCheck.after.indexOf("cam03") > rankCheck.before.indexOf("cam03"), rankCheck);
+    rankCheck.after.indexOf("cam03") > rankCheck.before.indexOf("cam03")
+    && rankCheck.after.indexOf("cam03") > rankCheck.after.indexOf("cam41"), rankCheck);
   r.check("f8-f 持ち比較の値に「交換後」と添える",
     swapCheck.barText.some((t) => t.indexOf("交換後") > 0), swapCheck.barText);
   // 継続可どうしが同順位のまま動かないと、残量が増えても順位が変わらない。
@@ -978,7 +996,7 @@ export async function run() {
       const bars = Array.from(document.querySelectorAll("#healthScatter rect.endurance-bar")).map((b) => b.getAttribute("data-site"));
       const vals = Array.from(document.querySelectorAll("#healthScatter text.endurance-value")).map((t) => t.textContent);
       out.firstBar = bars[0]; out.firstVal = vals[0];
-      out.card = { text: s.healthValueEl.textContent, cls: s.healthValueEl.className };
+      out.card = { text: s.healthValueEl.textContent, cls: s.healthValueEl.className, sub: s.healthSubEl.textContent };
       // 日が出て負荷が戻ったら、電池切れの表示は消える
       s.points = asOther(keep).concat(cutPts, [pt(10, 12.10, 14.8), pt(5, 12.15, 15.1)]);
       out.recovered = !!d.currentLoadCut("cam11");
@@ -991,10 +1009,11 @@ export async function run() {
   });
   r.check("f10-a 負荷が切れて電圧が戻った形は、交換ではなく「負荷切れ」と判定する",
     cutCheck.swap === null && cutCheck.cut && cutCheck.cut.vBefore === 10.546, cutCheck);
-  r.check("f10-b 負荷が切れたままの拠点は、持ち比較の先頭に「電池切れ（時刻〜）」と出す",
-    cutCheck.current && cutCheck.firstBar === "cam11" && cutCheck.firstVal.indexOf("電池切れ") === 0, cutCheck);
-  r.check("f10-c カードにも「電池切れ」を危険色で出す",
-    cutCheck.card.text === "電池切れ" && cutCheck.card.cls.indexOf("critical") >= 0, cutCheck.card);
+  r.check("f10-b 下限に達して負荷が切れたままの拠点は、持ち比較の先頭に「停止中（電池切れ 時刻〜）」と出す",
+    cutCheck.current && cutCheck.firstBar === "cam11" && cutCheck.firstVal.indexOf("停止中（電池切れ ") === 0, cutCheck);
+  r.check("f10-c カードにも「停止中」を危険色で出し、電池切れと添える",
+    cutCheck.card.text === "停止中" && cutCheck.card.cls.indexOf("critical") >= 0 && cutCheck.card.sub.indexOf("電池切れ") === 0,
+    cutCheck.card);
   r.check("f10-d 負荷が戻れば(充電で復帰)電池切れの表示は消える", cutCheck.recovered === false, cutCheck);
   r.check("f10-e 負荷が動き続けている本物の交換は、これまでどおり交換として見つける", cutCheck.realSwap, cutCheck);
 
@@ -1041,6 +1060,54 @@ export async function run() {
   r.check("f11-d 実測の電圧が下限に達したら電池切れにする(下限+0.05V以下に入った時点から)",
     floorCheck.hit && floorCheck.hit.floor === 10.5 && floorCheck.hit.v <= 10.55 && floorCheck.hit.v > 10.5, floorCheck.hit);
   r.check("f11-e 下限で負荷が切れて電圧が戻っても、負荷が戻るまでは電池切れのまま", floorCheck.afterCut === true, floorCheck);
+
+  /* ====== f12: 機器の停止(データ停止・電池切れ・その他の停止)を見分けて出す ======
+     利用者の指摘：「機器なので、場合によっては停止している場合がある」。
+     多呂樋管 9/30：3:13 から機器の更新が止まり、中継サーバーは 10.546V・15.32W を繰り返し記録(自身も「データ停止」)。
+     4:34 以降は計測は届くが、消費が約1〜2W(ふだん約15W)＝機器(カメラ等)が止まっている。 */
+  const stopCheck = await page3.evaluate(async () => {
+    const d = window.__dashboardDebug;
+    const MIN = 60000, now = Date.now();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const asOther = (arr) => arr.map((p) => Object.assign({}, p, { via: "試験用の元データ" }));
+    const s = d.siteStates.cam11, keep = s.points.slice();       // 祇園大橋: 下限11.5V・夜間1.0A(ふだん約12W)
+    const pt = (minAgo, bat, load, pv) => ({ fetchedAt: new Date(now - minAgo * MIN), pv: pv || 0, bat, loadW: load, via: VIA });
+    const out = {};
+    const bar = () => { d.refreshBatteryOutlook();
+      const ids = Array.from(document.querySelectorAll("#healthScatter rect.endurance-bar")).map((b) => b.getAttribute("data-site"));
+      const vals = Array.from(document.querySelectorAll("#healthScatter text.endurance-value")).map((t) => t.textContent);
+      return vals[ids.indexOf("cam11")]; };
+    try {
+      // (a) 90分前から同じ値の繰り返し(機器の更新が止まっている)
+      const frozen = [pt(120, 12.10, 11.5), pt(110, 12.09, 11.8), pt(100, 12.08, 11.6)];
+      for (let m = 90; m >= 0; m -= 5) frozen.push(pt(m, 12.07, 11.7));
+      s.points = asOther(keep).concat(frozen);
+      out.relayLen = d.relayListSince(s.points, now - 3 * 60 * MIN).length;
+      const a = d.currentStop("cam11"); out.nodata = a && a.kind; out.nodataBar = bar();
+      // (b) 下限(11.5V)より上で、消費が約1Wに落ちたまま(電池以外の理由の停止)
+      s.points = asOther(keep).concat([pt(60, 12.10, 11.8), pt(50, 12.09, 11.6), pt(40, 12.15, 1.1),
+        pt(30, 12.16, 1.0), pt(20, 12.16, 1.2), pt(10, 12.17, 1.1), pt(3, 12.17, 1.0)]);
+      const b = d.currentStop("cam11"); out.stopped = b && b.kind; out.stoppedBar = bar();
+      out.stoppedCard = { text: s.healthValueEl.textContent, title: s.healthValueEl.parentElement.title };
+      // (b2) 1〜2点だけ一時的に落ちた(20分未満)は停止にしない
+      s.points = asOther(keep).concat([pt(40, 12.10, 11.8), pt(30, 12.09, 11.6), pt(20, 12.08, 12.0),
+        pt(10, 12.08, 4.5), pt(3, 12.07, 4.6)]);
+      out.blip = d.currentStop("cam11");
+      // (c) ふだんどおり動いている
+      s.points = asOther(keep).concat([pt(40, 12.10, 11.8), pt(30, 12.09, 11.6), pt(20, 12.08, 12.0), pt(10, 12.07, 11.9), pt(3, 12.06, 11.7)]);
+      out.normal = d.currentStop("cam11");
+    } finally { s.points = keep; d.refreshBatteryOutlook(); }
+    return out;
+  });
+  r.check("f12-a 中継サーバーが同じ値を繰り返しているだけの点は、新しい計測として数えない",
+    stopCheck.relayLen === 4, stopCheck.relayLen);
+  r.check("f12-b 機器から60分以上新しい計測が届かなければ「データ停止」と出す",
+    stopCheck.nodata === "nodata" && (stopCheck.nodataBar || "").indexOf("データ停止（") === 0, stopCheck);
+  r.check("f12-c 下限に達していなくても、消費がふだんの4割未満に落ちたままなら「停止中」と出す",
+    stopCheck.stopped === "stopped" && (stopCheck.stoppedBar || "").indexOf("停止中（") === 0
+    && stopCheck.stoppedCard.text === "停止中" && stopCheck.stoppedCard.title.indexOf("電池以外の理由") >= 0, stopCheck);
+  r.check("f12-d ふだんどおり動いていれば停止とはしない", stopCheck.normal === null, stopCheck.normal);
+  r.check("f12-e 消費の一時的な落ち込み(20分未満)は停止にしない", stopCheck.blip === null, stopCheck.blip);
 
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();

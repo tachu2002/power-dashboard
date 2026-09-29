@@ -481,7 +481,7 @@ export async function run() {
       // nightVPerH を持たせておく(持たない日は「古い形式」とみなして取り直されるため)
       // swapChecked も同様(当日の載せ替え検出を済ませた新しい形式の印)
       daysOut[k][id] = { v0: Math.round(v * 1000) / 1000, balWh: b,
-        nightA: plan[id].nightA || null, nightVPerH: 0.015, swapChecked: true,
+        nightA: plan[id].nightA || null, nightVPerH: 0.015, swapChecked: 2,
         vmin: Math.round((v - 0.05) * 1000) / 1000 };
       v += (plan[id].noisy ? 0 : b / WH_PER_V) + noise;
     }
@@ -751,17 +751,40 @@ export async function run() {
     cutRow(4, 34, 11.319, 2.0), cutRow(4, 40, 11.319, 2.0), cutRow(4, 45, 11.363, 2.0), cutRow(4, 51, 11.376, 2.0)];
   r.check("s21-h 電池切れで負荷が切れて電圧が戻った形は、交換とみなさない",
     M.findIntradaySwap(cutRows) === null, M.findIntradaySwap(cutRows));
+  /* 交換が何度もある拠点(中島樋管3号: 9/11・9/22)。いまの電池の区間がまだ短いときは、
+     交換をまたがずに1つ前の電池の区間で仮置きする(以前は9/11をまたいで当てはまりが0.567になり消えていた)。 */
+  const multi = { days: {} };
+  let mv = 12.0;
+  const bAt = dayKey(now - 20 * 24 * HOUR), cAt = dayKey(now - 3 * 24 * HOUR);   // 交換日(新しい電池の最初の日)
+  for (let back = 45; back >= 1; back--) {
+    const k = dayKey(now - back * 24 * HOUR);
+    const b = LT_BAL[back % LT_BAL.length];
+    if (k === bAt) mv = 12.4;                        // 1回目の交換
+    if (k === cAt) mv = 12.5;                        // 2回目の交換(直近3日しかない)
+    const e = { v0: Math.round(mv * 1000) / 1000, balWh: b, nightA: 1, nightVPerH: 0.015, vmin: 11.9, swapChecked: 2 };
+    const prevK = dayKey(now - (back + 1) * 24 * HOUR);
+    if (k === bAt) Object.assign(multi.days[prevK].cam54, { swapAt: at(16, 0).toISOString(), swapVBefore: 11.5, swapVAfter: 12.4 });
+    multi.days[k] = { cam54: e };
+    if (k === cAt) Object.assign(multi.days[prevK].cam54, { swapAt: at(16, 0).toISOString(), swapVBefore: 11.6, swapVAfter: 12.5 });
+    // 1回目の交換より前は200Wh/V、交換後は400Wh/V
+    mv += b / (k >= bAt ? 400 : 200);
+  }
+  const m54 = M.computeBatteryEndurance(multi, null).cam54;
+  r.check("s21-i 交換が続く拠点は、交換をまたがず1つ前の電池の区間で容量を仮置きする(持ち比較から消えない)",
+    m54 && typeof m54.capacityAh === "number" && m54.capPlaceholder === true && m54.fitR >= 0.9
+    && m54.capWindow.from >= bAt && m54.capWindow.to < cAt,
+    m54 && { cap: m54.capacityAh, r: m54.fitR, win: m54.capWindow, swaps: m54.swaps });
   const sum = M.summarizePowerDay(stepRows);
   r.check("s21-d 日次集計に交換の時刻と前後の電圧を持つ",
     sum.cam03 && sum.cam03.swapAt === at(16, 3).toISOString() && sum.cam03.swapVAfter === 12.3
-    && sum.cam03.swapChecked === true, sum.cam03);
+    && sum.cam03.swapChecked === 2, sum.cam03);
   // 昨日の午後に載せ替えた拠点: 日次の段差だけなら3日待つが、5分データで見つけたらすぐ確定する
   const swapStore = { days: {} };
   for (let back = 40; back >= 1; back--) {
     const k = dayKey(now - back * 24 * HOUR);
     const b = LT_BAL[back % LT_BAL.length];
     swapStore.days[k] = { cam03: { v0: 12.0 + (back % 3) * 0.01, balWh: b, nightA: 1, nightVPerH: 0.015,
-      vmin: 11.8, swapChecked: true } };
+      vmin: 11.8, swapChecked: 2 } };
   }
   swapStore.days[dayKey(now - 24 * HOUR)].cam03.swapAt = at(16, 3).toISOString();
   swapStore.days[dayKey(now - 24 * HOUR)].cam03.swapVBefore = 11.34;
@@ -781,14 +804,14 @@ export async function run() {
     const k = dayKey(now - back * 24 * HOUR);
     const b = LT_BAL[back % LT_BAL.length];
     goodStore.days[k] = { cam03: { v0: Math.round(gv * 1000) / 1000, balWh: b, nightA: 1, nightVPerH: 0.015,
-      vmin: 11.8, swapChecked: true } };
+      vmin: 11.8, swapChecked: 2 } };
     gv += b / 400;                                    // 400Wh/V の電池(当てはまりは良い)
   }
   const yk = dayKey(now - 24 * HOUR);
   Object.assign(goodStore.days[yk].cam03, { swapAt: at(16, 3).toISOString(), swapVBefore: 11.34, swapVAfter: 12.3 });
   // 今日の0時電圧は交換後の電池の値(前日より1V高い)
   goodStore.days[dayKey(now)] = { cam03: { v0: Math.round((gv + 1.0) * 1000) / 1000, balWh: -30, nightA: 1,
-    nightVPerH: 0.015, vmin: 12.2, swapChecked: true } };
+    nightVPerH: 0.015, vmin: 12.2, swapChecked: 2 } };
   const g03 = M.computeBatteryEndurance(goodStore, null).cam03;
   r.check("s21-g 交換後の0時電圧が届いても、仮置きの容量は交換より前の日だけで測る(持ち比較から消えない)",
     g03 && typeof g03.capacityAh === "number" && g03.capStale === true && g03.fitR >= 0.9
@@ -801,6 +824,24 @@ export async function run() {
     ltp2.calls.filter((u) => u.includes("/api/power/daily")).length === 0,
     ltp2.calls.filter((u) => u.includes("/api/power/daily")).length);
   fs.rmSync(ltSandbox, { recursive: true, force: true });
+
+  /* 負荷切れを交換と見分けるようにしたので、それより前の版で集計した日(swapChecked: true)は取り直す。
+     本番では梅名樋管2号に、下限で負荷が切れた日の誤った「交換」が8件残り、容量が出せなくなっていた。 */
+  const resumSandbox = makeSandbox("resum");
+  fs.mkdirSync(path.join(resumSandbox, "data"), { recursive: true });
+  const oldKey = dayKey(now - 2 * 24 * HOUR);
+  fs.writeFileSync(path.join(resumSandbox, "data", "power_daily.json"), JSON.stringify({ generatedAt: new Date(now).toISOString(),
+    days: { [oldKey]: { cam11: { v0: 12.3, balWh: 10, nightA: 1, nightVPerH: 0.015, vmin: 12.0, swapChecked: true,
+      swapAt: new Date(now - 2 * 24 * HOUR).toISOString() } } } }), "utf8");
+  await runPoll(resumSandbox, (u) => {
+    if (u.includes("mini.lhlab-vps.net/power/logs/")) return { text: async () => powerCsv(nightRows) };
+    return handler(u);
+  }, "resum1");
+  const resum = JSON.parse(fs.readFileSync(path.join(resumSandbox, "data", "power_daily.json"), "utf8"));
+  const re11 = resum.days[oldKey] && resum.days[oldKey].cam11;
+  r.check("s21-j 古い版で集計した日は取り直し、誤って残った交換を消す",
+    re11 && re11.swapChecked === 2 && re11.swapAt === undefined, re11);
+  fs.rmSync(resumSandbox, { recursive: true, force: true });
 
   /* ---- 後片付け ---- */
   fs.rmSync(sandbox, { recursive: true, force: true });
