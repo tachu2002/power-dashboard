@@ -1770,7 +1770,11 @@
     return (d.getUTCMonth() + 1) + "/" + d.getUTCDate() + " " + hm;
   }
   function outlookDetail(o, e) {
-    var how = o.socSource === "swap"
+    var how = o.socSource === "voltage"
+      ? "充電が止まっているので、実測の電圧 " + o.measuredV.toFixed(2) + "V（" +
+        fmtOutlookWhen(o.measuredAt) + "）から求めた残量" +
+        (o.swapAt ? "（" + fmtOutlookWhen(o.swapAt) + " にバッテリーの載せ替えを検出。実効容量は交換前の値で仮置き）" : "")
+      : o.socSource === "swap"
       ? fmtOutlookWhen(o.swapAt) + " にバッテリーの載せ替えを検出（" + o.swapVBefore.toFixed(2) + "V → " +
         o.swapVAfter.toFixed(2) + "V）。交換後の電圧から残量を出し直し、そこからの実測の発電−消費を足した値。" +
         "実効容量は交換前の値で仮置きしています（交換後のデータで数日かけて測り直します）"
@@ -1879,8 +1883,8 @@
         if (o) {
           rows.push({ id: site.id, name: name, hours: o.hoursToReserve,
             sustain: o.hoursToReserve === null, soc: o.socNow, minSoc: o.minSocPct,
-            src: o.socSource === "swap" ? "予報込み・" + fmtOutlookWhen(o.swapAt) + " 交換後" : "予報込み",
-            swapped: o.socSource === "swap",
+            src: o.swapAt ? "予報込み・" + fmtOutlookWhen(o.swapAt) + " 交換後" : "予報込み",
+            swapped: !!o.swapAt,
             capacityAh: e.capacityAh, nightA: e.nightA, floorV: batteryEmptyVoltageFor(site.id) });
           return;
         }
@@ -5406,8 +5410,11 @@
     var nowMs = Date.now();
     var swap = sameDaySwap(site.id);
     var integrate = function (soc, fromMs) {
+      // 積算も中継サーバーの5分データだけで行う。別経路の点(「サーバー(直接取得)」など)は発電が
+      // 空欄のことがあり、混ぜるとその区間の発電を0として数えて残量を低く見積もってしまう。
       var meas = s.points.filter(function (p) {
-        return p.fetchedAt.getTime() >= fromMs && typeof p.bat === "number" && p.bat >= SWAP_MIN_VALID_V;
+        return p.fetchedAt.getTime() >= fromMs && typeof p.bat === "number" && p.bat >= SWAP_MIN_VALID_V
+          && isRelayPoint(p);
       }).sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
       for (var i = 1; i < meas.length; i++) {
         var dtH = (meas[i].fetchedAt - meas[i - 1].fetchedAt) / HOUR_MS;
@@ -5464,6 +5471,36 @@
     if (hit && hit.value && hit.swapKey !== swapKey) scheduleHealthRerender();
     return value;
   }
+  var REST_HOURS_MS = 3 * HOUR_MS;        // 充電が止まってからこれだけたてば、電圧がそのまま残量を表す
+  var REST_PV_W = 0.5;                     // これ未満の発電は「充電していない」とみなす
+  var REST_MIN_POINTS = 6;                 // 3時間の間に最低これだけ実測がなければ判断しない
+  var REST_MAX_AGE_MS = 30 * 60 * 1000;    // 実測がこれより古ければ起点に使わない
+  // 判断は中継サーバーの5分データ(1本の続いた計測)だけで行う。別の取得経路の点は計り方や
+  // 時刻がずれていることがあり、混ぜると電圧の段差や発電の有無を取り違える(交換の検出と同じ理由)。
+  function isRelayPoint(p) { return String(p.via || "").indexOf(SWAP_SOURCE_VIA) >= 0; }
+  // 最新の有効な電圧(交換作業中の0Vなどは除く)
+  function lastValidBat(points) {
+    for (var i = points.length - 1; i >= 0; i--) {
+      var p = points[i];
+      if (isRelayPoint(p) && typeof p.bat === "number" && p.bat >= SWAP_MIN_VALID_V) return p;
+    }
+    return null;
+  }
+  // 直近3時間、発電が一度も0.5Wを超えていないか(=充電直後の電圧の浮きが抜けているか)
+  function isRestedFromCharging(points, atMs) {
+    var n = 0;
+    for (var i = points.length - 1; i >= 0; i--) {
+      var p = points[i], t = p.fetchedAt.getTime();
+      if (!isRelayPoint(p)) continue;
+      if (t > atMs) continue;
+      if (t < atMs - REST_HOURS_MS) break;
+      if (typeof p.pv === "number") {
+        if (p.pv >= REST_PV_W) return false;
+        n++;
+      }
+    }
+    return n >= REST_MIN_POINTS;
+  }
   function computeBatteryOutlook(site) {
     var e = batteryHealthEntry(site.id);
     var s = siteStates[site.id];
@@ -5486,12 +5523,35 @@
     if (!cur) return null;
     var soc = cur.soc, socSource = cur.source;
     var today = cur.today || todayPowerDaily(site.id);
-    soc = Math.max(0, Math.min(100, soc));
+    // 下限が11.36V(残量0%)より低い拠点(北沢9.5V・多呂10.5Vなど)があるので、0%で切らない
+    soc = Math.max(DEEP_DISCHARGE_PCT, Math.min(100, soc));
+
+    /* --- 夜間は実測の電圧そのものを残量の起点にする ---
+       充電が止まって3時間以上たっていれば、充電直後の電圧の浮き(表面電荷)は抜けていて、
+       実測の電圧がそのまま残量を表す(0時の基準電圧と同じ考え方)。
+       以前は夜でも「0時の電圧＋収支」の計算値を起点にしていた。0時を過ぎてから当日の0時電圧が
+       サーバーに届くまでの間は前日の0時電圧になってしまい、実測より0.2V前後(多呂樋管は0.56V)
+       高い残量から数えていた。その差を「3時間で抜ける浮き」として扱ったため、充電の無い夜中に
+       予測の電圧が上がり、持ち時間も長く出ていた。
+       昼でも、発電が無いのに実測が計算値より低いときは、計算値が高すぎるので実測に合わせる。 */
+    var lastBat = lastValidBat(s.points);
+    var measuredSoc = null;
+    if (lastBat && nowMs - lastBat.fetchedAt.getTime() <= REST_MAX_AGE_MS) {
+      var pvNow = typeof lastBat.pv === "number" ? lastBat.pv : 0;
+      var rested = isRestedFromCharging(s.points, lastBat.fetchedAt.getTime());
+      var lowerThanModel = pvNow < REST_PV_W && lastBat.bat < voltageFromSoc(soc);
+      if (rested || lowerThanModel) {
+        measuredSoc = Math.max(DEEP_DISCHARGE_PCT, Math.min(100, socFromVoltage(lastBat.bat)));
+        soc = measuredSoc;
+        socSource = "voltage";
+      }
+    }
     var socNow = soc;
     // 実測の電圧と、残量から求めた休止時電圧とのズレ(充電中の下駄)。グラフを実測から
     // 滑らかに続けるために持ち越し、時定数3時間で抜けていくものとして扱う。
-    var lastBat = lastPointWith(s.points, "bat");
-    var offsetV = lastBat ? (lastBat.bat - voltageFromSoc(socNow)) : 0;
+    // 下駄は充電でしか乗らないので、上向き(実測が高い)だけを持ち越す。下向きのズレを持ち越すと、
+    // 充電していないのに予測の電圧が時間とともに上がってしまう。
+    var offsetV = lastBat ? Math.max(0, lastBat.bat - voltageFromSoc(socNow)) : 0;
     if (!isFinite(offsetV)) offsetV = 0;
 
     // --- 先の見通し ---
@@ -5518,6 +5578,7 @@
     var sun = sunTimesFor(lat, lon, nowMs);
     return {
       computedAt: nowMs, socNow: Math.round(socNow), socSource: socSource,
+      measuredV: lastBat ? lastBat.bat : null, measuredAt: lastBat ? lastBat.fetchedAt.getTime() : null,
       swapAt: cur.swap ? cur.swap.at : null, swapVBefore: cur.swap ? cur.swap.vBefore : null,
       swapVAfter: cur.swap ? cur.swap.vAfter : null,
       reserveSocPct: Math.round(reserve), reserveV: reserveV,
