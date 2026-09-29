@@ -620,18 +620,19 @@ export async function run() {
   r.check("f7-z1 拠点ごとの下限電圧を読む(北沢9.5V / 既定11.5V)",
     limits.北沢の下限V === 9.5 && limits.既定の下限V === 11.5, limits);
   // 11.36V未満は放電末期として直線で延長するため、下限が低い拠点はマイナスの残量になる
-  r.check("f7-z2 下限電圧を残量に換算する(9.5V=約−4% / 10.5V=約−2% / 11.5V=約9%)",
-    limits.北沢の下限SOC === -4 && limits.多呂の下限SOC === -2
+  // 放電末期は実測(多呂樋管 9/30: 11.28→10.55V で容量の約1割)に合わせて 10.5V=−10%・9.0V=−12%
+  r.check("f7-z2 下限電圧を残量に換算する(9.5V=約−11% / 10.5V=−10% / 11.5V=約9%)",
+    limits.北沢の下限SOC === -11 && limits.多呂の下限SOC === -10
     && limits.既定の下限SOC >= 8 && limits.既定の下限SOC <= 11, limits);
   r.check("f7-z2b 下限9.5Vと10.5Vの差が数字に出る",
     limits.北沢の下限SOC < limits.多呂の下限SOC, limits);
   r.check("f7-z3 下限が低い拠点ほど長くもつ（同じ容量・同じ消費でも）",
     limits.北沢の持ち > limits.既定の持ち * 1.1, { 北沢: limits.北沢の持ち, 既定: limits.既定の持ち });
   // 北沢: 50Ah × (60% − (−3.9%)) ÷ 1.0A = 32.0h
-  r.check("f7-z4 持ち時間は容量×(残量−下限)÷消費（北沢: 50×63.9%÷1.0=32h）",
-    Math.abs(limits.北沢の持ち - 32) < 0.5, limits.北沢の持ち);
+  r.check("f7-z4 持ち時間は容量×(残量−下限)÷消費（北沢: 50×71.3%÷1.0=35.7h）",
+    Math.abs(limits.北沢の持ち - 35.7) < 0.5, limits.北沢の持ち);
   r.check("f7-z5 見通しも拠点ごとの下限を使う",
-    limits.見通しの下限 && limits.見通しの下限.v === 9.5 && limits.見通しの下限.socPct === -4, limits.見通しの下限);
+    limits.見通しの下限 && limits.見通しの下限.v === 9.5 && limits.見通しの下限.socPct === -11, limits.見通しの下限);
   /* 充電されない夜間の電圧降下(実測)を持ち時間に反映しているか。
      実測: 夜間 1.0A で 0.0134V/h 落ちる → 1Vあたり 74.6Ah → 容量 100Ah。
      収支から出した容量(50Ah)の2倍なので、持ち時間も約2倍になる。 */
@@ -716,10 +717,10 @@ export async function run() {
       const s03 = d.siteStates.cam03;
       const keep = s03.points.slice();
       const before = { order: order(), o: d.computeBatteryOutlook(d.SITE_CATALOG.cam03) };
-      // 5分おきに11.34V → 12.60Vへ跳ね上がる(発電はほぼ0のまま。充電済みの電池に載せ替えた形)
+      // 5分おきに11.34V → 12.70Vへ跳ね上がる(発電はほぼ0のまま。満充電の電池に載せ替えた形)
       // 発電は null にしておく(発電の見積りの回帰に、日射予報と合わない点を混ぜないため)
       s03.points = asOther(keep).concat([pt(95, 11.36, null), pt(90, 11.35, null), pt(85, 11.34, null),
-        pt(80, 12.60, null), pt(75, 12.59, null), pt(70, 12.58, null)]);
+        pt(80, 12.70, null), pt(75, 12.69, null), pt(70, 12.68, null)]);
       const sw = d.detectIntradaySwap(s03.points, jstMid(fixed));
       const after = { order: order(), o: d.computeBatteryOutlook(d.SITE_CATALOG.cam03) };
       const table = (() => { document.getElementById("healthTableBtn").click();
@@ -759,7 +760,7 @@ export async function run() {
     } finally { Date.now = realNow; }
   });
   r.check("f8-a 発電が増えずに電圧だけ0.35V以上跳ねたら、その時刻を交換として検出する",
-    swapCheck.sw && Math.abs(swapCheck.sw.vAfter - 12.60) < 0.001 && Math.abs(swapCheck.sw.vBefore - 11.34) < 0.001,
+    swapCheck.sw && Math.abs(swapCheck.sw.vAfter - 12.70) < 0.001 && Math.abs(swapCheck.sw.vBefore - 11.34) < 0.001,
     swapCheck.sw);
   r.check("f8-b 交換作業中の0Vをはさんでも検出する(梅名樋管2号の形)",
     swapCheck.dropout && Math.abs(swapCheck.dropout.vAfter - 12.48) < 0.001, swapCheck.dropout);
@@ -771,22 +772,53 @@ export async function run() {
   r.check("f8-d 交換後は、交換直後の電圧から残量を出し直す(0時基準ではなく)",
     swapCheck.before.src === "balance" && swapCheck.after.src === "swap"
     && swapCheck.after.soc > swapCheck.before.soc + 20, { 前: swapCheck.before, 後: swapCheck.after });
-  r.check("f8-e 交換で持ち時間が延び、持ち比較の順位が入れ替わる",
-    swapCheck.before.order[0] === "cam03" && swapCheck.after.order[0] !== "cam03"
-    && swapCheck.after.order.indexOf("cam03") > swapCheck.before.order.indexOf("cam03"),
-    { 前: swapCheck.before.order, 後: swapCheck.after.order });
+  // 並びは「24時間以内の最低残量(下限電圧=0%)」で決まる。いちばん危ない北沢に満充電の電池を
+  // 載せ替えると、順位が下がる(安全側へ移る)ことを確かめる。
+  const rankCheck = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const realNow = Date.now, HOUR = 3600000, MIN = 60000;
+    const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
+      return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
+    const jNow = new Date(realNow() + 9 * HOUR);
+    const fixed = (jNow.getUTCHours() >= 2) ? realNow() : jstMid(realNow()) + 17.5 * HOUR;
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const asOther = (arr) => arr.map((p) => Object.assign({}, p, { via: "試験用の元データ" }));
+    const pt = (minAgo, bat) => ({ fetchedAt: new Date(fixed - minAgo * MIN), pv: null, bat, loadW: 12, via: VIA });
+    const order = () => { d.refreshBatteryOutlook();
+      return Array.from(document.querySelectorAll("#healthScatter rect.endurance-bar")).map((b) => b.getAttribute("data-site")); };
+    const s11 = d.siteStates.cam03, keep = s11.points.slice();
+    // 北沢(下限9.5V)を、祇園大橋と同じ50Ah・1.0Aの電池にしておく
+    const e03 = d.getBatteryHealthState().sites.cam03;
+    const keepE = { capacityAh: e03.capacityAh, nightA: e03.nightA };
+    e03.capacityAh = 50; e03.nightA = 1.0;
+    Date.now = () => fixed;
+    try {
+      s11.points = asOther(keep);
+      const before = order();
+      s11.points = asOther(keep).concat([pt(95, 11.36, null), pt(90, 11.35), pt(85, 11.34),
+        pt(80, 12.70), pt(75, 12.69), pt(70, 12.68)]);
+      const after = order();
+      return { before, after };
+    } finally {
+      Date.now = realNow; s11.points = keep;
+      e03.capacityAh = keepE.capacityAh; e03.nightA = keepE.nightA;
+      d.refreshBatteryOutlook();
+    }
+  });
+  r.check("f8-e 交換で残量が増えると、持ち比較の順位が入れ替わる(下限電圧を基準に並べる)",
+    rankCheck.after.indexOf("cam03") > rankCheck.before.indexOf("cam03"), rankCheck);
   r.check("f8-f 持ち比較の値に「交換後」と添える",
     swapCheck.barText.some((t) => t.indexOf("交換後") > 0), swapCheck.barText);
   // 継続可どうしが同順位のまま動かないと、残量が増えても順位が変わらない。
   // 7日間でいちばん下がったときの残量が少ない順に並べ、その値を添える。
-  const lows = swapCheck.barText.filter((t) => t.indexOf("継続可（最低") === 0)
+  const lows = swapCheck.barText.filter((t) => t.indexOf("継続可（24h内最低") === 0)
     .map((t) => Number((t.match(/最低(-?\d+)%/) || [])[1]));
   // 何拠点が継続可になるかは時間帯(日射の予報)で変わるので、1拠点以上あればよい
-  r.check("f8-i 継続可どうしは7日間の最低残量が少ない順に並べ、その値を添える",
+  r.check("f8-i 継続可どうしは24時間以内の最低残量(下限=0%)が少ない順に並べ、その値を添える",
     lows.length >= 1 && lows.every((v, i) => i === 0 || lows[i - 1] <= v)
-    && swapCheck.barText.every((t) => t.indexOf("継続可") !== 0 || t.indexOf("継続可（最低") === 0), swapCheck.barText);
+    && swapCheck.barText.every((t) => t.indexOf("継続可") !== 0 || t.indexOf("継続可（24h内最低") === 0), swapCheck.barText);
   r.check("f8-g 健全性の一覧に今日の交換時刻と前後の電圧を出す",
-    (swapCheck.table[11] || "").indexOf(swapCheck.swapClock) >= 0 && (swapCheck.table[11] || "").indexOf("11.34→12.60V") >= 0,
+    (swapCheck.table[11] || "").indexOf(swapCheck.swapClock) >= 0 && (swapCheck.table[11] || "").indexOf("11.34→12.70V") >= 0,
     swapCheck.table[11]);
   const staleCache = await page3.evaluate(() => {
       // 元からある点は「別の取得経路」として扱い、差し込んだ中継サーバーの点と混ざらないようにする
@@ -923,6 +955,92 @@ export async function run() {
     nightFix.deep.src === "voltage" && nightFix.deep.soc < 0, nightFix.deep);
   r.check("f9-e 実測が30分以上前で止まっていれば起点に使わない",
     nightFix.stale.src !== "voltage", nightFix.stale);
+
+  /* ====== f10: 電池切れ(下限で負荷が切れた)を交換と取り違えず、「電池切れ」と出す ======
+     多呂樋管 9/30: 夜通し放電して 3:13 に 10.546V、4:34 に負荷が 15.3W→2.0W に落ち電圧が 11.319V に戻った。 */
+  const cutCheck = await page3.evaluate(async () => {
+    const d = window.__dashboardDebug;
+    const MIN = 60000, now = Date.now();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const asOther = (arr) => arr.map((p) => Object.assign({}, p, { via: "試験用の元データ" }));
+    const s = d.siteStates.cam11, keep = s.points.slice();
+    const pt = (minAgo, bat, load) => ({ fetchedAt: new Date(now - minAgo * MIN), pv: 0, bat, loadW: load, via: VIA });
+    const cutPts = [pt(60, 10.60, 15.3), pt(55, 10.58, 15.3), pt(50, 10.546, 15.3), pt(45, 10.546, 15.3),
+      pt(40, 11.319, 2.0), pt(35, 11.319, 2.0), pt(30, 11.363, 2.0), pt(25, 11.376, 2.0), pt(20, 11.376, 2.0)];
+    const out = {};
+    try {
+      s.points = asOther(keep).concat(cutPts);
+      const scan = d.scanVoltageSteps(s.points, now - 24 * 60 * MIN);
+      out.swap = scan.swap; out.cut = scan.cut && { vBefore: scan.cut.vBefore, vAfter: scan.cut.vAfter };
+      out.current = !!d.currentLoadCut("cam11");
+      d.refreshBatteryOutlook();
+      await new Promise((r) => setTimeout(r, 30));
+      const bars = Array.from(document.querySelectorAll("#healthScatter rect.endurance-bar")).map((b) => b.getAttribute("data-site"));
+      const vals = Array.from(document.querySelectorAll("#healthScatter text.endurance-value")).map((t) => t.textContent);
+      out.firstBar = bars[0]; out.firstVal = vals[0];
+      out.card = { text: s.healthValueEl.textContent, cls: s.healthValueEl.className };
+      // 日が出て負荷が戻ったら、電池切れの表示は消える
+      s.points = asOther(keep).concat(cutPts, [pt(10, 12.10, 14.8), pt(5, 12.15, 15.1)]);
+      out.recovered = !!d.currentLoadCut("cam11");
+      // 本物の交換(負荷は動き続ける)は、これまでどおり交換として見つける
+      s.points = asOther(keep).concat([pt(30, 11.40, 15.3), pt(25, 11.39, 15.3), pt(20, 12.40, 15.0), pt(15, 12.39, 15.1)]);
+      const sc2 = d.scanVoltageSteps(s.points, now - 24 * 60 * MIN);
+      out.realSwap = !!sc2.swap && !sc2.cut;
+    } finally { s.points = keep; d.refreshBatteryOutlook(); }
+    return out;
+  });
+  r.check("f10-a 負荷が切れて電圧が戻った形は、交換ではなく「負荷切れ」と判定する",
+    cutCheck.swap === null && cutCheck.cut && cutCheck.cut.vBefore === 10.546, cutCheck);
+  r.check("f10-b 負荷が切れたままの拠点は、持ち比較の先頭に「電池切れ（時刻〜）」と出す",
+    cutCheck.current && cutCheck.firstBar === "cam11" && cutCheck.firstVal.indexOf("電池切れ") === 0, cutCheck);
+  r.check("f10-c カードにも「電池切れ」を危険色で出す",
+    cutCheck.card.text === "電池切れ" && cutCheck.card.cls.indexOf("critical") >= 0, cutCheck.card);
+  r.check("f10-d 負荷が戻れば(充電で復帰)電池切れの表示は消える", cutCheck.recovered === false, cutCheck);
+  r.check("f10-e 負荷が動き続けている本物の交換は、これまでどおり交換として見つける", cutCheck.realSwap, cutCheck);
+
+  /* ====== f11: 残量と電池切れは拠点ごとの下限電圧を基準にする(利用者の指定) ======
+     11.36V(鉛蓄電池の一般的な0%)は基準にしない。下限電圧=0%・12.70V=100%(カードの電池ゲージと同じ)。 */
+  const floorCheck = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const MIN = 60000, now = Date.now();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const asOther = (arr) => arr.map((p) => Object.assign({}, p, { via: "試験用の元データ" }));
+    const pctAt = (id, v) => d.siteSocPct(id, d.socFromVoltage(v));
+    const out = {
+      floors: { cam14: d.batteryEmptyVoltageFor("cam14"), cam03: d.batteryEmptyVoltageFor("cam03"), cam11: d.batteryEmptyVoltageFor("cam11") },
+      zero: [pctAt("cam14", 10.5), pctAt("cam03", 9.5), pctAt("cam11", 11.5)],
+      full: [pctAt("cam14", 12.7), pctAt("cam03", 12.7), pctAt("cam11", 12.7)],
+      // 多呂樋管(下限10.5V)の 11.25V は、11.36V を下回っていても残量0%ではない
+      taro1125: pctAt("cam14", 11.25),
+      gauge1125: Math.round(d.batteryPercentFor("cam14", 11.25))
+    };
+    const s = d.siteStates.cam14, keep = s.points.slice();
+    const pt = (minAgo, bat, load) => ({ fetchedAt: new Date(now - minAgo * MIN), pv: 0, bat, loadW: load, via: VIA });
+    try {
+      // 11.25V まで下がっている(下限10.5Vより上)→ 電池切れではない
+      s.points = asOther(keep).concat([pt(30, 11.30, 15), pt(20, 11.27, 15), pt(10, 11.25, 15)]);
+      out.above = d.currentEmpty("cam14");
+      // 下限10.5Vに達した → 電池切れ(負荷はまだ動いていても、下限に達した時点で電池切れ)
+      s.points = asOther(keep).concat([pt(30, 10.62, 15), pt(20, 10.55, 15), pt(10, 10.546, 15)]);
+      const hit = d.currentEmpty("cam14");
+      out.hit = hit && { v: hit.v, floor: hit.floor };
+      // 下限で負荷が切れて電圧が戻っても、負荷が戻るまでは電池切れのまま
+      s.points = asOther(keep).concat([pt(40, 10.55, 15.3), pt(35, 10.546, 15.3), pt(30, 11.319, 2.0),
+        pt(20, 11.36, 2.0), pt(10, 11.37, 2.0)]);
+      out.afterCut = !!d.currentEmpty("cam14");
+    } finally { s.points = keep; }
+    return out;
+  });
+  r.check("f11-a 残量は下限電圧を0%・12.70Vを100%として出す(拠点ごとに下限が違う)",
+    floorCheck.floors.cam14 === 10.5 && floorCheck.floors.cam03 === 9.5 && floorCheck.floors.cam11 === 11.5
+    && floorCheck.zero.every((v) => v === 0) && floorCheck.full.every((v) => v === 100), floorCheck);
+  r.check("f11-b 11.36Vは基準にしない(下限10.5Vの多呂樋管は11.25Vでも0%ではなく、電池ゲージと同じ値)",
+    floorCheck.taro1125 > 30 && Math.abs(floorCheck.taro1125 - floorCheck.gauge1125) <= 1, floorCheck);
+  r.check("f11-c 下限より上なら、11.36Vを下回っていても電池切れにしない", floorCheck.above === null, floorCheck.above);
+  // 計測の丸めを見込んで、下限+0.05V以下に入った最初の時点を電池切れの始まりとする
+  r.check("f11-d 実測の電圧が下限に達したら電池切れにする(下限+0.05V以下に入った時点から)",
+    floorCheck.hit && floorCheck.hit.floor === 10.5 && floorCheck.hit.v <= 10.55 && floorCheck.hit.v > 10.5, floorCheck.hit);
+  r.check("f11-e 下限で負荷が切れて電圧が戻っても、負荷が戻るまでは電池切れのまま", floorCheck.afterCut === true, floorCheck);
 
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();

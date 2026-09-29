@@ -745,6 +745,12 @@ export async function run() {
   r.check("s21-c 充電で上がっただけ・通信が途切れていた間の上昇は交換とみなさない",
     M.findIntradaySwap(chargeRows) === null && M.findIntradaySwap(gapRows) === null,
     [M.findIntradaySwap(chargeRows), M.findIntradaySwap(gapRows)]);
+  // 電池切れで負荷が切れた形(多呂樋管 9/30: 10.546V・負荷15.3W → 4:34 に 11.319V・負荷2.0W のまま)は交換ではない
+  const cutRow = (hh, mm, bat, load) => ({ siteId: "cam14", fetchedAt: at(hh, mm), bat, pv: 0, loadW: load });
+  const cutRows = [cutRow(4, 18, 10.546, 15.3), cutRow(4, 23, 10.546, 15.3), cutRow(4, 29, 10.546, 15.3),
+    cutRow(4, 34, 11.319, 2.0), cutRow(4, 40, 11.319, 2.0), cutRow(4, 45, 11.363, 2.0), cutRow(4, 51, 11.376, 2.0)];
+  r.check("s21-h 電池切れで負荷が切れて電圧が戻った形は、交換とみなさない",
+    M.findIntradaySwap(cutRows) === null, M.findIntradaySwap(cutRows));
   const sum = M.summarizePowerDay(stepRows);
   r.check("s21-d 日次集計に交換の時刻と前後の電圧を持つ",
     sum.cam03 && sum.cam03.swapAt === at(16, 3).toISOString() && sum.cam03.swapVAfter === 12.3

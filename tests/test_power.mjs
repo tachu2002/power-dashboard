@@ -206,10 +206,11 @@ export async function run() {
   // 50Ah × (80% − 下限11.5V相当の9.3%) ÷ 1.00A = 35h
   r.check("p8-e 持ち時間を時間で出す（丸一日以上は既定色）",
     health.ok.text === "35h" && health.ok.sub === "日射ゼロ時" && health.ok.cls === "", health.ok);
-  // 北沢は下限9.5V(=残量−3.9%)なので 50Ah × (30+3.9)% ÷ 0.96A = 18h → 24h未満は注意色
-  r.check("p8-f 丸一日もたない拠点は注意色", health.warn.text === "18h" && health.warn.cls === "warn", health.warn);
-  // 梅名2号は下限10.5V(=残量−1.8%)なので 15Ah × (50+1.8)% ÷ 1.60A = 4.9h → 12h未満は危険色
-  r.check("p8-g 一晩もたない拠点は危険色", health.bad.text === "4.9h" && health.bad.cls === "critical", health.bad);
+  // 放電末期の見積りは実測(多呂樋管 9/30: 11.28→10.55V で容量の約1割)に合わせて 10.5V=−10%・9.0V=−12%。
+  // 北沢は下限9.5V(=残量−11.3%)なので 50Ah × (30+11.3)% ÷ 0.96A = 22h → 24h未満は注意色
+  r.check("p8-f 丸一日もたない拠点は注意色", health.warn.text === "22h" && health.warn.cls === "warn", health.warn);
+  // 梅名2号は下限10.5V(=残量−10%)なので 15Ah × (50+10)% ÷ 1.60A = 5.6h → 12h未満は危険色
+  r.check("p8-g 一晩もたない拠点は危険色", health.bad.text === "5.6h" && health.bad.cls === "critical", health.bad);
   // 14Ah × (86-20)% ÷ 0.07A = 132h → 48時間を超えたら「日」表記
   r.check("p8-h 2日以上もつ拠点は「日」表記で良好色",
     health.long.text.endsWith("日") && health.long.cls === "ok", health.long);
@@ -268,7 +269,7 @@ export async function run() {
     bars.thresholds === 3 && bars.hasNow, bars);
   r.check("p8-u2 拠点名と値を並べて出す",
     bars.names.length === 4 && bars.values.length === 4
-    && bars.values[0].indexOf("4.9h") === 0 && bars.values[3].indexOf("日") > 0, bars);
+    && bars.values[0].indexOf("5.6h") === 0 && bars.values[3].indexOf("日") > 0, bars);
   r.check("p8-v 読み方と更新間隔を説明する",
     bars.note.indexOf("あと何時間もつか") >= 0 && bars.note.indexOf("短い順") >= 0
     && bars.note.indexOf("10分ごとに計算し直しています") >= 0, bars.note.slice(0, 140));

@@ -328,8 +328,8 @@ export function buildBatteryHealth(opts = {}) {
   // 持ち時間はその下限までで測るため、同じ容量でも拠点で変わる。
   const spec = opts.sites || {
     cam11: { capacityAh: 50, nightA: 1.00, socPct: 80 },   // 下限11.5V → 35h(既定色)
-    cam03: { capacityAh: 50, nightA: 0.96, socPct: 30 },   // 下限 9.5V → 18h(注意)
-    cam09: { capacityAh: 15, nightA: 1.60, socPct: 50 },   // 下限10.5V → 4.7h(危険)
+    cam03: { capacityAh: 50, nightA: 0.96, socPct: 30 },   // 下限 9.5V → 22h(注意)
+    cam09: { capacityAh: 15, nightA: 1.60, socPct: 50 },   // 下限10.5V → 5.6h(危険)
     cam41: { capacityAh: 14, nightA: 0.07, socPct: 86 },   // 下限11.5V → 6.4日(良好)
     cam12: { mains: true, v0: 13.45 },                     // 常時電源
     cam13: { fitR: 0.41 }                                  // 測定中(日数不足)
