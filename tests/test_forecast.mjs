@@ -946,9 +946,9 @@ export async function run() {
     try {
       const t1 = D0 + 2.5 * HOUR;                        // 2:30
       const a = run("cam11", t1, nightPts(t1, 12.02, 11.92));
-      const up = a && a.series.slice(0, 18).some((p, i, arr) => i > 0 && p.v > arr[i - 1].v + 1e-9);
+      const up = a && a.series.slice(0, 12).some((p, i, arr) => i > 0 && p.v > arr[i - 1].v + 1e-9);
       out.night = { src: a && a.socSource, soc: a && a.socNow, want: Math.round(d.socFromVoltage(11.92)),
-        first: a && +a.series[0].v.toFixed(3), after3h: a && +a.series[17].v.toFixed(3), rises: up };
+        first: a && +a.series[0].v.toFixed(3), after3h: a && +a.series[11].v.toFixed(3), rises: up };
       // 昼の充電中(発電8W・13.2V)は、計算値(0時の電圧＋収支)を起点にしたまま、浮きが抜けて下がっていく
       const t2 = D0 + 13 * HOUR;
       const b = run("cam11", t2, Array.from({ length: 19 }, (_, i) => ({
@@ -965,7 +965,7 @@ export async function run() {
   });
   r.check("f9-a 充電が3時間以上止まっている夜は、実測の電圧から残量を出す(計算値ではなく)",
     nightFix.night.src === "voltage" && Math.abs(nightFix.night.soc - nightFix.night.want) <= 1, nightFix.night);
-  r.check("f9-b 充電の無い夜中に、予測の電圧が上がらない(次の3時間)",
+  r.check("f9-b 充電の無い夜中に、予測の電圧が上がらない(次の2時間。夜明けが近づけば f13 のとおり上向きになる)",
     nightFix.night.rises === false && nightFix.night.after3h < nightFix.night.first, nightFix.night);
   r.check("f9-c 昼の充電中は計算値を起点にし、充電による電圧の浮きは時間とともに抜けていく",
     nightFix.day.src === "balance" && nightFix.day.first > 12.6, nightFix.day);
@@ -1108,6 +1108,123 @@ export async function run() {
     && stopCheck.stoppedCard.text === "停止中" && stopCheck.stoppedCard.title.indexOf("電池以外の理由") >= 0, stopCheck);
   r.check("f12-d ふだんどおり動いていれば停止とはしない", stopCheck.normal === null, stopCheck.normal);
   r.check("f12-e 消費の一時的な落ち込み(20分未満)は停止にしない", stopCheck.blip === null, stopCheck.blip);
+
+  /* ====== f13: 予測の電圧は、日の出で上向き・日の入りで下向きになる ======
+     残量→電圧の換算(休止電圧)だけで描いていたため、日中も予測の電圧が下がり続けていた
+     (本番 9/30 7:19 の各拠点: 朝日が昇っているのに、12時間先まで右下がり)。
+     実際は日射があれば(曇りでも雨でも)充電電流で端子電圧が持ち上がり、日が沈むと抜ける。
+     発電係数は試験用の点の入れ方(実行時刻)で変わるので、ここでは元の点は使わず、
+     「発電 = 0.06 × 予報の日射」になる点を自分で作って差し込む(実行時刻に左右されない)。
+     時刻は「実際の今より後」の 3:00 / 11:00 に固定する(予報の日射を書き換えても、過去の点と食い違わない)。 */
+  const liftFix = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const realNow = Date.now, HOUR = 3600000, MIN = 60000;
+    const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
+      return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
+    const D0 = jstMid(realNow());
+    const nextAt = (h) => { const t = D0 + h * HOUR; return t > realNow() + 5 * MIN ? t : t + 24 * HOUR; };
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const fc = d.getForecastState();
+    const radAt = (t) => { const w = fc.hours.reduce((b, h) => (Math.abs(h.t - t) < Math.abs(b.t - t) ? h : b), fc.hours[0]);
+      return Math.abs(w.t - t) <= 90 * MIN ? w.rad : 0; };
+    // 直近14時間は発電が予報の日射に比例する昼の点、最後の4時間は発電0の夜の点
+    const mk = (fixed, withDay) => {
+      const pts = [];
+      if (withDay) for (let m = 14 * 60; m > 4 * 60; m -= 10) {
+        const t = fixed - m * MIN; pts.push({ fetchedAt: new Date(t), pv: 0.06 * radAt(t), bat: 12.4, loadW: 12, via: VIA }); }
+      return pts;
+    };
+    const night = (fixed) => Array.from({ length: 25 }, (_, i) => ({
+      fetchedAt: new Date(fixed - (24 - i) * 10 * MIN), pv: 0, bat: 12.10 - 0.05 * i / 24, loadW: 12, via: VIA }));
+    const dayNow = (fixed) => Array.from({ length: 25 }, (_, i) => { const t = fixed - (24 - i) * 10 * MIN;
+      return { fetchedAt: new Date(t), pv: 0.06 * radAt(t), bat: 12.7, loadW: 12, via: VIA }; });
+    const run = (id, fixed, pts, mult) => {
+      const s = d.siteStates[id], keep = s.points.slice();
+      s.points = pts.slice().sort((a, b) => a.fetchedAt - b.fetchedAt);
+      const saved = fc.hours.map((h) => h.rad);
+      if (mult !== undefined) fc.hours.forEach((h) => { if (h.t > fixed) h.rad = h.rad * mult; });
+      Date.now = () => fixed;
+      try { return d.computeBatteryOutlook(d.SITE_CATALOG[id]); }
+      finally { Date.now = realNow; s.points = keep; fc.hours.forEach((h, i) => { h.rad = saved[i]; }); }
+    };
+    const at = (o, h) => o.series[Math.round(h * 6) - 1].v;
+    const hm = (ms) => new Date(ms + 9 * HOUR).toISOString().slice(11, 16);
+    const out = {};
+    try {
+      // (a) 夜明け前 3:00 から見る。日の出の前後を底に、そのあとは電圧が上がる
+      const t3 = nextAt(3);
+      const a = run("cam11", t3, mk(t3, true).concat(night(t3)));
+      const av = a.series.map((p) => p.v);
+      const minI = av.indexOf(Math.min.apply(null, av));
+      out.dawn = { v0: +av[0].toFixed(2), min: +av[minI].toFixed(2), minAt: hm(a.series[minI].t), sunrise: hm(a.sunrise),
+        vNoon: +at(a, 8).toFixed(2), pvCoef: a.pvCoef, minMs: a.series[minI].t, sunriseMs: a.sunrise };
+      // (b) 曇り(予報の日射が15%)でも、日射があれば日射ゼロの日より高くなる
+      const c = run("cam11", t3, mk(t3, true).concat(night(t3)), 0.15);
+      const z = run("cam11", t3, mk(t3, true).concat(night(t3)), 0);
+      out.cloudy = { pre: +at(c, 2).toFixed(2), vNoon: +at(c, 8).toFixed(2), noSunNoon: +at(z, 8).toFixed(2) };
+      // (c) 昼 11:00 から見る。日の入りのあと(23:00 まで)は電圧が下がる
+      const t11 = nextAt(11);
+      const b = run("cam11", t11, mk(t11, true).concat(dayNow(t11)));
+      const vs = b.series.map((p) => p.v);
+      out.dusk = { start: +vs[0].toFixed(2), max: +Math.max.apply(null, vs).toFixed(2), end: +vs[vs.length - 1].toFixed(2),
+        sunset: hm(b.sunset), lift: b.liftNowV };
+      // 夜(充電が止まって3時間以上)は持ち上がり0
+      const t25 = nextAt(2.5);
+      out.nightLift = run("cam11", t25, mk(t25, true).concat(night(t25))).liftNowV;
+    } finally { d.refreshBatteryOutlook(); }
+    return out;
+  });
+  r.check("f13-a 夜明け前から見ると、予測の電圧は日の出の前後(2時間以内)を底に、そのあと上向きになる",
+    Math.abs(liftFix.dawn.minMs - liftFix.dawn.sunriseMs) <= 2 * 3600000 && liftFix.dawn.vNoon > liftFix.dawn.min + 0.1, liftFix.dawn);
+  r.check("f13-b 曇り(日射15%)でも、日射があれば予測の電圧は日射ゼロの日より高くなる(充電の持ち上がり)",
+    liftFix.cloudy.vNoon > liftFix.cloudy.noSunNoon + 0.05, liftFix.cloudy);
+  r.check("f13-c 昼から見ると、日の入りのあと予測の電圧は昼のピークより下がる",
+    liftFix.dusk.max - liftFix.dusk.end >= 0.3 && liftFix.dusk.lift > 0, liftFix.dusk);
+  r.check("f13-d 充電が止まって3時間以上たった夜は、電圧の持ち上がりは0",
+    liftFix.nightLift === 0, liftFix.nightLift);
+
+  // 夜間の電圧降下の実測がある拠点(放電側の実効容量が収支の約2.3倍)では、消費を同じ倍率で割って
+  // 日中の充電を見込むので、曇りの日でも日が昇れば右上がりになる(本番 9/26 祇園大橋の形)
+  const page4 = await newPage(null, {
+    nowMs: NOW, hourly: buildHourly({ nowMs: NOW, realisticSun: true, rain: false, nightRad: 30 }),
+    powerDaily: buildPowerDaily({ nowMs: NOW, history: 6, today: {
+      cam11: { v0: 12.24, balWh: 100, nightA: 1.0, nightVPerH: 0.0116 } } }),
+    batteryHealth: buildBatteryHealth({ nowMs: NOW, sites: { cam11: { capacityAh: 50, nightA: 1.0, socPct: 80 } } })
+  });
+  await openDashboard(page4, () => {
+    const d = window.__dashboardDebug;
+    return d.getForecastState().hours.length > 0 && Object.keys(d.getBatteryHealthState().sites || {}).length > 0;
+  });
+  const cloudy2 = await page4.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const realNow = Date.now, HOUR = 3600000, MIN = 60000;
+    const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
+      return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
+    const D0 = jstMid(realNow());
+    const t3 = D0 + 3 * HOUR > realNow() + 5 * MIN ? D0 + 3 * HOUR : D0 + 27 * HOUR;
+    const fc = d.getForecastState();
+    const radAt = (t) => { const w = fc.hours.reduce((b, h) => (Math.abs(h.t - t) < Math.abs(b.t - t) ? h : b), fc.hours[0]);
+      return Math.abs(w.t - t) <= 90 * MIN ? w.rad : 0; };
+    const s = d.siteStates.cam11, keep = s.points.slice();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const pts = [];
+    for (let m = 14 * 60; m > 4 * 60; m -= 10) { const t = t3 - m * MIN;
+      pts.push({ fetchedAt: new Date(t), pv: 0.06 * radAt(t), bat: 12.4, loadW: 12, via: VIA }); }
+    for (let i = 0; i < 25; i++) pts.push({ fetchedAt: new Date(t3 - (24 - i) * 10 * MIN), pv: 0,
+      bat: 12.10 - 0.05 * i / 24, loadW: 12, via: VIA });
+    s.points = pts;
+    const saved = fc.hours.map((h) => h.rad);
+    fc.hours.forEach((h) => { if (h.t > t3) h.rad = h.rad * 0.15; });
+    Date.now = () => t3;
+    try {
+      const o = d.computeBatteryOutlook(d.SITE_CATALOG.cam11);
+      const at = (h) => o.series[Math.round(h * 6) - 1].v;
+      return { ratio: o.nightCapacityRatio, pre: +at(2).toFixed(2), noon: +at(8).toFixed(2), pvCoef: o.pvCoef };
+    } finally { Date.now = realNow; s.points = keep; fc.hours.forEach((h, i) => { h.rad = saved[i]; }); }
+  });
+  r.check("f13-e 曇り(日射15%)の日でも、夜間降下の実測がある拠点は日が昇ると予測の電圧が右上がりになる",
+    cloudy2.ratio > 1.5 && cloudy2.noon > cloudy2.pre + 0.05, cloudy2);
+  await page4.close();
 
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();
