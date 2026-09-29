@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-29T18:40:05.687Z",
+  "generatedAt": "2026-09-29T19:50:06.393Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -104,7 +104,7 @@
         12.141,
         12.124,
         11.93,
-        11.891
+        11.873
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -216,7 +216,7 @@
         12.119,
         12.049,
         11.842,
-        11.803
+        11.79
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -545,7 +545,7 @@
         12.04,
         11.847,
         11.539,
-        11.482
+        11.469
       ],
       "swaps": [
         "2026-09-10"
@@ -654,7 +654,7 @@
         12.115,
         12.031,
         11.886,
-        11.856
+        11.851
       ],
       "swaps": [
         "2026-07-03",
@@ -764,7 +764,7 @@
         11.772,
         11.68,
         12.04,
-        11.961
+        11.957
       ],
       "swaps": [
         "2026-07-04",
@@ -783,7 +783,7 @@
       "mvSpansSwap": true,
       "ratedAh": null,
       "sohPct": null,
-      "mvPerAhNow": 8.6,
+      "mvPerAhNow": 8.7,
       "mvPerAhPrev": 9.2,
       "nightNights": 23,
       "nightGenMaxWh": 173
@@ -877,7 +877,7 @@
         11.979,
         11.921,
         11.697,
-        11.658
+        11.645
       ],
       "swaps": [
         "2026-09-18"
@@ -991,7 +991,7 @@
         12.278,
         12.295,
         12.132,
-        12.106
+        12.093
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1103,7 +1103,7 @@
         12.264,
         12.225,
         12.001,
-        11.957
+        11.952
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1116,7 +1116,7 @@
       "mvSpansSwap": false,
       "ratedAh": 20,
       "sohPct": 99,
-      "mvPerAhNow": 31.8,
+      "mvPerAhNow": 30.6,
       "mvPerAhPrev": 30.8,
       "nightNights": 20,
       "nightGenMaxWh": 61
@@ -1210,7 +1210,7 @@
         11.649,
         11.535,
         11.337,
-        12.264
+        12.26
       ],
       "swaps": [
         "2026-09-10",
@@ -1238,19 +1238,19 @@
       "socPct": 0,
       "nightA": 1.392,
       "vmin": 12.22,
-      "capacityAh": 41.3,
-      "fitR": 0.948,
-      "whPerV": 376,
+      "capacityAh": 47.6,
+      "fitR": 0.622,
+      "whPerV": 435,
       "enduranceH": 0,
       "usableAh": 0,
       "capacityInitialAh": null,
-      "capacityNowAh": 41.7,
+      "capacityNowAh": 47.9,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-09-11",
+        "from": "2026-08-27",
         "to": "2026-09-30",
-        "days": 19,
-        "tempC": 23.4,
+        "days": 34,
+        "tempC": 24.2,
         "whole": false
       },
       "initialWindow": null,
@@ -1324,18 +1324,19 @@
       ],
       "swaps": [
         "2026-07-02",
-        "2026-09-11"
+        "2026-09-11",
+        "2026-10-01"
       ],
-      "lastSwapAt": "2026-09-11",
-      "lastSwapTime": null,
-      "lastSwapVBefore": null,
-      "lastSwapVAfter": null,
-      "capAfterSwap": true,
-      "capStale": false,
-      "capDaysAfterSwap": 20,
-      "mvSpansSwap": true,
+      "lastSwapAt": "2026-10-01",
+      "lastSwapTime": "2026-09-29T19:34:47.000Z",
+      "lastSwapVBefore": 10.546,
+      "lastSwapVAfter": 11.319,
+      "capAfterSwap": false,
+      "capStale": true,
+      "capDaysAfterSwap": 0,
+      "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 83,
+      "sohPct": 96,
       "mvPerAhNow": 10.7,
       "mvPerAhPrev": 9.9,
       "nightNights": 20,
@@ -1435,7 +1436,7 @@
         12.339,
         12.361,
         12.172,
-        12.146
+        12.141
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1542,7 +1543,7 @@
         11.983,
         11.908,
         11.666,
-        11.609
+        11.596
       ],
       "swaps": [
         "2026-09-18"
@@ -1752,7 +1753,7 @@
         12.027,
         12.115,
         11.957,
-        11.921
+        11.913
       ],
       "swaps": [
         "2026-09-25"
@@ -1861,7 +1862,7 @@
         11.68,
         11.513,
         -0.001,
-        12.203
+        12.185
       ],
       "swaps": [
         "2026-09-02",
@@ -1977,7 +1978,7 @@
         12.273,
         12.308,
         12.141,
-        12.11
+        12.097
       ],
       "swaps": [
         "2026-09-20"
@@ -2091,7 +2092,7 @@
         12.146,
         12.163,
         11.961,
-        11.926
+        11.904
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2198,7 +2199,7 @@
         11.974,
         11.899,
         11.825,
-        12.062
+        12.036
       ],
       "swaps": [
         "2026-09-13",
@@ -2611,7 +2612,7 @@
         11.882,
         11.807,
         11.741,
-        12.181
+        12.163
       ],
       "swaps": [
         "2026-09-10",
@@ -2721,7 +2722,7 @@
         11.781,
         11.772,
         12.154,
-        12.128
+        12.093
       ],
       "swaps": [
         "2026-09-04",
@@ -2832,7 +2833,7 @@
         12.278,
         12.225,
         12.001,
-        11.965
+        11.952
       ],
       "swaps": [
         "2026-09-11",
@@ -2942,7 +2943,7 @@
         11.943,
         11.917,
         11.649,
-        11.587
+        11.583
       ],
       "swaps": [
         "2026-09-11",
