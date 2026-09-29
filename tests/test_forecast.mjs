@@ -691,8 +691,10 @@ export async function run() {
     const HOUR = 3600000, MIN = 60000;
     const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
       return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
-    let fixed = jstMid(realNow()) + 17.5 * HOUR;
-    if (fixed < realNow()) fixed += 24 * HOUR;
+    // 当日の収支データ(テスト開始時の日付)と同じ日のうちに固定する。
+    // 深夜0〜2時は交換前後の点を並べる余地がないので、同じ日の17:30にする。
+    const jNow = new Date(realNow() + 9 * HOUR);
+    let fixed = (jNow.getUTCHours() >= 2) ? realNow() : jstMid(realNow()) + 17.5 * HOUR;
     Date.now = () => fixed;
     try {
       // 本番の点はほとんどがサーバー経由の名前で入っている(画面から直接の名前は1日数点しかない)。
@@ -743,6 +745,8 @@ export async function run() {
       d.refreshBatteryOutlook();
       return {
         sw, dropout, charging, longGap, mixed, direct, yesterday, table, barText,
+        swapClock: (() => { const x = new Date(fixed - 80 * MIN + 9 * HOUR);
+          return String(x.getUTCHours()).padStart(2, "0") + ":" + String(x.getUTCMinutes()).padStart(2, "0"); })(),
         before: { order: before.order, src: before.o && before.o.socSource, soc: before.o && before.o.socNow,
           h: before.o && before.o.hoursToReserve },
         after: { order: after.order, src: after.o && after.o.socSource, soc: after.o && after.o.socNow,
@@ -776,15 +780,15 @@ export async function run() {
   r.check("f8-i 継続可どうしは7日間の最低残量が少ない順に並べ、その値を添える",
     lows.length >= 2 && lows.every((v, i) => i === 0 || lows[i - 1] <= v), swapCheck.barText);
   r.check("f8-g 健全性の一覧に今日の交換時刻と前後の電圧を出す",
-    (swapCheck.table[11] || "").indexOf("16:10") >= 0 && (swapCheck.table[11] || "").indexOf("11.34→12.60V") >= 0,
+    (swapCheck.table[11] || "").indexOf(swapCheck.swapClock) >= 0 && (swapCheck.table[11] || "").indexOf("11.34→12.60V") >= 0,
     swapCheck.table[11]);
   const staleCache = await page3.evaluate(() => {
     // 10分のキャッシュの途中でも、交換が見つかれば計算し直す
     const d = window.__dashboardDebug;
     const realNow = Date.now, HOUR = 3600000, MIN = 60000;
     const j = new Date(realNow() + 9 * HOUR);
-    let fixed = Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR + 17.5 * HOUR;
-    if (fixed < realNow()) fixed += 24 * HOUR;
+    const mid0 = Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR;
+    let fixed = j.getUTCHours() >= 2 ? realNow() : mid0 + 17.5 * HOUR;
     Date.now = () => fixed;
     try {
       const s03 = d.siteStates.cam03, keep = s03.points.slice();
@@ -800,6 +804,38 @@ export async function run() {
   });
   r.check("f8-h 10分のキャッシュ中でも、交換を見つけたらすぐ計算し直す",
     staleCache.recomputed && staleCache.aSrc === "balance" && staleCache.bSrc === "swap", staleCache);
+
+  /* 昨日の午後に交換し、日付が変わった直後(今日の0時の電圧がまだ届いていない間)。
+     以前はこの間だけ、交換前の電池の残量(昨日の0時の電圧)に戻ってしまっていた。 */
+  const overnight = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const realNow = Date.now, HOUR = 3600000, MIN = 60000;
+    const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
+      return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
+    const D0 = jstMid(realNow());                     // 当日の収支データがある日
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const s03 = d.siteStates.cam03, keep = s03.points.slice();
+    const mk = (base) => [0, 5, 10, 15, 20].map((m, i) => ({ fetchedAt: new Date(base + m * MIN),
+      pv: null, bat: i < 3 ? 11.34 : 12.30, loadW: 12, via: VIA }));
+    const out = {};
+    try {
+      // (1) 翌日の0:20。翌日の0時の電圧はまだ無い → 交換後の電圧から出す
+      s03.points = keep.concat(mk(D0 + 15.9 * HOUR));
+      Date.now = () => D0 + 24 * HOUR + 20 * MIN;
+      const o1 = d.computeBatteryOutlook(d.SITE_CATALOG.cam03);
+      out.noV0 = { src: o1 && o1.socSource, soc: o1 && o1.socNow };
+      // (2) 前日の午後に交換し、当日の0時の電圧が届いている → それが交換後の電池の値なので0時基準
+      s03.points = keep.concat(mk(D0 - 8.1 * HOUR));
+      Date.now = () => D0 + 3 * HOUR;
+      const o2 = d.computeBatteryOutlook(d.SITE_CATALOG.cam03);
+      out.withV0 = { src: o2 && o2.socSource, swap: d.sameDaySwap("cam03") };
+    } finally { Date.now = realNow; s03.points = keep; d.refreshBatteryOutlook(); }
+    return out;
+  });
+  r.check("f8-j 日付が変わった直後(0時の電圧がまだ無い間)も、昨日の交換後の電圧から残量を出す",
+    overnight.noV0.src === "swap" && overnight.noV0.soc >= 60, overnight.noV0);
+  r.check("f8-k 今日の0時の電圧が届いたら、それ(交換後の電池の値)を起点に戻る",
+    overnight.withV0.src === "balance" && overnight.withV0.swap === null, overnight.withV0);
 
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();
