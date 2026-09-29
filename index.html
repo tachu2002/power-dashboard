@@ -1790,6 +1790,8 @@
       "発電の見積り: 日射 × " + o.pvCoef + "（過去の発電実績から）／曇り具合 " +
       Math.round(o.cloudFactor * 100) + "%\n" +
       "消費 " + o.loadW + "W\n" +
+      "電圧の予測: 残量の休止電圧 ＋ 充電による持ち上がり（発電があれば曇りでも上向き、日没後は約2時間で抜ける。いま +" +
+      (o.liftNowV || 0).toFixed(2) + "V）\n" +
       (o.sunrise ? "日の出 " + fmtOutlookWhen(o.sunrise).replace(/^今日 /, "") +
         "／日の入り " + fmtOutlookWhen(o.sunset).replace(/^今日 /, "") + "\n" : "") +
       "10分ごとに計算し直しています。";
@@ -5371,6 +5373,8 @@
   }
   // 任意の時刻の日射[W/m2]。予報があればそれを、無ければ快晴モデル×曇り具合を使う。
   function radiationAt(lat, lon, tMs, cloudFactor) {
+    // 日の出前・日の入り後は、予報が(時間の丸めで)日射を持っていても0にする
+    if (solarAltitudeDeg(lat, lon, tMs) <= SUN_HORIZON_DEG) return 0;
     var w = weatherHourAt(tMs);
     if (w && isFinite(w.rad)) return Math.max(0, w.rad);
     return clearSkyRadiation(lat, lon, tMs) * cloudFactor;
@@ -5671,6 +5675,46 @@
     if (hit && hit.value && hit.swapKey !== swapKey) scheduleHealthRerender();
     return value;
   }
+  /* 充電中の電圧の持ち上がり(日射があれば、曇りでも雨でも電圧は上向きになる)。
+     残量→電圧の換算(OCV表)は「休止時の電圧」なので、それだけで描くと、日中は残量がほとんど
+     増えない曇りの日などに、日が昇っても予測の電圧が下がり続けてしまう。実際は、日射で充電電流が
+     流れると端子電圧は休止電圧より持ち上がり、日が沈むと2時間ほどで抜けていく。
+       持ち上がり[V] = 最大値 × (1 − exp(−(発電W ÷ 容量Ah) ÷ x0))       ← 発電が増えるほど頭打ちで増える
+       上がるときは時定数 0.25時間、抜けるときは 2時間 で追いかける
+     実測(17拠点・直近14日・5分ごと)に当てはめた値。昼間の電圧の誤差が 0.61V → 0.26V になった。
+     容量で割るのは、同じ発電でも容量の小さい電池ほど充電電流が大きく、持ち上がりも大きいため。 */
+  var LIFT_MAX_V = 1.0;
+  var LIFT_X0_W_PER_AH = 0.25;
+  var LIFT_TAU_UP_H = 0.25;
+  var LIFT_TAU_DOWN_H = 2;
+  var LIFT_HISTORY_MS = 6 * HOUR_MS;
+  function liftTargetV(pvW, capAh) {
+    if (!(pvW > 0) || !(capAh > 0)) return 0;
+    return LIFT_MAX_V * (1 - Math.exp(-(pvW / capAh) / LIFT_X0_W_PER_AH));
+  }
+  function liftStep(lift, target, dtH) {
+    var tau = target > lift ? LIFT_TAU_UP_H : LIFT_TAU_DOWN_H;
+    return lift + (target - lift) * (1 - Math.exp(-dtH / tau));
+  }
+  // 「いま」の持ち上がり。直近6時間の実測の発電を、上と同じ追いかけ方で流して求める。
+  function chargeLiftNow(points, capAh, nowMs) {
+    var list = (points || []).filter(function (p) {
+      return isRelayPoint(p) && typeof p.bat === "number" && p.bat >= SWAP_MIN_VALID_V
+        && typeof p.pv === "number" && p.fetchedAt.getTime() >= nowMs - LIFT_HISTORY_MS;
+    }).sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+    var lift = 0, prevT = null;
+    list.forEach(function (p) {
+      var t = p.fetchedAt.getTime();
+      if (prevT !== null) {
+        var dtH = (t - prevT) / HOUR_MS;
+        if (dtH > 0) lift = liftStep(lift, liftTargetV(p.pv, capAh), Math.min(dtH, 1));
+      }
+      prevT = t;
+    });
+    // 最後の実測から「いま」までの間の分を減らす(通信が途切れていた場合など)
+    if (prevT !== null && nowMs > prevT) lift = liftStep(lift, 0, Math.min((nowMs - prevT) / HOUR_MS, 3));
+    return lift;
+  }
   var REST_HOURS_MS = 3 * HOUR_MS;        // 充電が止まってからこれだけたてば、電圧がそのまま残量を表す
   var REST_PV_W = 0.5;                     // これ未満の発電は「充電していない」とみなす
   var REST_MIN_POINTS = 6;                 // 3時間の間に最低これだけ実測がなければ判断しない
@@ -5712,8 +5756,16 @@
     var capWh = e.capacityAh * OUTLOOK_V_NOM;                 // 充電側(収支から出した実効容量)
     // 放電側は「充電されない夜間に実際どれだけ電圧が落ちるか」から出した容量を使う。
     var nightCap = nightDeclineCapacityAh(site.id, e.capacityAh);
-    var dischargeCapWh = (nightCap ? nightCap.capacityAh : e.capacityAh) * OUTLOOK_V_NOM;
     var loadW = e.nightA * OUTLOOK_V_NOM;
+    /* 放電側は夜間の実効容量(収支の容量の nightCap.ratio 倍)で換算する、というのは、
+       「夜間の放電電流から見た消費が、実際に電池から出ていく量より大きい」ことの言い換えで、
+       実際に出ていく量は 消費 ÷ ratio 。以前は 減るとき=消費÷(容量×ratio)・増えるとき=(発電−消費)÷容量 と
+       分けていたため、夜は合っても、日中は発電が消費(夜間電流×12.5V)を超えるまで充電が全く見込まれず、
+       晴れた日中でも残量が増えなかった。消費を ratio で割って同じ容量で換算すれば、夜は今までと同じで、
+       日中の充電も実態に近くなる。
+       実測(17拠点・直近14日)で、0時から翌0時までの電圧の予測誤差: 以前 0.165V → 0.094V。 */
+    var loadRatio = nightCap && nightCap.ratio > 0 ? nightCap.ratio : 1;
+    var loadEffW = loadW / loadRatio;
     var nowMs = Date.now();
     var reserve = reserveSocFor(site.id);          // 拠点ごとの下限電圧を残量に換算したもの
     var reserveV = batteryEmptyVoltageFor(site.id);
@@ -5747,12 +5799,23 @@
       }
     }
     var socNow = soc;
-    // 実測の電圧と、残量から求めた休止時電圧とのズレ(充電中の下駄)。グラフを実測から
+    // いまの充電による電圧の持ち上がり。実測の電圧から残量を求めた場合(充電が止まっている)は、
+    // 電圧がそのまま休止電圧なので持ち上がりは無い。
+    var liftNow = (measuredSoc !== null || !lastBat) ? 0 : chargeLiftNow(s.points, e.capacityAh, nowMs);
+    if (!isFinite(liftNow)) liftNow = 0;
+    // 実測の電圧と、モデル(残量の休止電圧＋充電の持ち上がり)とのズレ。グラフを実測から
     // 滑らかに続けるために持ち越し、時定数3時間で抜けていくものとして扱う。
-    // 下駄は充電でしか乗らないので、上向き(実測が高い)だけを持ち越す。下向きのズレを持ち越すと、
+    // 充電していないときは、上向き(実測が高い)だけを持ち越す。下向きのズレを持ち越すと、
     // 充電していないのに予測の電圧が時間とともに上がってしまう。
-    var offsetV = lastBat ? Math.max(0, lastBat.bat - voltageFromSoc(socNow)) : 0;
+    // 充電中は持ち上がりの見積りの誤差なので、上下どちらも持ち越す(実測から段差なくつなぐ)。
+    var offsetV = 0;
+    if (lastBat) {
+      var gap = lastBat.bat - (voltageFromSoc(socNow) + liftNow);
+      var chargingNow = typeof lastBat.pv === "number" && lastBat.pv >= REST_PV_W;
+      offsetV = chargingNow ? Math.max(-0.5, Math.min(0.5, gap)) : Math.max(0, gap);
+    }
     if (!isFinite(offsetV)) offsetV = 0;
+    var lift = liftNow;
 
     // --- 先の見通し ---
     var cloud = cloudFactorFromForecast(lat, lon, nowMs);
@@ -5766,17 +5829,16 @@
     for (var j = 1; j <= steps; j++) {
       var t = nowMs + j * OUTLOOK_STEP_MS;
       var pvW = k * radiationAt(lat, lon, t - OUTLOOK_STEP_MS / 2, cloud);
-      var netW = pvW - loadW;
-      // 減るときは夜間の実測に合わせた容量、増えるときは収支から出した容量で換算する。
-      var useWh = netW < 0 ? dischargeCapWh : capWh;
-      soc = Math.max(DEEP_DISCHARGE_PCT, Math.min(100, soc + netW * stepH / useWh * 100));
+      var netW = pvW - loadEffW;
+      soc = Math.max(DEEP_DISCHARGE_PCT, Math.min(100, soc + netW * stepH / capWh * 100));
+      lift = liftStep(lift, liftTargetV(pvW, e.capacityAh), stepH);
       if (soc < minSoc) { minSoc = soc; minSocAt = t; }
       if (t - nowMs <= 24 * HOUR_MS && soc < minSoc24) minSoc24 = soc;
       if (hoursToReserve === null && soc <= reserve) hoursToReserve = j * stepH;
       // グラフ用は12時間先まで(それ以降は描かないので持たない)
       if (t - nowMs <= PREDICTION_HORIZON_MS) {
         var decay = Math.exp(-(t - nowMs) / OUTLOOK_SURFACE_TAU_MS);
-        series.push({ t: t, soc: soc, v: voltageFromSoc(soc) + offsetV * decay });
+        series.push({ t: t, soc: soc, v: voltageFromSoc(soc) + lift + offsetV * decay });
       }
     }
     var sun = sunTimesFor(lat, lon, nowMs);
@@ -5792,6 +5854,7 @@
       nightCapacityAh: nightCap ? nightCap.capacityAh : null,
       nightCapacityRatio: nightCap ? nightCap.ratio : null,
       nightCapacityNights: nightCap ? nightCap.nights : null,
+      liftNowV: Math.round(liftNow * 100) / 100,
       minSocPct: Math.round(minSoc), minSocAt: minSocAt, balWhToday: today ? today.balWh : null,
       hoursToReserve: hoursToReserve, cloudFactor: Math.round(cloud * 100) / 100,
       pvCoef: Math.round(k * 1000) / 1000, loadW: Math.round(loadW * 100) / 100,
