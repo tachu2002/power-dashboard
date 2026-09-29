@@ -837,6 +837,24 @@ export async function run() {
   r.check("f8-k 今日の0時の電圧が届いたら、それ(交換後の電池の値)を起点に戻る",
     overnight.withV0.src === "balance" && overnight.withV0.swap === null, overnight.withV0);
 
+  // 新しい実測が届いたら、10分を待たずに持ち比較を並べ直す(ページを開いた直後や交換直後に古い順位が残らない)
+  const rerender = await page3.evaluate(async () => {
+    const d = window.__dashboardDebug;
+    const c0 = d.getHealthRenderCount();
+    d.mergePowerHistory([{ siteId: "cam11", fetchedAt: new Date(Date.now() - 60000), pv: 1.0, bat: 12.4,
+      pvVoltage: null, loadW: 12, status: "ok", via: "mini.lhlab-vps.net" }]);
+    const c1 = d.getHealthRenderCount();          // 同じ瞬間の分はまとめるので、この時点ではまだ
+    await new Promise((r) => setTimeout(r, 50));
+    const c2 = d.getHealthRenderCount();
+    await new Promise((r) => setTimeout(r, 400));
+    const c3 = d.getHealthRenderCount();          // 描き直しが描き直しを呼んで止まらなくなっていないか
+    return { c0, c1, c2, c3 };
+  });
+  r.check("f8-l 新しい実測が届いたら、持ち比較をすぐ並べ直す(同時に届いた分は1回にまとめる)",
+    rerender.c1 === rerender.c0 && rerender.c2 === rerender.c0 + 1, rerender);
+  r.check("f8-m 並べ直しが並べ直しを呼んで止まらなくなることはない",
+    rerender.c3 === rerender.c2, rerender);
+
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();
 
