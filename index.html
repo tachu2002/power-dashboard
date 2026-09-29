@@ -1749,7 +1749,14 @@
     // 放電し続ける前提の値なので、夜間の実測から出した容量があればそちらを使う。
     var nightCap = nightDeclineCapacityAh(siteId, e.capacityAh);
     var cap = nightCap ? nightCap.capacityAh : e.capacityAh;
-    var usable = cap * Math.max(0, e.socPct - reserveSocFor(siteId)) / 100;
+    var socPct = e.socPct;
+    // 今日載せ替えた拠点は、0時の残量(交換前の電池)ではなく交換後の残量から数える
+    var site = SITE_CATALOG[siteId];
+    if (site && sameDaySwap(siteId)) {
+      var cur = currentSocFor(site, e, e.capacityAh * OUTLOOK_V_NOM, e.nightA * OUTLOOK_V_NOM);
+      if (cur) socPct = Math.max(0, Math.min(100, cur.soc));
+    }
+    var usable = cap * Math.max(0, socPct - reserveSocFor(siteId)) / 100;
     return Math.round(usable / e.nightA * 10) / 10;
   }
   // 見通しの補助表示。時刻は「今日 18:20」「明日 06:10」「9/30 12:00」のように出す。
@@ -1763,7 +1770,11 @@
     return (d.getUTCMonth() + 1) + "/" + d.getUTCDate() + " " + hm;
   }
   function outlookDetail(o, e) {
-    var how = o.socSource === "balance"
+    var how = o.socSource === "swap"
+      ? fmtOutlookWhen(o.swapAt) + " にバッテリーの載せ替えを検出（" + o.swapVBefore.toFixed(2) + "V → " +
+        o.swapVAfter.toFixed(2) + "V）。交換後の電圧から残量を出し直し、そこからの実測の発電−消費を足した値。" +
+        "実効容量は交換前の値で仮置きしています（交換後のデータで数日かけて測り直します）"
+      : o.socSource === "balance"
       ? "0時の電圧から求めた残量に、当日の収支 " +
         (o.balWhToday >= 0 ? "+" : "") + o.balWhToday + "Wh（発電−消費）を足した値"
       : "0時の " + e.socPct + "% から実測の発電で更新した値";
@@ -1867,20 +1878,28 @@
         var name = site.name.replace(/（.*$/, "");
         if (o) {
           rows.push({ id: site.id, name: name, hours: o.hoursToReserve,
-            sustain: o.hoursToReserve === null, soc: o.socNow, src: "予報込み",
+            sustain: o.hoursToReserve === null, soc: o.socNow, minSoc: o.minSocPct,
+            src: o.socSource === "swap" ? "予報込み・" + fmtOutlookWhen(o.swapAt) + " 交換後" : "予報込み",
+            swapped: o.socSource === "swap",
             capacityAh: e.capacityAh, nightA: e.nightA, floorV: batteryEmptyVoltageFor(site.id) });
           return;
         }
         var noSun = noSunHoursFor(site.id, e);
         if (typeof noSun === "number") {
-          rows.push({ id: site.id, name: name, hours: noSun, sustain: false, soc: e.socPct,
-            src: "日射ゼロ時", capacityAh: e.capacityAh, nightA: e.nightA,
+          var swNow = sameDaySwap(site.id);
+          rows.push({ id: site.id, name: name, hours: noSun, sustain: false, minSoc: null,
+            soc: swNow ? Math.round(socFromVoltage(swNow.vAfter)) : e.socPct,
+            src: swNow ? "日射ゼロ時・" + fmtOutlookWhen(swNow.at) + " 交換後" : "日射ゼロ時",
+            swapped: !!swNow, capacityAh: e.capacityAh, nightA: e.nightA,
             floorV: batteryEmptyVoltageFor(site.id) });
         }
       });
       // 短い順(危ない順)に上から。継続可はいちばん下。
+      // 継続可どうしは、7日間でいちばん下がったときの残量が少ない順に並べる。
+      // (以前は同順位のまま動かず、交換で残量が増えても順位が入れ替わらなかった)
       rows.sort(function (a, b) {
         if (a.sustain !== b.sustain) return a.sustain ? 1 : -1;
+        if (a.sustain) return (a.minSoc === null ? 999 : a.minSoc) - (b.minSoc === null ? 999 : b.minSoc);
         return (a.hours || 0) - (b.hours || 0);
       });
 
@@ -1948,14 +1967,18 @@
         var vEl = el("text", { class: "endurance-value", x: W - marginRight + 12, y: cy,
           "text-anchor": "start", "dominant-baseline": "middle",
           fill: color, "font-size": 11, "font-weight": 700, "font-family": FONT });
-        vEl.textContent = (r.sustain ? "継続可" : fmtEndurance(r.hours)) + (noSunRow ? " ※" : "");
+        // 今日載せ替えた拠点は、交換後の電池で数えていることが分かるようにする
+        // 継続可の拠点は、並び順の根拠になっている「7日間の最低残量」を添える
+        vEl.textContent = (r.sustain ? "継続可" + (typeof r.minSoc === "number" ? "（最低" + r.minSoc + "%）" : "")
+          : fmtEndurance(r.hours)) + (noSunRow ? " ※" : "") + (r.swapped ? " 交換後" : "");
         svg.appendChild(vEl);
 
         function show() {
           while (tooltip.firstChild) tooltip.removeChild(tooltip.firstChild);
           var l0 = document.createElement("div");
           l0.style.cssText = "color:var(--text-primary);font-weight:600;";
-          l0.textContent = r.name + "　" + (r.sustain ? "継続可" : fmtEndurance(r.hours));
+          l0.textContent = r.name + "　" + (r.sustain
+            ? "継続可（7日間の最低 " + r.minSoc + "%）" : fmtEndurance(r.hours));
           var l1 = document.createElement("div");
           l1.style.cssText = "color:var(--text-secondary);";
           l1.textContent = "残量 " + r.soc + "% ／ 容量 " + r.capacityAh + "Ah ／ 夜間 " + r.nightA + "A";
@@ -2147,7 +2170,18 @@
             + (e.mvSpansSwap ? "（交換前）" : "") + "</span>" : "");
       }
       var swapCell = '<span class="ht-mute">—</span>';
-      if (e.lastSwapAt) {
+      var todaySwap = sameDaySwap(r.id);
+      if (todaySwap) {
+        // 今日の載せ替え(5分ごとの実測電圧から検出)。残量はもう交換後の電池で計算している。
+        swapCell = '<span class="num">' + fmtOutlookWhen(todaySwap.at) + "</span>"
+          + '<span class="ht-small">　' + todaySwap.vBefore.toFixed(2) + "→" + todaySwap.vAfter.toFixed(2)
+          + "V・容量は測り直し中</span>";
+      } else if (e.lastSwapTime) {
+        // 5分データで交換の時刻まで分かっているもの(サーバー側で確定)
+        swapCell = '<span class="num">' + fmtOutlookWhen(Date.parse(e.lastSwapTime)) + "</span>"
+          + (e.capStale ? '<span class="ht-warn ht-small">　測り直し中</span>'
+            : e.capDaysAfterSwap ? '<span class="ht-small">　以降' + e.capDaysAfterSwap + "日で測定</span>" : "");
+      } else if (e.lastSwapAt) {
         // 載せ替えた電池が新品とは限らない(臨時の予備で前より弱いこともある)ので、
         // 良し悪しの色は付けず、日付と「測り直しの状況」だけを出す。
         swapCell = '<span class="num">' + e.lastSwapAt.slice(5).replace("-", "/") + "</span>"
@@ -5244,6 +5278,13 @@
     // 持ち時間を実態より長く見積もってしまう。
     var health = batteryHealthEntry(siteId);
     var since = (health && health.lastSwapAt) || null;
+    // 今日載せ替えたばかりなら、交換後の夜はまだ無い(明日の夜から使う)
+    var sw = sameDaySwap(siteId);
+    if (sw) {
+      var nd = new Date(sw.at + 9 * HOUR_MS + 24 * HOUR_MS);
+      var p2 = function (n) { return String(n).padStart(2, "0"); };
+      since = nd.getUTCFullYear() + "-" + p2(nd.getUTCMonth() + 1) + "-" + p2(nd.getUTCDate());
+    }
     Object.keys(days).forEach(function (k) {
       if (since && k < since) return;
       var e = days[k] && days[k][siteId];
@@ -5282,13 +5323,122 @@
     if (w && isFinite(w.rad)) return Math.max(0, w.rad);
     return clearSkyRadiation(lat, lon, tMs) * cloudFactor;
   }
+  /* ---------------------------------------------------------------------
+   * 当日中のバッテリー交換の検出(5分ごとの実測電圧から)
+   * -----------------------------------------------------------------------
+   * 残量は「0時の電圧＋そこからの収支」で出しているため、昼に載せ替えても翌日の0時まで
+   * 反映されず、持ち時間の順位も入れ替わらなかった。
+   * 実データ(9/28〜9/29)の交換は、どれも「発電が増えていないのに、1回の計測の間に電圧が
+   * 0.5〜1V跳ね上がる」形で残っている。
+   *   北沢アンダーパス 9/29 15:58→16:03  11.34→12.30V (発電 0.2→0.1W)
+   *   梅名樋管2号      9/29 16:19〜17:03 作業中は0V → 12.48V
+   *   中郷第１樋管     9/29 16:47→16:52  11.85→12.41V
+   *   中村橋           9/29 15:09→15:14  11.86→12.42V
+   *   清住緑地         9/28 15:41→15:44  11.90→12.71V
+   * 発電が増えずに電圧だけ上がるのは載せ替え以外に起こらないので、これを交換とみなし、
+   * 交換後の電圧から残量を出し直す。0V付近の値は作業中の欠測として飛ばす。
+   * 充電中は日射で電圧が上がるので、間隔が空いた2点(20分超)は、途中が作業中の0Vで
+   * つながっている場合だけ比べる(通信が途切れていた間に充電で上がった分を拾わないため)。 */
+  var SWAP_STEP_V = 0.35;                 // 1回の計測間でこれ以上上がったら交換
+  var SWAP_MAX_PV_RISE_W = 1;             // 発電がこれ以上増えていたら充電による上昇なので除く
+  var SWAP_NORMAL_GAP_MS = 20 * 60 * 1000;// 通常の計測間隔の上限
+  var SWAP_WORK_GAP_MS = 3 * HOUR_MS;     // 作業中(0V)をはさむ場合に許す間隔
+  var SWAP_MIN_VALID_V = 5;               // これ未満は作業中の欠測(0V)として扱う
+  var SWAP_CHARGING_PV_W = 2;             // 交換直後の発電がこれ以上なら、電圧に充電の下駄が乗っている
+  var SWAP_CHARGING_CAP_V = 12.55;        // その場合の残量の上限(休止電圧でこれ以上とはみなさない)
+  // 中継サーバーの5分データの取得経路名。サーバー経由(「サーバー(mini.lhlab-vps.net 電源CSV)」)と
+  // 画面から直接(「mini.lhlab-vps.net」)の2通りの名前で入ってくるので、部分一致で拾う。
+  var SWAP_SOURCE_VIA = "mini.lhlab-vps.net";
+  function detectIntradaySwap(points, sinceMs) {
+    // 比べるのは中継サーバーの5分データどうしだけ。別の取得経路(拠点の機器から直接など)の
+    // 電圧は計り方が違ってずれることがあり、混ぜると経路の差を「跳ね」と誤認するため。
+    var list = (points || []).filter(function (p) {
+      return p.fetchedAt.getTime() >= sinceMs && typeof p.bat === "number"
+        && String(p.via || "").indexOf(SWAP_SOURCE_VIA) >= 0;
+    }).sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+    var found = null, prev = null, sawDropout = false;
+    list.forEach(function (p) {
+      if (p.bat < SWAP_MIN_VALID_V) { if (prev) sawDropout = true; return; }
+      if (prev) {
+        var gap = p.fetchedAt - prev.fetchedAt;
+        var gapOk = gap <= SWAP_NORMAL_GAP_MS || (sawDropout && gap <= SWAP_WORK_GAP_MS);
+        var pvA = typeof prev.pv === "number" ? prev.pv : 0;
+        var pvB = typeof p.pv === "number" ? p.pv : 0;
+        if (gapOk && p.bat - prev.bat >= SWAP_STEP_V && pvB - pvA <= SWAP_MAX_PV_RISE_W) {
+          found = { at: p.fetchedAt.getTime(), vBefore: prev.bat, vAfter: p.bat, pvAfter: pvB };
+        }
+      }
+      prev = p; sawDropout = false;
+    });
+    return found;
+  }
+  function jstMidnightMs(nowMs) {
+    var jst = new Date(nowMs + 9 * HOUR_MS);
+    return Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate()) - 9 * HOUR_MS;
+  }
+  // 今日(JST)のうちに載せ替えがあったか。0時の電圧に反映済みの昨日以前の交換は対象外。
+  function sameDaySwap(siteId) {
+    var s = siteStates[siteId];
+    if (!s) return null;
+    return detectIntradaySwap(s.points, jstMidnightMs(Date.now()));
+  }
+  /* 「今」の残量[%]。
+     ・今日交換していれば、交換直後の電圧から出し直し、そこからの実測の発電−消費を足す
+     ・そうでなければ、0時の電圧に中継サーバーの当日収支(発電Wh−消費Wh)を足す
+     ・それも無ければ、0時の残量に実測の発電を積分して足す */
+  function currentSocFor(site, e, capWh, loadW) {
+    var s = siteStates[site.id];
+    var nowMs = Date.now();
+    var swap = s ? detectIntradaySwap(s.points, jstMidnightMs(nowMs)) : null;
+    var integrate = function (soc, fromMs) {
+      var meas = s.points.filter(function (p) {
+        return p.fetchedAt.getTime() >= fromMs && typeof p.bat === "number" && p.bat >= SWAP_MIN_VALID_V;
+      }).sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+      for (var i = 1; i < meas.length; i++) {
+        var dtH = (meas[i].fetchedAt - meas[i - 1].fetchedAt) / HOUR_MS;
+        if (!(dtH > 0) || dtH > 1) continue;
+        var pv = ((meas[i].pv || 0) + (meas[i - 1].pv || 0)) / 2;
+        // 消費は実測値があればそれを、無ければ夜間の平均消費を使う
+        var ld = (typeof meas[i].loadW === "number" && typeof meas[i - 1].loadW === "number")
+          ? (meas[i].loadW + meas[i - 1].loadW) / 2 : loadW;
+        soc += (pv - ld) * dtH / capWh * 100;
+      }
+      return soc;
+    };
+    if (swap) {
+      var v = swap.pvAfter >= SWAP_CHARGING_PV_W ? Math.min(swap.vAfter, SWAP_CHARGING_CAP_V) : swap.vAfter;
+      return { soc: integrate(socFromVoltage(v), swap.at), source: "swap", swap: swap };
+    }
+    var today = todayPowerDaily(site.id);
+    if (today && typeof today.v0 === "number" && typeof today.balWh === "number") {
+      return { soc: socFromVoltage(today.v0) + today.balWh / capWh * 100, source: "balance", swap: null, today: today };
+    }
+    if (typeof e.socPct === "number" && s) {
+      return { soc: integrate(e.socPct, jstMidnightMs(nowMs)), source: "pv", swap: null };
+    }
+    return null;
+  }
+  // 交換を見つけたら、10分待たずに持ち時間の順位と一覧を並べ直す(1回だけ)。
+  var healthRerenderTimer = null;
+  function scheduleHealthRerender() {
+    if (healthRerenderTimer) return;
+    healthRerenderTimer = setTimeout(function () {
+      healthRerenderTimer = null;
+      refreshAllBatteryHealth();
+      refreshAllPredictionCharts();
+    }, 0);
+  }
   function batteryOutlook(site) {
     var hit = outlookCache[site.id];
+    // 今日の交換の有無が変わったら、キャッシュが新しくても計算し直す
+    var sw = sameDaySwap(site.id);
+    var swapKey = sw ? sw.at : 0;
     // 出せなかった結果(null)はキャッシュしない。予報や実効容量がまだ届いていないだけの
     // ことが多く、キャッシュしてしまうと届いたあとも10分間そのままになってしまう。
-    if (hit && hit.value && Date.now() - hit.at < OUTLOOK_REFRESH_MS) return hit.value;
+    if (hit && hit.value && hit.swapKey === swapKey && Date.now() - hit.at < OUTLOOK_REFRESH_MS) return hit.value;
     var value = computeBatteryOutlook(site);
-    if (value) outlookCache[site.id] = { at: Date.now(), value: value };
+    if (value) outlookCache[site.id] = { at: Date.now(), value: value, swapKey: swapKey };
+    if (hit && hit.value && hit.swapKey !== swapKey) scheduleHealthRerender();
     return value;
   }
   function computeBatteryOutlook(site) {
@@ -5308,28 +5458,11 @@
     var reserve = reserveSocFor(site.id);          // 拠点ごとの下限電圧を残量に換算したもの
     var reserveV = batteryEmptyVoltageFor(site.id);
 
-    // --- 起点: 今日の0:00の残量に、そこからの収支[Wh]を足して「今」の残量を出す ---
-    // 収支は中継サーバーの積算値(発電Wh − 消費Wh)そのものなので、発電の取りこぼしがない。
-    // これが取れない場合だけ、実測の発電Wを積分する方法に切り替える。
-    var today = todayPowerDaily(site.id);
-    var soc = null, socSource = null;
-    if (today && typeof today.v0 === "number" && typeof today.balWh === "number") {
-      soc = socFromVoltage(today.v0) + today.balWh / capWh * 100;
-      socSource = "balance";
-    } else if (typeof e.socPct === "number") {
-      var jst = new Date(nowMs + 9 * HOUR_MS);
-      var midnight = Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate()) - 9 * HOUR_MS;
-      soc = e.socPct;
-      socSource = "pv";
-      var meas = s.points.filter(function (p) { return p.fetchedAt.getTime() >= midnight && typeof p.pv === "number"; })
-        .sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
-      for (var i = 1; i < meas.length; i++) {
-        var dtH = (meas[i].fetchedAt - meas[i - 1].fetchedAt) / HOUR_MS;
-        if (!(dtH > 0) || dtH > 1) continue;
-        soc += ((meas[i].pv + meas[i - 1].pv) / 2 - loadW) * dtH / capWh * 100;
-      }
-    }
-    if (soc === null) return null;
+    // --- 起点: 「今」の残量(今日交換していれば交換直後の電圧から出し直す) ---
+    var cur = currentSocFor(site, e, capWh, loadW);
+    if (!cur) return null;
+    var soc = cur.soc, socSource = cur.source;
+    var today = cur.today || todayPowerDaily(site.id);
     soc = Math.max(0, Math.min(100, soc));
     var socNow = soc;
     // 実測の電圧と、残量から求めた休止時電圧とのズレ(充電中の下駄)。グラフを実測から
@@ -5362,6 +5495,8 @@
     var sun = sunTimesFor(lat, lon, nowMs);
     return {
       computedAt: nowMs, socNow: Math.round(socNow), socSource: socSource,
+      swapAt: cur.swap ? cur.swap.at : null, swapVBefore: cur.swap ? cur.swap.vBefore : null,
+      swapVAfter: cur.swap ? cur.swap.vAfter : null,
       reserveSocPct: Math.round(reserve), reserveV: reserveV,
       nightCapacityAh: nightCap ? nightCap.capacityAh : null,
       nightCapacityRatio: nightCap ? nightCap.ratio : null,
@@ -6360,6 +6495,7 @@
     OUTLOOK_REFRESH_MS: OUTLOOK_REFRESH_MS,
     refreshAllBatteryHealth: refreshAllBatteryHealth,
     createEnduranceChart: createEnduranceChart,
+    detectIntradaySwap: detectIntradaySwap, sameDaySwap: sameDaySwap, currentSocFor: currentSocFor,
     renderHealthTable: renderHealthTable, healthTableRows: healthTableRows,
     healthStateOf: healthStateOf, deepDischargeCounts: deepDischargeCounts,
     recentVminMedian: recentVminMedian, HEALTH_DEEP_V: HEALTH_DEEP_V,
