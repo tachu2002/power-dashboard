@@ -1801,11 +1801,12 @@
     // サーバー側の enduranceH は一律20%下限のため使わず、拠点ごとの下限で出し直す。
     var hours = noSunHoursFor(site.id, e);
     var text, cls, sub, title;
-    var em = e && !e.mains ? currentEmpty(site.id) : null;
-    if (em) {
-      // 実測の電圧が下限に達した(=電池切れ)。持ち時間を出しても意味がないので、止まっていることを出す。
-      text = "電池切れ"; cls = "critical"; sub = fmtOutlookWhen(em.at).replace(/^今日 /, "") + "〜";
-      title = emptyTitle(site.id, em);
+    var st = e && !e.mains ? currentStop(site.id) : null;
+    if (st) {
+      // 機器が止まっている。持ち時間を出しても意味がないので、止まっていることを出す。
+      text = st.kind === "nodata" ? "データ停止" : "停止中"; cls = "critical";
+      sub = (st.kind === "empty" ? "電池切れ " : "") + fmtOutlookWhen(st.at).replace(/^今日 /, "") + "〜";
+      title = stopTitle(site.id, st);
     } else if (!e) {
       text = "—"; cls = "muted"; sub = "データなし";
       title = "バッテリーの持ち: この拠点は中継サーバーの電源データに出ていません。";
@@ -1885,10 +1886,10 @@
         if (!e || e.mains) return;
         var name = site.name.replace(/（.*$/, "");
         // 電池切れで負荷が切れたまま(機器が止まっている)なら、持ち時間ではなく「電池切れ」を先頭に出す
-        var emNow = currentEmpty(site.id);
-        if (emNow) {
-          rows.push({ id: site.id, name: name, hours: 0, sustain: false, cut: emNow, minSoc: null, soc: 0,
-            src: "電池切れ", capacityAh: e.capacityAh, nightA: e.nightA, floorV: batteryEmptyVoltageFor(site.id) });
+        var stNow = currentStop(site.id);
+        if (stNow) {
+          rows.push({ id: site.id, name: name, hours: 0, sustain: false, cut: stNow, minSoc: null, soc: 0,
+            src: "停止", capacityAh: e.capacityAh, nightA: e.nightA, floorV: batteryEmptyVoltageFor(site.id) });
           return;
         }
         var o = batteryOutlook(site);
@@ -1985,7 +1986,7 @@
           fill: color, "font-size": 11, "font-weight": 700, "font-family": FONT });
         // 今日載せ替えた拠点は、交換後の電池で数えていることが分かるようにする
         // 継続可の拠点は、並び順の根拠になっている「24時間以内の最低残量」を添える
-        vEl.textContent = r.cut ? "電池切れ（" + fmtOutlookWhen(r.cut.at).replace(/^今日 /, "") + "〜）"
+        vEl.textContent = r.cut ? stopLabel(r.cut)
           : (r.sustain ? "継続可" + (typeof r.minSoc === "number" ? "（24h内最低" + r.minSoc + "%）" : "")
             : fmtEndurance(r.hours)) + (noSunRow ? " ※" : "") + (r.swapped ? " 交換後" : "");
         svg.appendChild(vEl);
@@ -1995,7 +1996,7 @@
           var l0 = document.createElement("div");
           l0.style.cssText = "color:var(--text-primary);font-weight:600;";
           l0.textContent = r.name + "　" + (r.cut
-            ? "電池切れ（" + fmtOutlookWhen(r.cut.at) + " に下限 " + r.cut.floor.toFixed(2) + "V に達した）"
+            ? stopLabel(r.cut)
             : r.sustain ? "継続可（24時間以内の最低 " + r.minSoc + "%）" : fmtEndurance(r.hours));
           var l1 = document.createElement("div");
           l1.style.cssText = "color:var(--text-secondary);";
@@ -2092,7 +2093,7 @@
       if (o) { forecast = true; if (o.hoursToReserve === null) sustain = true; else hours = o.hoursToReserve; }
       else hours = noSun;
       // 電池切れで負荷が切れたまま(機器停止中)なら、持ち時間0として先頭に並べる
-      var cut = currentEmpty(site.id);     // 下限電圧に達している(電池切れ)
+      var cut = currentStop(site.id);      // 機器が止まっている(データ停止・電池切れ・その他)
       if (cut) { hours = 0; sustain = false; forecast = true; }
       var floorV = batteryEmptyVoltageFor(site.id);
       var vmin = recentVminMedian(e);
@@ -2144,7 +2145,7 @@
     var html = rows.map(function (r) {
       var st = healthStateOf(r);
       var e = r.e;
-      var hTxt = r.cut ? "電池切れ（" + fmtOutlookWhen(r.cut.at).replace(/^今日 /, "") + "〜）"
+      var hTxt = r.cut ? stopLabel(r.cut)
         : r.sustain ? "継続可" : (r.hours === null ? "—" : fmtEndurance(r.hours));
       var hCls = r.sustain ? "ht-ok" : (r.hours === null ? "ht-mute" : ({
         critical: "ht-bad", warn: "ht-warn", ok: "ht-ok", muted: "ht-mute"
@@ -2173,7 +2174,9 @@
           + (r.bal > 0 ? "+" : "") + r.bal + "</span>";
       var capCell = "—";
       if (typeof e.capacityNowAh === "number") {
+        // 交換後の電池がまだ測れず、前の電池の区間の値で仮置きしているときは「仮」と添える
         capCell = '<span class="num">' + e.capacityNowAh + "Ah</span>"
+          + (e.capPlaceholder ? '<span class="ht-warn ht-small">（仮）</span>' : "")
           + (e.ratedAh ? '<span class="ht-small">／定格 ' + e.ratedAh + "Ah</span>" : "");
       } else if (typeof e.capacityAh === "number") {
         capCell = '<span class="num">' + e.capacityAh + "Ah</span>";
@@ -5422,10 +5425,20 @@
   function relayListSince(points, sinceMs) {
     // 比べるのは中継サーバーの5分データどうしだけ。別の取得経路(拠点の機器から直接など)の
     // 電圧は計り方が違ってずれることがあり、混ぜると経路の差を「跳ね」と誤認するため。
-    return (points || []).filter(function (p) {
+    var list = (points || []).filter(function (p) {
       return p.fetchedAt.getTime() >= sinceMs && typeof p.bat === "number"
         && String(p.via || "").indexOf(SWAP_SOURCE_VIA) >= 0;
     }).sort(function (a, b) { return a.fetchedAt - b.fetchedAt; });
+    /* 電圧・負荷・発電がまったく同じ値の繰り返しは、新しい計測ではない。中継サーバーは拠点の機器から
+       更新が届かない間も、最後の値を5分ごとに書き続ける(多呂樋管 9/30 3:13〜4:29 は 10.546V・15.32W を
+       16回繰り返し、中継サーバー自身も「データ停止」と記録していた)。最初の1点だけ残す。 */
+    var out = [];
+    list.forEach(function (p) {
+      var q = out[out.length - 1];
+      if (q && q.bat === p.bat && q.loadW === p.loadW && q.pv === p.pv) return;
+      out.push(p);
+    });
+    return out;
   }
   // 発電なしで電圧が跳ねた点を拾い、交換(swap)と負荷切れ(cut)に分けて返す(それぞれ最新のもの)。
   function scanVoltageSteps(points, sinceMs) {
@@ -5494,6 +5507,59 @@
     var cut = scanVoltageSteps(s.points, hit.fetchedAt.getTime()).cut;
     return { at: hit.fetchedAt.getTime(), v: hit.bat, floor: floor, cut: cut,
       lastV: last.bat, lastLoad: typeof last.loadW === "number" ? last.loadW : null, loadRef: loadRef };
+  }
+  /* ---------------------------------------------------------------------
+   * 機器の停止(利用者の指摘：「機器なので、場合によっては停止している場合がある」)
+   * -----------------------------------------------------------------------
+   * 停止には3通りある。優先順に判定する。
+   *  データ停止 … 機器から新しい計測が60分以上届いていない(中継サーバーが同じ値を繰り返しているだけ)
+   *  電池切れ   … 実測の電圧が下限に達し、負荷(カメラ等)が止まったまま
+   *  停止中     … 下限には達していないが、負荷がふだんの4割未満に落ちたまま(電池以外の理由の停止)
+   * 停止している拠点は持ち時間を出さず、持ち比較の先頭に「停止中」「データ停止」と出す。 */
+  var STOP_NODATA_MS = 60 * 60 * 1000;
+  var STOP_NOMINAL_V = 12;          // 夜間電流[A] → ふだんの消費[W] の換算
+  var STOP_MIN_LOW_MS = 20 * 60 * 1000;   // 消費が落ちたまま、これだけ続いたら停止とみなす
+  function currentStop(siteId) {
+    var s = siteStates[siteId];
+    if (!s) return null;
+    var list = relayListSince(s.points, Date.now() - 24 * HOUR_MS)
+      .filter(function (p) { return p.bat >= SWAP_MIN_VALID_V; });
+    if (!list.length) return null;
+    var last = list[list.length - 1];
+    if (Date.now() - last.fetchedAt.getTime() >= STOP_NODATA_MS) {
+      return { kind: "nodata", at: last.fetchedAt.getTime(), lastV: last.bat };
+    }
+    var em = currentEmpty(siteId);
+    if (em) { em.kind = "empty"; return em; }
+    var e = batteryHealthEntry(siteId);
+    var normalW = e && typeof e.nightA === "number" ? e.nightA * STOP_NOMINAL_V : null;
+    if (!(normalW >= LOAD_CUT_MIN_BEFORE_W)) return null;
+    // 最新から遡って、負荷が低いままの区間の始まりを探す(2点以上続いていること)
+    var i = list.length - 1, n = 0;
+    while (i >= 0 && typeof list[i].loadW === "number" && list[i].loadW < normalW * LOAD_CUT_RATIO) { i--; n++; }
+    if (n < 2) return null;
+    var startP = list[i + 1];
+    // 一時的な落ち込み(実データでは祇園大橋が昼に1点だけ約4.5Wになることがある)を拾わないよう、
+    // 20分以上続いたときだけ停止とみなす
+    if (last.fetchedAt.getTime() - startP.fetchedAt.getTime() < STOP_MIN_LOW_MS) return null;
+    return { kind: "stopped", at: startP.fetchedAt.getTime(), lastLoad: last.loadW, normalW: normalW, lastV: last.bat };
+  }
+  function stopLabel(st) {
+    var t = fmtOutlookWhen(st.at).replace(/^今日 /, "");
+    if (st.kind === "nodata") return "データ停止（" + t + "〜）";
+    if (st.kind === "empty") return "停止中（電池切れ " + t + "〜）";
+    return "停止中（" + t + "〜）";
+  }
+  function stopTitle(siteId, st) {
+    if (st.kind === "nodata") {
+      return fmtOutlookWhen(st.at) + " を最後に、機器から新しい計測が届いていません（最後の電圧 " +
+        st.lastV.toFixed(2) + "V）。\n中継サーバーは最後の値を繰り返し記録しているだけなので、持ち時間は出していません。";
+    }
+    if (st.kind === "empty") return "機器が止まっています（電池切れ）。\n" + emptyTitle(siteId, st);
+    return "機器が止まっています（" + fmtOutlookWhen(st.at) + "〜）。\n消費が約" + Math.round(st.lastLoad) +
+      "W と、ふだん（約" + Math.round(st.normalW) + "W）の4割を下回ったままです。下限電圧 " +
+      batteryEmptyVoltageFor(siteId).toFixed(2) + "V には達していないので、電池以外の理由の停止とみられます。" +
+      "\n消費が戻れば、この表示は消えます。";
   }
   function emptyTitle(siteId, em) {
     return "下限 " + em.floor.toFixed(2) + "V に達しました（" + fmtOutlookWhen(em.at) + "・" + em.v.toFixed(3) + "V）。" +
@@ -6722,7 +6788,7 @@
     createEnduranceChart: createEnduranceChart,
     detectIntradaySwap: detectIntradaySwap, sameDaySwap: sameDaySwap, currentSocFor: currentSocFor,
     scanVoltageSteps: scanVoltageSteps, currentLoadCut: currentLoadCut,
-    currentEmpty: currentEmpty, siteSocPct: siteSocPct,
+    currentEmpty: currentEmpty, siteSocPct: siteSocPct, currentStop: currentStop, relayListSince: relayListSince,
     getHealthRenderCount: function () { return healthRenderCount; },
     renderHealthTable: renderHealthTable, healthTableRows: healthTableRows,
     healthStateOf: healthStateOf, deepDischargeCounts: deepDischargeCounts,
