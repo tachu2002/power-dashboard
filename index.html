@@ -2000,7 +2000,9 @@
   }
 
   var healthScatter = null;
+  var healthRenderCount = 0;          // 並べ直した回数(テストで「新しい実測で並べ直したか」を見る)
   function refreshAllBatteryHealth() {
+    healthRenderCount++;
     POWER_SITES.forEach(function (site) { updateBatteryHealth(site); });
     if (!healthScatter) healthScatter = createEnduranceChart("healthScatter");
     healthScatter.render();
@@ -3309,6 +3311,10 @@
     // 残量の見通しは実測(発電W)を使うため、新しい実測が入ったら「持ち」の表示も出し直す。
     // (これが無いと、起動直後にまだ実測が無くて見通しを出せなかった表示のままになる。)
     updateBatteryHealth(site);
+    // 上段の「持ち比較」と健全性の一覧も、新しい実測が入るたびに並べ直す。
+    // 以前はカードだけ更新して並びは10分ごとだったため、ページを開いた直後や交換直後に
+    // 古い順位のまま最大10分残っていた。同じ瞬間に届いた拠点の分はまとめて1回だけ描く。
+    scheduleHealthRerender();
   }
 
   /* =====================================================================
@@ -5429,12 +5435,20 @@
   }
   // 交換を見つけたら、10分待たずに持ち時間の順位と一覧を並べ直す(1回だけ)。
   var healthRerenderTimer = null;
+  // 並べ直しの最中に呼ばれた予約は捨てる。並べ直しはカードも描き直し、カードの描き直しは
+  // 並べ直しを予約するので、これが無いと描き直しが延々と続いてしまう。
+  var healthRerendering = false;
   function scheduleHealthRerender() {
-    if (healthRerenderTimer) return;
+    if (healthRerenderTimer || healthRerendering) return;
     healthRerenderTimer = setTimeout(function () {
       healthRerenderTimer = null;
-      refreshAllBatteryHealth();
-      refreshAllPredictionCharts();
+      healthRerendering = true;
+      try {
+        refreshAllBatteryHealth();
+        refreshAllPredictionCharts();
+      } finally {
+        healthRerendering = false;
+      }
     }, 0);
   }
   function batteryOutlook(site) {
@@ -6505,6 +6519,7 @@
     refreshAllBatteryHealth: refreshAllBatteryHealth,
     createEnduranceChart: createEnduranceChart,
     detectIntradaySwap: detectIntradaySwap, sameDaySwap: sameDaySwap, currentSocFor: currentSocFor,
+    getHealthRenderCount: function () { return healthRenderCount; },
     renderHealthTable: renderHealthTable, healthTableRows: healthTableRows,
     healthStateOf: healthStateOf, deepDischargeCounts: deepDischargeCounts,
     recentVminMedian: recentVminMedian, HEALTH_DEEP_V: HEALTH_DEEP_V,
