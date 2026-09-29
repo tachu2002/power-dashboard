@@ -109,7 +109,9 @@ export async function run() {
   r.check("x2-a 最新の区切りが404でも1つ前の区切りで取得できる", fb.value === 0.75, fb);
   r.check("x2-b 拠点は正常扱いになる", fb.state === "ok", fb);
   r.check("x2-c 2つ以上の区切りを試している", tried.length >= 2, tried);
-  r.check("x2-d 試す区切りは新しい順", tried.length >= 2 ? tried[0] > tried[1] : true, tried);
+  // 0時直後は新しい区切りが「0000」(当日)、1つ前が「2355」(前日)になるので、文字列の大小では比べられない
+  const newerSlot = (a, b) => a > b || (a < "0100" && b >= "2300");
+  r.check("x2-d 試す区切りは新しい順", tried.length >= 2 ? newerSlot(tried[0], tried[1]) : true, tried);
   await page2.close();
 
   /* ===== 区切りをすべて試しても取れない場合は従来どおり失敗扱い ===== */

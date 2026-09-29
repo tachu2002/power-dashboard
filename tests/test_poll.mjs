@@ -479,8 +479,9 @@ export async function run() {
       // 収支の並びと周期が合わない別パターンを使う。
       const noise = plan[id].noisy ? [0.08, 0.05, -0.09, 0.07, -0.04, -0.08, 0.06][back % 7] : 0;
       // nightVPerH を持たせておく(持たない日は「古い形式」とみなして取り直されるため)
+      // swapChecked も同様(当日の載せ替え検出を済ませた新しい形式の印)
       daysOut[k][id] = { v0: Math.round(v * 1000) / 1000, balWh: b,
-        nightA: plan[id].nightA || null, nightVPerH: 0.015,
+        nightA: plan[id].nightA || null, nightVPerH: 0.015, swapChecked: true,
         vmin: Math.round((v - 0.05) * 1000) / 1000 };
       v += (plan[id].noisy ? 0 : b / WH_PER_V) + noise;
     }
@@ -722,6 +723,49 @@ export async function run() {
     L43 && L43.swaps.indexOf(dayKey(now - 30 * 24 * HOUR)) < 0, L43 && L43.swaps);
   r.check("s20-y 直近1〜2日の跳ねは、続くかどうか分かるまで交換と確定しない",
     L43 && L43.swaps.length === 0 && L43.lastSwapAt === null, L43 && L43.swaps);
+
+  /* ---- 当日中の載せ替え(5分データの電圧の跳ね) ----
+     日次の0時電圧だけでは交換を確かめるのに3日かかる。5分データには交換の瞬間が
+     はっきり残っている(実データ: 北沢 9/29 15:58→16:03 11.34→12.30V、梅名樋管2号は
+     作業中0V→12.48V)ので、これを見つけたらその場で確定する。 */
+  const M = ltp.mod;
+  const at = (hh, mm) => new Date(Date.parse(dayKey(now - 24 * HOUR) + "T00:00:00Z") - 9 * HOUR + (hh * 60 + mm) * 60000);
+  const row = (hh, mm, bat, pv) => ({ siteId: "cam03", fetchedAt: at(hh, mm), bat, pv, loadW: 12 });
+  const stepRows = [row(15, 48, 11.36, 0.2), row(15, 53, 11.35, 0.2), row(15, 58, 11.34, 0.2),
+    row(16, 3, 12.30, 0.1), row(16, 8, 12.29, 0.1)];
+  const dropRows = [row(16, 19, 11.41, 0.5), row(16, 25, 0, 0), row(16, 30, 0, 0), row(16, 52, 0, 0),
+    row(17, 3, 12.48, 0.5)];
+  const chargeRows = [row(9, 0, 12.20, 2), row(9, 5, 12.70, 12)];
+  const gapRows = [row(9, 0, 12.10, 3), row(10, 10, 12.60, 3)];
+  const fs1 = M.findIntradaySwap(stepRows), fs2 = M.findIntradaySwap(dropRows);
+  r.check("s21-a 発電が増えずに電圧だけ跳ねた瞬間を、当日中の交換として見つける",
+    fs1 && fs1.at === at(16, 3).toISOString() && fs1.vBefore === 11.34 && fs1.vAfter === 12.30, fs1);
+  r.check("s21-b 交換作業中の0Vをはさんでも見つける",
+    fs2 && fs2.at === at(17, 3).toISOString() && fs2.vAfter === 12.48, fs2);
+  r.check("s21-c 充電で上がっただけ・通信が途切れていた間の上昇は交換とみなさない",
+    M.findIntradaySwap(chargeRows) === null && M.findIntradaySwap(gapRows) === null,
+    [M.findIntradaySwap(chargeRows), M.findIntradaySwap(gapRows)]);
+  const sum = M.summarizePowerDay(stepRows);
+  r.check("s21-d 日次集計に交換の時刻と前後の電圧を持つ",
+    sum.cam03 && sum.cam03.swapAt === at(16, 3).toISOString() && sum.cam03.swapVAfter === 12.3
+    && sum.cam03.swapChecked === true, sum.cam03);
+  // 昨日の午後に載せ替えた拠点: 日次の段差だけなら3日待つが、5分データで見つけたらすぐ確定する
+  const swapStore = { days: {} };
+  for (let back = 40; back >= 1; back--) {
+    const k = dayKey(now - back * 24 * HOUR);
+    const b = LT_BAL[back % LT_BAL.length];
+    swapStore.days[k] = { cam03: { v0: 12.0 + (back % 3) * 0.01, balWh: b, nightA: 1, nightVPerH: 0.015,
+      vmin: 11.8, swapChecked: true } };
+  }
+  swapStore.days[dayKey(now - 24 * HOUR)].cam03.swapAt = at(16, 3).toISOString();
+  swapStore.days[dayKey(now - 24 * HOUR)].cam03.swapVBefore = 11.34;
+  swapStore.days[dayKey(now - 24 * HOUR)].cam03.swapVAfter = 12.3;
+  const sw03 = M.computeBatteryEndurance(swapStore, null).cam03;
+  r.check("s21-e 5分データで見つけた交換は3日待たずに確定し、翌日から新しい電池の日として数える",
+    sw03 && sw03.lastSwapAt === dayKey(now) && sw03.lastSwapTime === at(16, 3).toISOString()
+    && sw03.lastSwapVAfter === 12.3, sw03 && { at: sw03.lastSwapAt, time: sw03.lastSwapTime });
+  r.check("s21-f 交換直後は容量を測り直し中として扱う(交換前の値で仮置き)",
+    sw03 && sw03.capStale === true, sw03 && { stale: sw03.capStale, cap: sw03.capacityAh });
 
   // 2回目は12時間たっていないので取りに行かない
   const ltp2 = await runPoll(ltSandbox, ltHandler, "lt2");

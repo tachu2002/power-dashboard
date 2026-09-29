@@ -680,6 +680,127 @@ export async function run() {
   r.check("f7-ag ページ例外にはならない", nightPage.errMsgs().length === 0, nightPage.errMsgs());
   await nightPage.close();
 
+  /* ====== f8: 当日中のバッテリー載せ替えを残量と順位に反映する ======
+     残量は「0時の電圧＋当日の収支」で出していたため、昼に交換しても翌日0時まで反映されず、
+     持ち時間の順位が入れ替わらなかった。実データの交換(9/29 北沢 15:58→16:03 11.34→12.30V、
+     梅名樋管2号 16:19〜17:03 は作業中0V→12.48V)と同じ形の5分データを入れて確かめる。
+     時刻に依存しないよう、ページ内の Date.now を「次の17:30(JST)」に固定して計算する。 */
+  const swapCheck = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const realNow = Date.now;
+    const HOUR = 3600000, MIN = 60000;
+    const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
+      return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
+    let fixed = jstMid(realNow()) + 17.5 * HOUR;
+    if (fixed < realNow()) fixed += 24 * HOUR;
+    Date.now = () => fixed;
+    try {
+      // 本番の点はほとんどがサーバー経由の名前で入っている(画面から直接の名前は1日数点しかない)。
+      // 以前これを取りこぼして本番で検出が効かなくなりかけたので、本番と同じ名前で確かめる。
+      const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+      const pt = (minAgo, bat, pv, via) => ({ fetchedAt: new Date(fixed - minAgo * MIN), pv, bat,
+        loadW: 24, waterLevelM: null, via: via || VIA });
+      const order = () => { d.refreshBatteryOutlook();
+        return Array.from(document.querySelectorAll("#healthScatter rect.endurance-bar"))
+          .map((b) => b.getAttribute("data-site")); };
+      // 交換前: 北沢(cam03)は残量が少ないので最上位(いちばん危ない)。
+      // 順位の入れ替わりを見るため、この確認の間だけ祇園大橋と同じ50Ah・1.0Aの電池にしておく。
+      const e03 = d.getBatteryHealthState().sites.cam03;
+      const keepE = { capacityAh: e03.capacityAh, nightA: e03.nightA };
+      e03.capacityAh = 50; e03.nightA = 1.0;
+      const s03 = d.siteStates.cam03;
+      const keep = s03.points.slice();
+      const before = { order: order(), o: d.computeBatteryOutlook(d.SITE_CATALOG.cam03) };
+      // 5分おきに11.34V → 12.60Vへ跳ね上がる(発電はほぼ0のまま。充電済みの電池に載せ替えた形)
+      // 発電は null にしておく(発電の見積りの回帰に、日射予報と合わない点を混ぜないため)
+      s03.points = keep.concat([pt(95, 11.36, null), pt(90, 11.35, null), pt(85, 11.34, null),
+        pt(80, 12.60, null), pt(75, 12.59, null), pt(70, 12.58, null)]);
+      const sw = d.detectIntradaySwap(s03.points, jstMid(fixed));
+      const after = { order: order(), o: d.computeBatteryOutlook(d.SITE_CATALOG.cam03) };
+      const table = (() => { document.getElementById("healthTableBtn").click();
+        const tr = document.querySelector('#healthTableBody tr[data-site="cam03"]');
+        const cells = tr ? Array.from(tr.querySelectorAll("td")).map((td) => td.textContent.trim()) : [];
+        document.getElementById("healthTableBtn").click();
+        return cells; })();
+      const barText = Array.from(document.querySelectorAll("#healthScatter text.endurance-value"))
+        .map((t) => t.textContent);
+      // 作業中の0Vをはさむ形(梅名樋管2号)
+      const dropout = d.detectIntradaySwap([pt(60, 11.41, 0.5), pt(55, 0, 0), pt(50, 0, 0), pt(30, 0, 0),
+        pt(20, 0, 0), pt(15, 12.48, 0.5)], jstMid(fixed));
+      // 充電で上がっただけ(発電が増えている)は交換ではない
+      const charging = d.detectIntradaySwap([pt(30, 12.20, 2), pt(25, 12.70, 12)], jstMid(fixed));
+      // 通信が1時間途切れていた間に充電で上がった分(0Vをはさまない)は交換ではない
+      const longGap = d.detectIntradaySwap([pt(90, 12.10, 3), pt(20, 12.60, 3)], jstMid(fixed));
+      // 別の取得経路との差は交換ではない
+      const mixed = d.detectIntradaySwap([pt(30, 11.80, 0.2), pt(25, 12.40, 0.2, "サーバー(直接取得)")], jstMid(fixed));
+      // 画面から直接取った中継サーバーの点(名前が違う)どうしでも検出できる
+      const direct = d.detectIntradaySwap([pt(30, 11.80, 0.2, "mini.lhlab-vps.net"),
+        pt(25, 12.40, 0.2, "mini.lhlab-vps.net")], jstMid(fixed));
+      // 0時より前(=0時の電圧に反映済み)の跳ねは今日の交換として扱わない
+      const yesterday = d.detectIntradaySwap([pt(18.5 * 60, 11.40, 0.2), pt(18.4 * 60, 12.40, 0.2)], jstMid(fixed));
+      s03.points = keep;
+      e03.capacityAh = keepE.capacityAh; e03.nightA = keepE.nightA;
+      d.refreshBatteryOutlook();
+      return {
+        sw, dropout, charging, longGap, mixed, direct, yesterday, table, barText,
+        before: { order: before.order, src: before.o && before.o.socSource, soc: before.o && before.o.socNow,
+          h: before.o && before.o.hoursToReserve },
+        after: { order: after.order, src: after.o && after.o.socSource, soc: after.o && after.o.socNow,
+          h: after.o && after.o.hoursToReserve, swapAt: after.o && after.o.swapAt }
+      };
+    } finally { Date.now = realNow; }
+  });
+  r.check("f8-a 発電が増えずに電圧だけ0.35V以上跳ねたら、その時刻を交換として検出する",
+    swapCheck.sw && Math.abs(swapCheck.sw.vAfter - 12.60) < 0.001 && Math.abs(swapCheck.sw.vBefore - 11.34) < 0.001,
+    swapCheck.sw);
+  r.check("f8-b 交換作業中の0Vをはさんでも検出する(梅名樋管2号の形)",
+    swapCheck.dropout && Math.abs(swapCheck.dropout.vAfter - 12.48) < 0.001, swapCheck.dropout);
+  r.check("f8-c 充電で上がっただけ・通信の途切れ・別経路との差・0時より前 は交換とみなさない",
+    !swapCheck.charging && !swapCheck.longGap && !swapCheck.mixed && !swapCheck.yesterday,
+    { charging: swapCheck.charging, longGap: swapCheck.longGap, mixed: swapCheck.mixed, yesterday: swapCheck.yesterday });
+  r.check("f8-c2 中継サーバーの点は、サーバー経由・画面から直接のどちらの名前でも拾う",
+    swapCheck.sw && swapCheck.direct, { server: swapCheck.sw, direct: swapCheck.direct });
+  r.check("f8-d 交換後は、交換直後の電圧から残量を出し直す(0時基準ではなく)",
+    swapCheck.before.src === "balance" && swapCheck.after.src === "swap"
+    && swapCheck.after.soc > swapCheck.before.soc + 20, { 前: swapCheck.before, 後: swapCheck.after });
+  r.check("f8-e 交換で持ち時間が延び、持ち比較の順位が入れ替わる",
+    swapCheck.before.order[0] === "cam03" && swapCheck.after.order[0] !== "cam03"
+    && swapCheck.after.order.indexOf("cam03") > swapCheck.before.order.indexOf("cam03"),
+    { 前: swapCheck.before.order, 後: swapCheck.after.order });
+  r.check("f8-f 持ち比較の値に「交換後」と添える",
+    swapCheck.barText.some((t) => t.indexOf("交換後") > 0), swapCheck.barText);
+  // 継続可どうしが同順位のまま動かないと、残量が増えても順位が変わらない。
+  // 7日間でいちばん下がったときの残量が少ない順に並べ、その値を添える。
+  const lows = swapCheck.barText.filter((t) => t.indexOf("継続可（最低") === 0)
+    .map((t) => Number((t.match(/最低(-?\d+)%/) || [])[1]));
+  r.check("f8-i 継続可どうしは7日間の最低残量が少ない順に並べ、その値を添える",
+    lows.length >= 2 && lows.every((v, i) => i === 0 || lows[i - 1] <= v), swapCheck.barText);
+  r.check("f8-g 健全性の一覧に今日の交換時刻と前後の電圧を出す",
+    (swapCheck.table[11] || "").indexOf("16:10") >= 0 && (swapCheck.table[11] || "").indexOf("11.34→12.60V") >= 0,
+    swapCheck.table[11]);
+  const staleCache = await page3.evaluate(() => {
+    // 10分のキャッシュの途中でも、交換が見つかれば計算し直す
+    const d = window.__dashboardDebug;
+    const realNow = Date.now, HOUR = 3600000, MIN = 60000;
+    const j = new Date(realNow() + 9 * HOUR);
+    let fixed = Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR + 17.5 * HOUR;
+    if (fixed < realNow()) fixed += 24 * HOUR;
+    Date.now = () => fixed;
+    try {
+      const s03 = d.siteStates.cam03, keep = s03.points.slice();
+      d.refreshBatteryOutlook();
+      const a = d.batteryOutlook(d.SITE_CATALOG.cam03);
+      s03.points = keep.concat([
+        { fetchedAt: new Date(fixed - 10 * MIN), pv: 0.1, bat: 11.35, loadW: 24, via: "mini.lhlab-vps.net" },
+        { fetchedAt: new Date(fixed - 5 * MIN), pv: 0.1, bat: 12.35, loadW: 24, via: "mini.lhlab-vps.net" }]);
+      const b = d.batteryOutlook(d.SITE_CATALOG.cam03);
+      s03.points = keep;
+      return { aSrc: a && a.socSource, bSrc: b && b.socSource, recomputed: a !== b };
+    } finally { Date.now = realNow; d.refreshBatteryOutlook(); }
+  });
+  r.check("f8-h 10分のキャッシュ中でも、交換を見つけたらすぐ計算し直す",
+    staleCache.recomputed && staleCache.aSrc === "balance" && staleCache.bSrc === "swap", staleCache);
+
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
   await page3.close();
 
