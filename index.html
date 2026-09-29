@@ -5376,11 +5376,20 @@
     var jst = new Date(nowMs + 9 * HOUR_MS);
     return Date.UTC(jst.getUTCFullYear(), jst.getUTCMonth(), jst.getUTCDate()) - 9 * HOUR_MS;
   }
-  // 今日(JST)のうちに載せ替えがあったか。0時の電圧に反映済みの昨日以前の交換は対象外。
+  // まだ残量の起点(0時の電圧)に反映されていない載せ替えがあるか。
+  //  ・今日の交換 … 0時の電圧は交換前の電池のものなので、必ず交換後の電圧から出し直す
+  //  ・昨日の交換 … 今日の0時の電圧が届いていれば、それが交換後の電池の値なので不要。
+  //                 日付が変わった直後で、まだ届いていない間は交換後の電圧から出し直す
+  //                 (以前はこの間だけ交換前の電池の残量に戻ってしまっていた)
   function sameDaySwap(siteId) {
     var s = siteStates[siteId];
     if (!s) return null;
-    return detectIntradaySwap(s.points, jstMidnightMs(Date.now()));
+    var mid = jstMidnightMs(Date.now());
+    var sw = detectIntradaySwap(s.points, mid - 24 * HOUR_MS);
+    if (!sw) return null;
+    if (sw.at >= mid) return sw;
+    var today = todayPowerDaily(siteId);
+    return (today && typeof today.v0 === "number") ? null : sw;
   }
   /* 「今」の残量[%]。
      ・今日交換していれば、交換直後の電圧から出し直し、そこからの実測の発電−消費を足す
@@ -5389,7 +5398,7 @@
   function currentSocFor(site, e, capWh, loadW) {
     var s = siteStates[site.id];
     var nowMs = Date.now();
-    var swap = s ? detectIntradaySwap(s.points, jstMidnightMs(nowMs)) : null;
+    var swap = sameDaySwap(site.id);
     var integrate = function (soc, fromMs) {
       var meas = s.points.filter(function (p) {
         return p.fetchedAt.getTime() >= fromMs && typeof p.bat === "number" && p.bat >= SWAP_MIN_VALID_V;
