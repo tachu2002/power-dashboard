@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-30T02:10:09.522Z",
+  "generatedAt": "2026-09-30T03:20:06.131Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -446,17 +446,18 @@
       "swaps": [
         "2026-09-15",
         "2026-09-22",
-        "2026-09-26"
+        "2026-09-26",
+        "2026-10-01"
       ],
-      "lastSwapAt": "2026-09-26",
-      "lastSwapTime": "2026-09-25T03:12:53.000Z",
-      "lastSwapVBefore": 13.201,
-      "lastSwapVAfter": 13.741,
+      "lastSwapAt": "2026-10-01",
+      "lastSwapTime": "2026-09-30T03:17:36.000Z",
+      "lastSwapVBefore": 12.409,
+      "lastSwapVAfter": 12.836,
       "capAfterSwap": false,
       "capStale": true,
       "capPlaceholder": true,
-      "capDaysAfterSwap": 5,
-      "mvSpansSwap": true,
+      "capDaysAfterSwap": 0,
+      "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 109,
       "mvPerAhNow": 15.7,
@@ -485,7 +486,7 @@
         "days": 20,
         "tempC": 23.3,
         "whole": false,
-        "placeholder": false
+        "placeholder": true
       },
       "initialWindow": null,
       "spanDays": 110,
@@ -557,17 +558,18 @@
         11.464
       ],
       "swaps": [
-        "2026-09-10"
+        "2026-09-10",
+        "2026-10-01"
       ],
-      "lastSwapAt": "2026-09-10",
-      "lastSwapTime": "2026-09-09T05:05:06.000Z",
-      "lastSwapVBefore": 11.79,
-      "lastSwapVAfter": 12.748,
-      "capAfterSwap": true,
-      "capStale": false,
-      "capPlaceholder": false,
-      "capDaysAfterSwap": 21,
-      "mvSpansSwap": true,
+      "lastSwapAt": "2026-10-01",
+      "lastSwapTime": "2026-09-30T02:55:49.000Z",
+      "lastSwapVBefore": 12.084,
+      "lastSwapVAfter": 12.559,
+      "capAfterSwap": false,
+      "capStale": true,
+      "capPlaceholder": true,
+      "capDaysAfterSwap": 0,
+      "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 63,
       "mvPerAhNow": 10.5,
@@ -1343,7 +1345,7 @@
         11.921,
         11.807,
         11.372,
-        10.546
+        -0.001
       ],
       "swaps": [
         "2026-07-02",
@@ -1673,7 +1675,7 @@
         13.372,
         13.377,
         13.381,
-        13.381
+        13.377
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2443,7 +2445,7 @@
         13.5,
         13.5,
         13.5,
-        13.504
+        13.5
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2545,7 +2547,7 @@
         13.596,
         13.596,
         13.601,
-        13.605
+        13.601
       ],
       "swaps": [],
       "lastSwapAt": null,
