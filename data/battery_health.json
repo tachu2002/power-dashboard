@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-06T15:04:11.631Z",
+  "generatedAt": "2026-10-06T16:10:04.604Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -13,17 +13,17 @@
     "cam11": {
       "days": 117,
       "mains": false,
-      "v0": 12.379,
-      "socPct": 71,
+      "v0": 12.375,
+      "socPct": 70,
       "nightA": 1.031,
       "vmin": 12.35,
       "capacityAh": 45.1,
       "fitR": 0.944,
       "whPerV": 417,
-      "enduranceH": 22.3,
-      "usableAh": 22.99,
+      "enduranceH": 21.9,
+      "usableAh": 22.55,
       "capacityInitialAh": 58.2,
-      "capacityNowAh": 45.5,
+      "capacityNowAh": 45.6,
       "degradePct": 78,
       "capWindow": {
         "from": "2026-09-03",
@@ -105,7 +105,7 @@
         12.247,
         12.26,
         12.269,
-        12.379
+        12.357
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -127,15 +127,15 @@
     "cam01": {
       "days": 117,
       "mains": false,
-      "v0": 12.405,
-      "socPct": 73,
+      "v0": 12.401,
+      "socPct": 72,
       "nightA": 1.087,
       "vmin": 12.3,
-      "capacityAh": 46.1,
-      "fitR": 0.969,
+      "capacityAh": 46.2,
+      "fitR": 0.968,
       "whPerV": 426,
-      "enduranceH": 22.5,
-      "usableAh": 24.45,
+      "enduranceH": 22.1,
+      "usableAh": 24.01,
       "capacityInitialAh": 51.6,
       "capacityNowAh": 46.6,
       "degradePct": 90,
@@ -219,7 +219,7 @@
         12.238,
         12.269,
         12.26,
-        12.405
+        12.379
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -241,15 +241,15 @@
     "cam41": {
       "days": 117,
       "mains": false,
-      "v0": 12.568,
-      "socPct": 86,
+      "v0": 12.563,
+      "socPct": 85,
       "nightA": 0.073,
       "vmin": 12.52,
       "capacityAh": 13.9,
       "fitR": 0.909,
       "whPerV": 130,
-      "enduranceH": 125.3,
-      "usableAh": 9.15,
+      "enduranceH": 123.4,
+      "usableAh": 9.01,
       "capacityInitialAh": null,
       "capacityNowAh": 13.8,
       "degradePct": null,
@@ -328,7 +328,7 @@
         12.475,
         12.462,
         12.471,
-        12.568
+        12.55
       ],
       "swaps": [
         "2026-09-18",
@@ -355,15 +355,15 @@
     "cam42": {
       "days": 117,
       "mains": false,
-      "v0": 12.194,
-      "socPct": 57,
+      "v0": 12.181,
+      "socPct": 56,
       "nightA": 0.943,
       "vmin": 12.272,
       "capacityAh": 54.8,
       "fitR": 0.879,
       "whPerV": 503,
-      "enduranceH": 21.5,
-      "usableAh": 20.28,
+      "enduranceH": 20.9,
+      "usableAh": 19.74,
       "capacityInitialAh": null,
       "capacityNowAh": 54.6,
       "degradePct": null,
@@ -442,7 +442,7 @@
         12.053,
         12.075,
         12.071,
-        12.194
+        12.15
       ],
       "swaps": [
         "2026-09-15",
@@ -471,17 +471,17 @@
       "nightGenMaxWh": 162
     },
     "cam43": {
-      "days": 116,
+      "days": 117,
       "mains": false,
-      "v0": 12.083,
-      "socPct": 49,
+      "v0": 12.131,
+      "socPct": 52,
       "nightA": 1.483,
-      "vmin": 11.98,
+      "vmin": 11.984,
       "capacityAh": 31.2,
       "fitR": 0.797,
       "whPerV": 279,
-      "enduranceH": 6.1,
-      "usableAh": 9.05,
+      "enduranceH": 6.7,
+      "usableAh": 9.98,
       "capacityInitialAh": null,
       "capacityNowAh": 31.5,
       "degradePct": null,
@@ -494,11 +494,11 @@
         "placeholder": true
       },
       "initialWindow": null,
-      "spanDays": 116,
-      "pvPeakNowW": 23.8,
+      "spanDays": 117,
+      "pvPeakNowW": 23.3,
       "pvPeakInitialW": 28.6,
-      "loadWhPerDay": 98.7,
-      "genWhPerDay": 104.6,
+      "loadWhPerDay": 98.5,
+      "genWhPerDay": 97.6,
       "vminFrom": "2026-08-09",
       "vminDays": [
         12.11,
@@ -560,7 +560,7 @@
         11.974,
         11.97,
         11.97,
-        null
+        12.11
       ],
       "swaps": [
         "2026-09-10",
@@ -574,7 +574,7 @@
       "capAfterSwap": false,
       "capStale": true,
       "capPlaceholder": true,
-      "capDaysAfterSwap": 1,
+      "capDaysAfterSwap": 2,
       "mvSpansSwap": true,
       "ratedAh": 50,
       "sohPct": 63,
@@ -586,17 +586,17 @@
     "cam44": {
       "days": 117,
       "mains": false,
-      "v0": 12.335,
+      "v0": 12.331,
       "socPct": 67,
       "nightA": 0.32,
       "vmin": 12.29,
-      "capacityAh": 28,
-      "fitR": 0.952,
-      "whPerV": 257,
+      "capacityAh": 28.1,
+      "fitR": 0.951,
+      "whPerV": 258,
       "enduranceH": 41.2,
-      "usableAh": 13.17,
+      "usableAh": 13.2,
       "capacityInitialAh": null,
-      "capacityNowAh": 28.4,
+      "capacityNowAh": 28.5,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-19",
@@ -673,7 +673,7 @@
         12.119,
         12.181,
         12.176,
-        12.335
+        12.326
       ],
       "swaps": [
         "2026-07-03",
@@ -698,15 +698,15 @@
     "cam46": {
       "days": 117,
       "mains": false,
-      "v0": 12.278,
-      "socPct": 63,
+      "v0": 12.27,
+      "socPct": 62,
       "nightA": 1.693,
       "vmin": 12.15,
       "capacityAh": 72.3,
       "fitR": 0.746,
       "whPerV": 659,
-      "enduranceH": 18.4,
-      "usableAh": 31.11,
+      "enduranceH": 17.9,
+      "usableAh": 30.38,
       "capacityInitialAh": null,
       "capacityNowAh": 71.6,
       "degradePct": null,
@@ -785,7 +785,7 @@
         12.119,
         12.141,
         12.093,
-        12.278
+        12.251
       ],
       "swaps": [
         "2026-07-04",
@@ -813,15 +813,15 @@
     "cam47": {
       "days": 117,
       "mains": false,
-      "v0": 12.247,
-      "socPct": 61,
+      "v0": 12.243,
+      "socPct": 60,
       "nightA": 1.303,
       "vmin": 12.31,
       "capacityAh": 46.9,
-      "fitR": 0.959,
+      "fitR": 0.958,
       "whPerV": 430,
-      "enduranceH": 14.7,
-      "usableAh": 19.21,
+      "enduranceH": 14.4,
+      "usableAh": 18.76,
       "capacityInitialAh": null,
       "capacityNowAh": 47.5,
       "degradePct": null,
@@ -900,7 +900,7 @@
         12.023,
         12.11,
         12.115,
-        12.247
+        12.225
       ],
       "swaps": [
         "2026-09-18"
@@ -924,7 +924,7 @@
     "cam40": {
       "days": 117,
       "mains": false,
-      "v0": 12.48,
+      "v0": 12.478,
       "socPct": 78,
       "nightA": 1.245,
       "vmin": 12.363,
@@ -1016,7 +1016,7 @@
         12.37,
         12.365,
         12.37,
-        12.48
+        12.467
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1038,7 +1038,7 @@
     "cam45": {
       "days": 117,
       "mains": false,
-      "v0": 12.541,
+      "v0": 12.534,
       "socPct": 83,
       "nightA": 0.35,
       "vmin": 12.5,
@@ -1046,7 +1046,7 @@
       "fitR": 0.958,
       "whPerV": 181,
       "enduranceH": 34.9,
-      "usableAh": 12.2,
+      "usableAh": 12.21,
       "capacityInitialAh": 24.4,
       "capacityNowAh": 19.6,
       "degradePct": 80,
@@ -1130,7 +1130,7 @@
         12.383,
         12.401,
         12.396,
-        12.541
+        12.524
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1152,15 +1152,15 @@
     "cam03": {
       "days": 117,
       "mains": false,
-      "v0": 12.357,
-      "socPct": 69,
+      "v0": 12.35,
+      "socPct": 68,
       "nightA": 0.963,
       "vmin": 12.205,
       "capacityAh": 45.5,
       "fitR": 0.903,
       "whPerV": 414,
-      "enduranceH": 23.2,
-      "usableAh": 22.31,
+      "enduranceH": 22.7,
+      "usableAh": 21.86,
       "capacityInitialAh": null,
       "capacityNowAh": 46,
       "degradePct": null,
@@ -1239,7 +1239,7 @@
         12.225,
         12.22,
         12.229,
-        12.357
+        12.326
       ],
       "swaps": [
         "2026-09-10",
@@ -1264,15 +1264,15 @@
     "cam14": {
       "days": 117,
       "mains": false,
-      "v0": 12.392,
-      "socPct": 72,
+      "v0": 12.389,
+      "socPct": 71,
       "nightA": 1.374,
       "vmin": 12.22,
       "capacityAh": 41.3,
       "fitR": 0.948,
       "whPerV": 377,
-      "enduranceH": 15.6,
-      "usableAh": 21.47,
+      "enduranceH": 15.3,
+      "usableAh": 21.05,
       "capacityInitialAh": null,
       "capacityNowAh": 41.7,
       "degradePct": null,
@@ -1351,7 +1351,7 @@
         -0.001,
         12.247,
         12.251,
-        12.392
+        12.365
       ],
       "swaps": [
         "2026-07-02",
@@ -1377,17 +1377,17 @@
     "cam13": {
       "days": 117,
       "mains": false,
-      "v0": 12.559,
-      "socPct": 85,
+      "v0": 12.552,
+      "socPct": 84,
       "nightA": 0.779,
       "vmin": 12.53,
       "capacityAh": 47.2,
-      "fitR": 0.926,
+      "fitR": 0.925,
       "whPerV": 443,
-      "enduranceH": 39.4,
-      "usableAh": 30.66,
+      "enduranceH": 38.8,
+      "usableAh": 30.21,
       "capacityInitialAh": 68.7,
-      "capacityNowAh": 47.6,
+      "capacityNowAh": 47.7,
       "degradePct": 69,
       "capWindow": {
         "from": "2026-09-03",
@@ -1469,7 +1469,7 @@
         12.453,
         12.44,
         12.445,
-        12.559
+        12.532
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1491,15 +1491,15 @@
     "cam12": {
       "days": 117,
       "mains": false,
-      "v0": 12.392,
-      "socPct": 72,
+      "v0": 12.389,
+      "socPct": 71,
       "nightA": 0.797,
       "vmin": 12.253,
       "capacityAh": 43.8,
       "fitR": 0.954,
       "whPerV": 403,
-      "enduranceH": 28.6,
-      "usableAh": 22.78,
+      "enduranceH": 28,
+      "usableAh": 22.34,
       "capacityInitialAh": null,
       "capacityNowAh": 44.2,
       "degradePct": null,
@@ -1578,7 +1578,7 @@
         12.282,
         12.273,
         12.273,
-        12.392
+        12.374
       ],
       "swaps": [
         "2026-09-18",
@@ -1603,7 +1603,7 @@
     "cam39": {
       "days": 93,
       "mains": true,
-      "v0": 13.407,
+      "v0": 13.405,
       "socPct": 100,
       "nightA": null,
       "vmin": 13.37,
@@ -1683,7 +1683,7 @@
         13.372,
         13.377,
         13.372,
-        13.407
+        13.403
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1705,17 +1705,17 @@
     "cam08": {
       "days": 117,
       "mains": false,
-      "v0": 12.247,
-      "socPct": 61,
+      "v0": 12.24,
+      "socPct": 60,
       "nightA": 1.347,
       "vmin": 12.2,
-      "capacityAh": 51.7,
-      "fitR": 0.923,
-      "whPerV": 473,
-      "enduranceH": 15.7,
-      "usableAh": 21.21,
+      "capacityAh": 51.9,
+      "fitR": 0.921,
+      "whPerV": 475,
+      "enduranceH": 15.4,
+      "usableAh": 20.75,
       "capacityInitialAh": null,
-      "capacityNowAh": 52.7,
+      "capacityNowAh": 52.8,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-25",
@@ -1792,7 +1792,7 @@
         12.128,
         12.137,
         12.132,
-        12.247
+        12.225
       ],
       "swaps": [
         "2026-09-25"
@@ -1807,7 +1807,7 @@
       "capDaysAfterSwap": 13,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 105,
+      "sohPct": 106,
       "mvPerAhNow": 9.9,
       "mvPerAhPrev": 9.5,
       "nightNights": 25,
@@ -1816,15 +1816,15 @@
     "cam09": {
       "days": 117,
       "mains": false,
-      "v0": 12.295,
-      "socPct": 64,
+      "v0": 12.28,
+      "socPct": 63,
       "nightA": 1.584,
       "vmin": 11.799,
       "capacityAh": 50.5,
       "fitR": 0.61,
       "whPerV": 450,
-      "enduranceH": 14,
-      "usableAh": 22.22,
+      "enduranceH": 13.7,
+      "usableAh": 21.71,
       "capacityInitialAh": null,
       "capacityNowAh": 49.7,
       "degradePct": null,
@@ -1903,7 +1903,7 @@
         12.146,
         12.154,
         12.137,
-        12.295
+        12.256
       ],
       "swaps": [
         "2026-09-02",
@@ -1934,17 +1934,17 @@
     "cam36": {
       "days": 117,
       "mains": false,
-      "v0": 12.467,
+      "v0": 12.459,
       "socPct": 77,
       "nightA": 1.249,
       "vmin": 12.31,
-      "capacityAh": 58.8,
-      "fitR": 0.88,
-      "whPerV": 545,
-      "enduranceH": 26.8,
-      "usableAh": 33.52,
+      "capacityAh": 58.9,
+      "fitR": 0.879,
+      "whPerV": 546,
+      "enduranceH": 26.9,
+      "usableAh": 33.58,
       "capacityInitialAh": null,
-      "capacityNowAh": 59.7,
+      "capacityNowAh": 59.8,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-20",
@@ -2021,7 +2021,7 @@
         12.348,
         12.348,
         12.335,
-        12.467
+        12.436
       ],
       "swaps": [
         "2026-09-20"
@@ -2036,7 +2036,7 @@
       "capDaysAfterSwap": 18,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 119,
+      "sohPct": 120,
       "mvPerAhNow": 7.6,
       "mvPerAhPrev": 7,
       "nightNights": 20,
@@ -2045,7 +2045,7 @@
     "cam04": {
       "days": 117,
       "mains": false,
-      "v0": 12.37,
+      "v0": 12.371,
       "socPct": 70,
       "nightA": 1.224,
       "vmin": 12.37,
@@ -2137,7 +2137,7 @@
         12.238,
         12.251,
         12.256,
-        12.37
+        12.357
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2159,15 +2159,15 @@
     "cam02": {
       "days": 117,
       "mains": false,
-      "v0": 12.278,
-      "socPct": 63,
+      "v0": 12.272,
+      "socPct": 62,
       "nightA": 1.75,
       "vmin": 12.15,
       "capacityAh": 53.2,
       "fitR": 0.925,
       "whPerV": 488,
-      "enduranceH": 13.1,
-      "usableAh": 22.89,
+      "enduranceH": 12.8,
+      "usableAh": 22.36,
       "capacityInitialAh": null,
       "capacityNowAh": 53.7,
       "degradePct": null,
@@ -2246,7 +2246,7 @@
         12.124,
         12.124,
         12.128,
-        12.278
+        12.256
       ],
       "swaps": [
         "2026-09-13",
@@ -2271,7 +2271,7 @@
     "cam48": {
       "days": 93,
       "mains": true,
-      "v0": 13.746,
+      "v0": 13.752,
       "socPct": 100,
       "nightA": null,
       "vmin": 13.74,
@@ -2351,7 +2351,7 @@
         13.737,
         13.737,
         13.737,
-        13.746
+        13.741
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2373,7 +2373,7 @@
     "cam50": {
       "days": 93,
       "mains": true,
-      "v0": 13.5,
+      "v0": 13.501,
       "socPct": 100,
       "nightA": null,
       "vmin": 13.5,
@@ -2577,15 +2577,15 @@
     "cam52": {
       "days": 117,
       "mains": false,
-      "v0": 12.194,
-      "socPct": 57,
+      "v0": 12.185,
+      "socPct": 56,
       "nightA": 1.297,
       "vmin": 12.061,
       "capacityAh": 47.9,
       "fitR": 0.958,
       "whPerV": 433,
-      "enduranceH": 13.7,
-      "usableAh": 17.71,
+      "enduranceH": 13.3,
+      "usableAh": 17.23,
       "capacityInitialAh": null,
       "capacityNowAh": 48.3,
       "degradePct": null,
@@ -2664,7 +2664,7 @@
         12.075,
         12.089,
         12.106,
-        12.194
+        12.163
       ],
       "swaps": [
         "2026-09-10",
@@ -2689,7 +2689,7 @@
     "cam53": {
       "days": 117,
       "mains": false,
-      "v0": 12.761,
+      "v0": 12.758,
       "socPct": 100,
       "nightA": 1.04,
       "vmin": 12.431,
@@ -2776,7 +2776,7 @@
         12.427,
         12.445,
         12.453,
-        12.761
+        12.744
       ],
       "swaps": [
         "2026-09-29"
@@ -2887,7 +2887,7 @@
         12.374,
         12.317,
         12.339,
-        12.506
+        12.493
       ],
       "swaps": [
         "2026-09-11",
@@ -2912,15 +2912,15 @@
     "cam54": {
       "days": 117,
       "mains": false,
-      "v0": 12.348,
-      "socPct": 68,
+      "v0": 12.334,
+      "socPct": 67,
       "nightA": 1.209,
       "vmin": 12.24,
       "capacityAh": 49.4,
       "fitR": 0.934,
       "whPerV": 452,
-      "enduranceH": 19.6,
-      "usableAh": 23.69,
+      "enduranceH": 19.2,
+      "usableAh": 23.2,
       "capacityInitialAh": null,
       "capacityNowAh": 49.7,
       "degradePct": null,
@@ -2999,7 +2999,7 @@
         12.212,
         12.124,
         12.15,
-        12.348
+        12.313
       ],
       "swaps": [
         "2026-09-11",
