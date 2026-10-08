@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-08T17:50:09.110Z",
+  "generatedAt": "2026-10-08T19:52:18.907Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -8,7 +8,7 @@
   "tempRefC": 25,
   "tempCoefPerC": 0.006,
   "longTermFrom": "2026-06-13",
-  "longTermTo": "2026-10-07",
+  "longTermTo": "2026-10-08",
   "sites": {
     "cam11": {
       "days": 119,
@@ -29,7 +29,7 @@
         "from": "2026-09-05",
         "to": "2026-10-09",
         "days": 34,
-        "tempC": 23.1,
+        "tempC": 23,
         "whole": false,
         "placeholder": false
       },
@@ -40,10 +40,10 @@
         "tempC": 23.6
       },
       "spanDays": 119,
-      "pvPeakNowW": 25.9,
+      "pvPeakNowW": 26.2,
       "pvPeakInitialW": 26.6,
       "loadWhPerDay": 81.2,
-      "genWhPerDay": 109.5,
+      "genWhPerDay": 110.8,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.38,
@@ -105,7 +105,7 @@
         12.269,
         12.278,
         12.238,
-        12.317
+        12.269
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -119,9 +119,9 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 92,
-      "mvPerAhNow": 11.9,
-      "mvPerAhPrev": 10.1,
-      "nightNights": 24,
+      "mvPerAhNow": 11,
+      "mvPerAhPrev": 11,
+      "nightNights": 23,
       "nightGenMaxWh": 124
     },
     "cam01": {
@@ -130,7 +130,7 @@
       "v0": 12.398,
       "socPct": 72,
       "nightA": 1.084,
-      "vmin": 12.298,
+      "vmin": 12.293,
       "capacityAh": 46.4,
       "fitR": 0.966,
       "whPerV": 428,
@@ -143,7 +143,7 @@
         "from": "2026-09-05",
         "to": "2026-10-09",
         "days": 34,
-        "tempC": 23.1,
+        "tempC": 23,
         "whole": false,
         "placeholder": false
       },
@@ -154,10 +154,10 @@
         "tempC": 23.6
       },
       "spanDays": 119,
-      "pvPeakNowW": 26.9,
+      "pvPeakNowW": 27.8,
       "pvPeakInitialW": 28.7,
-      "loadWhPerDay": 92.4,
-      "genWhPerDay": 105.5,
+      "loadWhPerDay": 92.5,
+      "genWhPerDay": 105.6,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.53,
@@ -219,7 +219,7 @@
         12.26,
         12.295,
         12.234,
-        12.339
+        12.282
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -233,9 +233,9 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 94,
-      "mvPerAhNow": 11.4,
-      "mvPerAhPrev": 9.2,
-      "nightNights": 24,
+      "mvPerAhNow": 10.5,
+      "mvPerAhPrev": 8.7,
+      "nightNights": 23,
       "nightGenMaxWh": 134
     },
     "cam41": {
@@ -263,10 +263,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 7.5,
+      "pvPeakNowW": 7.7,
       "pvPeakInitialW": 9.4,
       "loadWhPerDay": 16.2,
-      "genWhPerDay": 28.2,
+      "genWhPerDay": 28.7,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.54,
@@ -328,7 +328,7 @@
         12.471,
         12.48,
         12.436,
-        12.493
+        12.458
       ],
       "swaps": [
         "2026-09-18",
@@ -346,12 +346,12 @@
       "capStale": true,
       "capPlaceholder": true,
       "capDaysAfterSwap": 1,
-      "mvSpansSwap": true,
+      "mvSpansSwap": false,
       "ratedAh": 20,
       "sohPct": 69,
-      "mvPerAhNow": 205.5,
-      "mvPerAhPrev": 91.2,
-      "nightNights": 23,
+      "mvPerAhNow": 112.9,
+      "mvPerAhPrev": 95.4,
+      "nightNights": 22,
       "nightGenMaxWh": 30
     },
     "cam42": {
@@ -379,10 +379,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 28.4,
+      "pvPeakNowW": 28.7,
       "pvPeakInitialW": 29,
       "loadWhPerDay": 78.3,
-      "genWhPerDay": 120.5,
+      "genWhPerDay": 121.4,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.34,
@@ -444,7 +444,7 @@
         12.071,
         12.062,
         12.014,
-        12.137
+        12.093
       ],
       "swaps": [
         "2026-09-15",
@@ -467,17 +467,17 @@
       "mvSpansSwap": true,
       "ratedAh": 50,
       "sohPct": 109,
-      "mvPerAhNow": 19,
-      "mvPerAhPrev": 14.1,
-      "nightNights": 29,
-      "nightGenMaxWh": 161
+      "mvPerAhNow": 19.4,
+      "mvPerAhPrev": 13.5,
+      "nightNights": 28,
+      "nightGenMaxWh": 162
     },
     "cam43": {
       "days": 119,
       "mains": false,
       "v0": 12.116,
       "socPct": 51,
-      "nightA": 1.483,
+      "nightA": 1.482,
       "vmin": 11.984,
       "capacityAh": 31.2,
       "fitR": 0.797,
@@ -497,10 +497,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 27.4,
+      "pvPeakNowW": 27.9,
       "pvPeakInitialW": 28.6,
-      "loadWhPerDay": 98.8,
-      "genWhPerDay": 113.3,
+      "loadWhPerDay": 98.7,
+      "genWhPerDay": 114,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.11,
@@ -562,7 +562,7 @@
         11.97,
         12.014,
         11.939,
-        12.067
+        11.992
       ],
       "swaps": [
         "2026-09-10",
@@ -578,13 +578,13 @@
       "capStale": true,
       "capPlaceholder": true,
       "capDaysAfterSwap": 1,
-      "mvSpansSwap": true,
+      "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 63,
-      "mvPerAhNow": 13,
-      "mvPerAhPrev": 9.8,
-      "nightNights": 26,
-      "nightGenMaxWh": 166
+      "mvPerAhNow": 11.6,
+      "mvPerAhPrev": 9.5,
+      "nightNights": 25,
+      "nightGenMaxWh": 168
     },
     "cam44": {
       "days": 119,
@@ -592,7 +592,7 @@
       "v0": 12.351,
       "socPct": 69,
       "nightA": 0.319,
-      "vmin": 12.29,
+      "vmin": 12.285,
       "capacityAh": 28.5,
       "fitR": 0.946,
       "whPerV": 262,
@@ -605,16 +605,16 @@
         "from": "2026-09-19",
         "to": "2026-10-09",
         "days": 20,
-        "tempC": 22.7,
+        "tempC": 22.6,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 9,
+      "pvPeakNowW": 9.7,
       "pvPeakInitialW": 8.6,
       "loadWhPerDay": 33.7,
-      "genWhPerDay": 29.7,
+      "genWhPerDay": 31.1,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.35,
@@ -676,7 +676,7 @@
         12.176,
         12.256,
         12.185,
-        12.308
+        12.278
       ],
       "swaps": [
         "2026-07-03",
@@ -694,8 +694,8 @@
       "ratedAh": 50,
       "sohPct": 58,
       "mvPerAhNow": 17.6,
-      "mvPerAhPrev": 19.3,
-      "nightNights": 23,
+      "mvPerAhPrev": 16.9,
+      "nightNights": 22,
       "nightGenMaxWh": 43
     },
     "cam46": {
@@ -704,7 +704,7 @@
       "v0": 12.235,
       "socPct": 60,
       "nightA": 1.682,
-      "vmin": 12.148,
+      "vmin": 12.144,
       "capacityAh": 52.4,
       "fitR": 0.956,
       "whPerV": 477,
@@ -717,16 +717,16 @@
         "from": "2026-09-29",
         "to": "2026-10-09",
         "days": 10,
-        "tempC": 21.9,
+        "tempC": 21.8,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 24.9,
+      "pvPeakNowW": 26.4,
       "pvPeakInitialW": 28.8,
-      "loadWhPerDay": 111.9,
-      "genWhPerDay": 108.9,
+      "loadWhPerDay": 112,
+      "genWhPerDay": 109.4,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.2,
@@ -788,7 +788,7 @@
         12.093,
         12.146,
         12.049,
-        12.181
+        12.115
       ],
       "swaps": [
         "2026-07-04",
@@ -810,7 +810,7 @@
       "sohPct": 107,
       "mvPerAhNow": 8.7,
       "mvPerAhPrev": 9.2,
-      "nightNights": 27,
+      "nightNights": 26,
       "nightGenMaxWh": 174
     },
     "cam47": {
@@ -832,16 +832,16 @@
         "from": "2026-09-18",
         "to": "2026-10-09",
         "days": 21,
-        "tempC": 22.8,
+        "tempC": 22.7,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 28.8,
+      "pvPeakNowW": 28.9,
       "pvPeakInitialW": 27.3,
       "loadWhPerDay": 107.7,
-      "genWhPerDay": 116,
+      "genWhPerDay": 118.3,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.38,
@@ -903,7 +903,7 @@
         12.115,
         12.137,
         12.106,
-        12.181
+        12.119
       ],
       "swaps": [
         "2026-09-18"
@@ -921,8 +921,8 @@
       "sohPct": 96,
       "mvPerAhNow": 10.8,
       "mvPerAhPrev": 8.8,
-      "nightNights": 25,
-      "nightGenMaxWh": 150
+      "nightNights": 24,
+      "nightGenMaxWh": 151
     },
     "cam40": {
       "days": 119,
@@ -930,7 +930,7 @@
       "v0": 12.47,
       "socPct": 78,
       "nightA": 1.245,
-      "vmin": 12.363,
+      "vmin": 12.361,
       "capacityAh": 53.6,
       "fitR": 0.903,
       "whPerV": 498,
@@ -943,7 +943,7 @@
         "from": "2026-09-05",
         "to": "2026-10-09",
         "days": 34,
-        "tempC": 23.1,
+        "tempC": 23,
         "whole": false,
         "placeholder": false
       },
@@ -956,8 +956,8 @@
       "spanDays": 119,
       "pvPeakNowW": 27.1,
       "pvPeakInitialW": 25.6,
-      "loadWhPerDay": 96.1,
-      "genWhPerDay": 121,
+      "loadWhPerDay": 96.2,
+      "genWhPerDay": 122.9,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.51,
@@ -1019,7 +1019,7 @@
         12.37,
         12.383,
         12.348,
-        12.409
+        12.361
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1033,10 +1033,10 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 109,
-      "mvPerAhNow": 10.3,
-      "mvPerAhPrev": 7.1,
-      "nightNights": 24,
-      "nightGenMaxWh": 134
+      "mvPerAhNow": 9.1,
+      "mvPerAhPrev": 7.9,
+      "nightNights": 23,
+      "nightGenMaxWh": 135
     },
     "cam45": {
       "days": 119,
@@ -1057,7 +1057,7 @@
         "from": "2026-09-05",
         "to": "2026-10-09",
         "days": 34,
-        "tempC": 23.1,
+        "tempC": 23,
         "whole": false,
         "placeholder": false
       },
@@ -1068,10 +1068,10 @@
         "tempC": 23.6
       },
       "spanDays": 119,
-      "pvPeakNowW": 13.5,
+      "pvPeakNowW": 13.2,
       "pvPeakInitialW": 14.2,
       "loadWhPerDay": 30.6,
-      "genWhPerDay": 47.6,
+      "genWhPerDay": 48.9,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.53,
@@ -1133,7 +1133,7 @@
         12.396,
         12.423,
         12.392,
-        12.462
+        12.418
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1147,9 +1147,9 @@
       "mvSpansSwap": false,
       "ratedAh": 20,
       "sohPct": 100,
-      "mvPerAhNow": 36.4,
-      "mvPerAhPrev": 30.8,
-      "nightNights": 24,
+      "mvPerAhNow": 30.6,
+      "mvPerAhPrev": 33,
+      "nightNights": 23,
       "nightGenMaxWh": 62
     },
     "cam03": {
@@ -1177,10 +1177,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 25.3,
+      "pvPeakNowW": 27.8,
       "pvPeakInitialW": 21.8,
-      "loadWhPerDay": 91.4,
-      "genWhPerDay": 95.1,
+      "loadWhPerDay": 91.6,
+      "genWhPerDay": 97.6,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.4,
@@ -1242,7 +1242,7 @@
         12.229,
         12.225,
         12.216,
-        12.286
+        12.234
       ],
       "swaps": [
         "2026-09-10",
@@ -1260,8 +1260,8 @@
       "ratedAh": 50,
       "sohPct": 92,
       "mvPerAhNow": 11.3,
-      "mvPerAhPrev": 12.5,
-      "nightNights": 23,
+      "mvPerAhPrev": 11.5,
+      "nightNights": 22,
       "nightGenMaxWh": 134
     },
     "cam14": {
@@ -1269,7 +1269,7 @@
       "mains": false,
       "v0": 12.388,
       "socPct": 71,
-      "nightA": 1.373,
+      "nightA": 1.372,
       "vmin": 12.22,
       "capacityAh": 41.3,
       "fitR": 0.948,
@@ -1289,10 +1289,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 24.6,
+      "pvPeakNowW": 26.4,
       "pvPeakInitialW": 29.3,
       "loadWhPerDay": 109,
-      "genWhPerDay": 97,
+      "genWhPerDay": 100.3,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.25,
@@ -1354,7 +1354,7 @@
         12.251,
         12.269,
         12.207,
-        12.343
+        12.282
       ],
       "swaps": [
         "2026-07-02",
@@ -1372,10 +1372,10 @@
       "mvSpansSwap": true,
       "ratedAh": 50,
       "sohPct": 83,
-      "mvPerAhNow": 11.3,
-      "mvPerAhPrev": 10.1,
-      "nightNights": 25,
-      "nightGenMaxWh": 138
+      "mvPerAhNow": 11.2,
+      "mvPerAhPrev": 10.4,
+      "nightNights": 24,
+      "nightGenMaxWh": 139
     },
     "cam13": {
       "days": 119,
@@ -1396,7 +1396,7 @@
         "from": "2026-09-05",
         "to": "2026-10-09",
         "days": 34,
-        "tempC": 23.1,
+        "tempC": 23,
         "whole": false,
         "placeholder": false
       },
@@ -1407,10 +1407,10 @@
         "tempC": 23.6
       },
       "spanDays": 119,
-      "pvPeakNowW": 29.1,
+      "pvPeakNowW": 29,
       "pvPeakInitialW": 28.4,
       "loadWhPerDay": 89.7,
-      "genWhPerDay": 121.1,
+      "genWhPerDay": 126,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.55,
@@ -1472,7 +1472,7 @@
         12.445,
         12.449,
         12.44,
-        12.493
+        12.431
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1486,10 +1486,10 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 97,
-      "mvPerAhNow": 14.9,
-      "mvPerAhPrev": 13.1,
-      "nightNights": 24,
-      "nightGenMaxWh": 137
+      "mvPerAhNow": 14.3,
+      "mvPerAhPrev": 13.8,
+      "nightNights": 23,
+      "nightGenMaxWh": 138
     },
     "cam12": {
       "days": 119,
@@ -1497,7 +1497,7 @@
       "v0": 12.335,
       "socPct": 67,
       "nightA": 0.795,
-      "vmin": 12.253,
+      "vmin": 12.25,
       "capacityAh": 43.8,
       "fitR": 0.954,
       "whPerV": 403,
@@ -1516,10 +1516,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 27.8,
+      "pvPeakNowW": 28.2,
       "pvPeakInitialW": 27,
       "loadWhPerDay": 84.5,
-      "genWhPerDay": 90.4,
+      "genWhPerDay": 93,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.53,
@@ -1581,7 +1581,7 @@
         12.273,
         12.286,
         12.238,
-        12.282
+        12.247
       ],
       "swaps": [
         "2026-09-18",
@@ -1596,13 +1596,13 @@
       "capStale": true,
       "capPlaceholder": true,
       "capDaysAfterSwap": 1,
-      "mvSpansSwap": true,
+      "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 88,
-      "mvPerAhNow": 15.8,
+      "mvPerAhNow": 14.9,
       "mvPerAhPrev": 13.3,
-      "nightNights": 24,
-      "nightGenMaxWh": 126
+      "nightNights": 23,
+      "nightGenMaxWh": 127
     },
     "cam39": {
       "days": 95,
@@ -1725,16 +1725,16 @@
         "from": "2026-09-25",
         "to": "2026-10-09",
         "days": 14,
-        "tempC": 22.1,
+        "tempC": 22,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 25.6,
+      "pvPeakNowW": 26.6,
       "pvPeakInitialW": 24.6,
-      "loadWhPerDay": 98.1,
-      "genWhPerDay": 97.7,
+      "loadWhPerDay": 98.2,
+      "genWhPerDay": 99.6,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.2,
@@ -1796,7 +1796,7 @@
         12.132,
         12.154,
         12.102,
-        12.15
+        12.11
       ],
       "swaps": [
         "2026-09-25"
@@ -1842,10 +1842,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 25.5,
+      "pvPeakNowW": 28.6,
       "pvPeakInitialW": 24.5,
-      "loadWhPerDay": 121.9,
-      "genWhPerDay": 106.1,
+      "loadWhPerDay": 122,
+      "genWhPerDay": 109.1,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.27,
@@ -1907,7 +1907,7 @@
         12.137,
         12.159,
         12.119,
-        12.194
+        12.141
       ],
       "swaps": [
         "2026-09-02",
@@ -1930,9 +1930,9 @@
       "mvSpansSwap": true,
       "ratedAh": 50,
       "sohPct": 99,
-      "mvPerAhNow": 11.8,
-      "mvPerAhPrev": 9.5,
-      "nightNights": 24,
+      "mvPerAhNow": 11.5,
+      "mvPerAhPrev": 9.7,
+      "nightNights": 23,
       "nightGenMaxWh": 142
     },
     "cam36": {
@@ -1940,12 +1940,12 @@
       "mains": false,
       "v0": 12.515,
       "socPct": 81,
-      "nightA": 1.247,
+      "nightA": 1.251,
       "vmin": 12.31,
       "capacityAh": 59.6,
       "fitR": 0.875,
       "whPerV": 552,
-      "enduranceH": 29.2,
+      "enduranceH": 29.1,
       "usableAh": 36.35,
       "capacityInitialAh": null,
       "capacityNowAh": 60.5,
@@ -1954,16 +1954,16 @@
         "from": "2026-09-20",
         "to": "2026-10-09",
         "days": 19,
-        "tempC": 22.6,
+        "tempC": 22.5,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 26.3,
+      "pvPeakNowW": 26.7,
       "pvPeakInitialW": 28.7,
       "loadWhPerDay": 100.9,
-      "genWhPerDay": 77.9,
+      "genWhPerDay": 82.7,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.5,
@@ -2025,7 +2025,7 @@
         12.335,
         12.361,
         12.33,
-        12.269
+        12.251
       ],
       "swaps": [
         "2026-09-20"
@@ -2041,9 +2041,9 @@
       "mvSpansSwap": true,
       "ratedAh": 50,
       "sohPct": 121,
-      "mvPerAhNow": 8.3,
-      "mvPerAhPrev": 7.1,
-      "nightNights": 21,
+      "mvPerAhNow": 7.6,
+      "mvPerAhPrev": 7,
+      "nightNights": 20,
       "nightGenMaxWh": 137
     },
     "cam04": {
@@ -2065,7 +2065,7 @@
         "from": "2026-09-05",
         "to": "2026-10-09",
         "days": 34,
-        "tempC": 23.1,
+        "tempC": 23,
         "whole": false,
         "placeholder": false
       },
@@ -2076,10 +2076,10 @@
         "tempC": 23.6
       },
       "spanDays": 119,
-      "pvPeakNowW": 28.9,
+      "pvPeakNowW": 29.1,
       "pvPeakInitialW": 24.5,
-      "loadWhPerDay": 97.5,
-      "genWhPerDay": 113.1,
+      "loadWhPerDay": 97.6,
+      "genWhPerDay": 115.1,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.39,
@@ -2141,7 +2141,7 @@
         12.256,
         12.273,
         12.22,
-        12.291
+        12.242
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2155,9 +2155,9 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 95,
-      "mvPerAhNow": 9.9,
-      "mvPerAhPrev": 9.3,
-      "nightNights": 24,
+      "mvPerAhNow": 9.3,
+      "mvPerAhPrev": 10.3,
+      "nightNights": 23,
       "nightGenMaxWh": 141
     },
     "cam02": {
@@ -2166,7 +2166,7 @@
       "v0": 12.253,
       "socPct": 61,
       "nightA": 1.75,
-      "vmin": 12.15,
+      "vmin": 12.146,
       "capacityAh": 53.2,
       "fitR": 0.925,
       "whPerV": 488,
@@ -2185,10 +2185,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 30.6,
+      "pvPeakNowW": 30.7,
       "pvPeakInitialW": 30.7,
-      "loadWhPerDay": 139.3,
-      "genWhPerDay": 125.9,
+      "loadWhPerDay": 139.4,
+      "genWhPerDay": 127.7,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.42,
@@ -2250,7 +2250,7 @@
         12.128,
         12.154,
         12.119,
-        12.203
+        12.141
       ],
       "swaps": [
         "2026-09-13",
@@ -2267,10 +2267,10 @@
       "mvSpansSwap": true,
       "ratedAh": 50,
       "sohPct": 107,
-      "mvPerAhNow": 8.5,
-      "mvPerAhPrev": 7.4,
-      "nightNights": 26,
-      "nightGenMaxWh": 191
+      "mvPerAhNow": 8.3,
+      "mvPerAhPrev": 7.2,
+      "nightNights": 25,
+      "nightGenMaxWh": 192
     },
     "cam48": {
       "days": 95,
@@ -2584,7 +2584,7 @@
       "v0": 12.115,
       "socPct": 51,
       "nightA": 1.298,
-      "vmin": 12.066,
+      "vmin": 12.061,
       "capacityAh": 47.9,
       "fitR": 0.958,
       "whPerV": 433,
@@ -2603,10 +2603,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 29.9,
+      "pvPeakNowW": 30,
       "pvPeakInitialW": 30.3,
-      "loadWhPerDay": 101.8,
-      "genWhPerDay": 128,
+      "loadWhPerDay": 101.9,
+      "genWhPerDay": 128.2,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.04,
@@ -2668,7 +2668,7 @@
         12.106,
         12.097,
         12.08,
-        12.071
+        12.049
       ],
       "swaps": [
         "2026-09-10",
@@ -2709,16 +2709,16 @@
         "from": "2026-09-29",
         "to": "2026-10-09",
         "days": 10,
-        "tempC": 21.9,
+        "tempC": 21.8,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 21.4,
+      "pvPeakNowW": 21,
       "pvPeakInitialW": 20.2,
-      "loadWhPerDay": 98.7,
-      "genWhPerDay": 104.8,
+      "loadWhPerDay": 98.2,
+      "genWhPerDay": 105.7,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.49,
@@ -2780,7 +2780,7 @@
         12.453,
         12.449,
         12.365,
-        12.313
+        12.295
       ],
       "swaps": [
         "2026-09-29"
@@ -2799,7 +2799,7 @@
       "mvPerAhNow": 13,
       "mvPerAhPrev": 46.9,
       "nightNights": 19,
-      "nightGenMaxWh": 103
+      "nightGenMaxWh": 104
     },
     "cam55": {
       "days": 119,
@@ -2814,22 +2814,22 @@
       "enduranceH": 33.1,
       "usableAh": 32.68,
       "capacityInitialAh": null,
-      "capacityNowAh": 56.2,
+      "capacityNowAh": 56.3,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-22",
         "to": "2026-10-09",
         "days": 17,
-        "tempC": 22.5,
+        "tempC": 22.4,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 28.8,
+      "pvPeakNowW": 29,
       "pvPeakInitialW": 30.1,
-      "loadWhPerDay": 105.5,
-      "genWhPerDay": 124.7,
+      "loadWhPerDay": 105.6,
+      "genWhPerDay": 124.8,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.29,
@@ -2891,7 +2891,7 @@
         12.339,
         12.352,
         12.3,
-        12.423
+        12.383
       ],
       "swaps": [
         "2026-09-11",
@@ -2907,11 +2907,11 @@
       "capDaysAfterSwap": 18,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 112,
-      "mvPerAhNow": 9.5,
-      "mvPerAhPrev": 11,
-      "nightNights": 27,
-      "nightGenMaxWh": 146
+      "sohPct": 113,
+      "mvPerAhNow": 9.2,
+      "mvPerAhPrev": 11.2,
+      "nightNights": 26,
+      "nightGenMaxWh": 147
     },
     "cam54": {
       "days": 119,
@@ -2938,10 +2938,10 @@
       },
       "initialWindow": null,
       "spanDays": 119,
-      "pvPeakNowW": 29.3,
+      "pvPeakNowW": 29.5,
       "pvPeakInitialW": 30.2,
       "loadWhPerDay": 108,
-      "genWhPerDay": 113.9,
+      "genWhPerDay": 117.6,
       "vminFrom": "2026-08-11",
       "vminDays": [
         12.24,
@@ -3003,7 +3003,7 @@
         12.15,
         12.207,
         12.146,
-        12.154
+        12.124
       ],
       "swaps": [
         "2026-09-11",
@@ -3024,7 +3024,7 @@
       "mvPerAhNow": 10.8,
       "mvPerAhPrev": 10.9,
       "nightNights": 26,
-      "nightGenMaxWh": 147
+      "nightGenMaxWh": 146
     }
   }
 }
