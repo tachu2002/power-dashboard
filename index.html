@@ -3139,11 +3139,26 @@
   // 短時間(直近60分)の水位上昇幅が大きい拠点を検出する(マップ上のアイコン強調用)。
   var RISE_ALERT_WINDOW_MS = 60 * 60 * 1000;
   var RISE_ALERT_THRESHOLD_M = 0.2;
+  /* センサーの無効値(2026-10-11)。
+     上町樋管は「サーバー(直接取得)」の水位が −5.703m に張り付くことがあり(直近9日で185回、ふだんは0.03m前後)、
+     そこから正しい値に戻っただけで「1時間で574cm上昇」と出ていた。梅名樋管2号(−5.78m)・大場川左岸2.3k(−5.39m)
+     なども同じ形。川の水位がふだんより2m以上下がることはないので、その拠点の手持ちの水位の上位25%点より
+     2m以上低い値は無効値とみなし、急上昇の計算に使わない。
+     北沢アンダーパス(ふだん −4.58m)や長泉の拠点(ふだん −15m台)のように、もともとマイナスの拠点は
+     その拠点自身の水準と比べるので影響しない。 */
+  var WATER_INVALID_DROP_M = 2.0;
+  function waterValidFloor(points) {
+    var v = points.map(function (p) { return p.waterLevelM; }).sort(function (a, b) { return a - b; });
+    if (v.length < 4) return -Infinity;
+    return v[Math.floor(v.length * 0.75)] - WATER_INVALID_DROP_M;
+  }
   function recentRiseM(site) {
     if (!site.hasWater) return null;
     var s = siteStates[site.id];
     if (!s) return null;
     var pts = s.points.filter(function (p) { return typeof p.waterLevelM === "number"; });
+    var floorM = waterValidFloor(pts);
+    pts = pts.filter(function (p) { return p.waterLevelM >= floorM; });
     if (pts.length < 2) return null;
     var latest = pts[pts.length - 1];
     var cutoff = latest.fetchedAt.getTime() - RISE_ALERT_WINDOW_MS;
@@ -7087,6 +7102,7 @@
   window.__dashboardDebug = {
     // --- 2026-10 デザイン見直し: いま見るべき水位 ---
     renderWaterStrip: renderWaterStrip, waterAlertOf: waterAlertOf,
+    recentRiseM: recentRiseM,
     // --- Request N (2026-09-13): ライブカメラ一覧のタイムラプス・桜川の発電対応 ---
     getCamlistPlaybackState: function () { return camlistPlaybackState; },
     startCamlistPlayback: startCamlistPlayback, stopCamlistPlayback: stopCamlistPlayback,
