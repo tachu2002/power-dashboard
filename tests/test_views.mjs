@@ -187,7 +187,14 @@ export async function run() {
       const high = read();
       s.points = keep.concat([mk(50, 2.05), mk(5, 2.10)]);          // 水防団待機水位だけ超え
       const rsrv = read();
-      return { high, rsrv };
+      // センサーの無効値(ふだんより2m以上低い −5.70m)から正しい値に戻っただけでは「急上昇」にしない(上町樋管 10/11)
+      const base = Array.from({ length: 12 }, (_, i) => mk(600 - i * 30, 0.50 + (i % 3) * 0.01));
+      s.points = keep.concat(base, [mk(50, -5.703), mk(20, -5.703), mk(5, 0.52)]);
+      const glitch = { rise: d.recentRiseM(d.SITE_CATALOG.kw01), strip: read() };
+      // 本当に上がった場合(0.50 → 0.80m)は従来どおり急上昇
+      s.points = keep.concat(base, [mk(50, 0.50), mk(5, 0.80)]);
+      const real = d.recentRiseM(d.SITE_CATALOG.kw01);
+      return { high, rsrv, glitch, real };
     } finally { s.points = keep; d.renderWaterStrip(); }
   });
   const chipsOf = (res, i) => res.tiles[i] ? res.tiles[i].chips.join(" ") : "";
@@ -200,6 +207,11 @@ export async function run() {
     chipsOf(water.high, 2).indexOf("下神川橋") >= 0 && chipsOf(water.high, 2).indexOf("+32cm") >= 0, water.high);
   r.check("v8-d 水防団待機水位だけ超えた拠点は2段目に出し、1段目には出さない",
     chipsOf(water.rsrv, 1).indexOf("下神川橋") >= 0 && chipsOf(water.rsrv, 0).indexOf("下神川橋") < 0, water.rsrv);
+
+  r.check("v8-e センサーの無効値(−5.70m)から戻っただけの変化は「急に上がっている」に出さない",
+    !(water.glitch.rise >= 0.2) && chipsOf(water.glitch.strip, 2).indexOf("下神川橋") < 0, water.glitch);
+  r.check("v8-f 本当の上昇(1時間で30cm)は従来どおり急上昇と判定する",
+    Math.abs(water.real - 0.30) < 0.001, water.real);
 
   r.check("v7-a 一連の操作でページ例外が発生しない", page.errMsgs().length === 0, page.errMsgs());
 
