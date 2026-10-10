@@ -36,6 +36,13 @@
     --accent-strong:  #007ba8;
     --accent-bright:  #29b6f6;
     --accent-contrast:#ffffff;
+    /* 状態の色(2026-10 見直し)。系列の色とは別に固定し、必ず言葉・記号と一緒に使う。 */
+    --status-critical: #d03b3b;
+    --status-warn:     #fab219;
+    --status-warn-text:#8a5a00;
+    --status-ok:       #0ca30c;
+    --status-calm:     #8fbfa3;
+    --shadow-soft:     0 1px 2px rgba(10,50,70,0.06), 0 2px 8px rgba(10,50,70,0.05);
   }
   @media (prefers-color-scheme: dark) {
     :root:where(:not([data-theme="light"])) {
@@ -65,6 +72,12 @@
       --accent-strong:  #0c5c78;
       --accent-bright:  #1c8fb8;
       --accent-contrast:#ffffff;
+      --status-critical: #e05c5c;
+      --status-warn:     #fab219;
+      --status-warn-text:#f5c04a;
+      --status-ok:       #2fbf2f;
+      --status-calm:     #4f8f6b;
+      --shadow-soft:     none;
     }
   }
   :root[data-theme="dark"] {
@@ -94,6 +107,12 @@
     --surface-2:      #123040;
     --delta-up:       #5aa6f5;
     --delta-down:     #e05c5c;
+    --status-critical: #e05c5c;
+    --status-warn:     #fab219;
+    --status-warn-text:#f5c04a;
+    --status-ok:     #2fbf2f;
+    --status-calm:     #4f8f6b;
+    --shadow-soft:     none;
   }
 
   * { box-sizing: border-box; }
@@ -203,14 +222,14 @@
      (配色・背景のイメージのみの変更で、構成・機能は従来通り)。帯の中だけ配色トークンを上書きし、
      子要素(サイドバー切替ボタン・アクセスカウンター等)が自動的に白系の配色へ追従するようにしている。 */
   .top-header {
-    padding: 16px 20px;
+    padding: 14px 18px;
     border-bottom: none;
-    border-radius: 14px;
-    margin-bottom: 18px;
+    border-radius: 12px;
+    margin-bottom: 16px;
     display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap;
     background: linear-gradient(100deg, var(--accent-strong), var(--accent-bright));
     color: var(--accent-contrast);
-    box-shadow: 0 4px 16px rgba(0,70,100,0.22);
+    box-shadow: 0 1px 3px rgba(0,70,100,0.18);
     --text-primary:   var(--accent-contrast);
     --text-secondary: rgba(255,255,255,0.88);
     --text-muted:     rgba(255,255,255,0.72);
@@ -351,7 +370,7 @@
   .grid-power {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 16px;
   }
   @media (max-width: 1500px) { .grid-power { grid-template-columns: repeat(3, 1fr); } }
@@ -359,11 +378,11 @@
   @media (max-width: 640px) { .grid-power { grid-template-columns: 1fr; } }
 
   .card {
-    background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px;
-    padding: 10px 12px 10px; min-width: 0; overflow: hidden;
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px 10px; min-width: 0; overflow: hidden; box-shadow: var(--shadow-soft);
   }
-  .card.state-warn { border: 3px solid var(--warn-border); background: var(--warn-bg); padding: 8px 10px 8px; }
-  .card.state-critical { border: 3px solid var(--critical-border); background: var(--critical-bg); padding: 8px 10px 8px; }
+  .card.state-warn { border: 2px solid var(--warn-border); background: var(--warn-bg); padding: 11px 13px 9px; }
+  .card.state-critical { border: 2px solid var(--critical-border); background: var(--critical-bg); padding: 11px 13px 9px; }
   .bat-alert-line {
     display: none; align-items: center; gap: 5px; font-size: 11px; font-weight: 600;
     margin-top: 6px; padding: 4px 8px; border-radius: 6px; line-height: 1.3;
@@ -690,6 +709,76 @@
   .chart-legend:empty { display: none; margin-top: 0; }
   .chart-legend-chip { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-secondary); }
   .chart-legend-dot { width: 9px; height: 9px; border-radius: 2px; flex: none; }
+
+  /* ===================== いま見るべき拠点(2026-10 見直し) =====================
+     電源監視の先頭に、持ち比較と同じ判定で「停止中／12時間もたない／24時間もたない／余裕あり」を並べる。
+     色だけに頼らず、見出しの言葉と記号(■▲●✓)で区別する。 */
+  .attention-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 12px; }
+  .attention-strip[hidden] { display: none; }
+  .attention-tile {
+    background: var(--surface-1); border: 1px solid var(--border); border-radius: 12px;
+    padding: 12px 14px; min-width: 0; display: flex; flex-direction: column; gap: 2px; box-shadow: var(--shadow-soft);
+  }
+  .attention-head { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 700; color: var(--text-primary); }
+  .attention-mark { font-size: 12px; line-height: 1; width: 14px; text-align: center; color: var(--text-muted); }
+  .attention-count { display: flex; align-items: baseline; gap: 4px; margin-top: 2px; }
+  .attention-count .n { font-size: 30px; font-weight: 700; line-height: 1.1; color: var(--text-primary); }
+  .attention-count .u { font-size: 12px; color: var(--text-secondary); }
+  .attention-sub { font-size: 11px; color: var(--text-muted); }
+  .attention-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .attention-note { font-size: 12px; color: var(--text-secondary); }
+  .attention-chip {
+    display: inline-flex; align-items: baseline; gap: 6px; font-size: 12px; padding: 4px 10px;
+    border-radius: 99px; border: 1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+  }
+  .attention-chip .nm { font-weight: 600; }
+  .attention-chip .vv { color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .attention-chip:hover { border-color: var(--accent); filter: none; }
+  .attention-chip:focus-visible, .attention-tile button:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  /* 該当がある区分だけ色を付ける(0件の区分は静かなまま) */
+  .attention-tile.tone-stop.has-items, .attention-tile.tone-critical.has-items {
+    border-color: var(--status-critical); background: var(--critical-bg); }
+  .attention-tile.tone-stop.has-items .attention-mark,
+  .attention-tile.tone-critical.has-items .attention-mark { color: var(--status-critical); }
+  .attention-tile.tone-warn.has-items { border-color: var(--status-warn); background: var(--warn-bg); }
+  .attention-tile.tone-warn.has-items .attention-mark { color: var(--status-warn-text); }
+  .attention-tile.tone-calm .attention-mark { color: var(--status-ok); }
+  @media (max-width: 1100px) { .attention-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 520px) {
+    .top-header h1 { font-size: 18px; }
+    .top-header { padding: 12px 14px; }
+    .attention-strip { gap: 8px; }
+    .attention-tile { padding: 10px 12px; }
+    .attention-count .n { font-size: 24px; }
+  }
+
+  /* 各カードの上端に、持ちの区分を色帯で示す(区分名は「持ち」の見出しにも添える) */
+  .card[data-endurance] { position: relative; }
+  .card[data-endurance="stop"], .card[data-endurance="critical"] { box-shadow: inset 0 3px 0 var(--status-critical), var(--shadow-soft); }
+  .card[data-endurance="warn"] { box-shadow: inset 0 3px 0 var(--status-warn), var(--shadow-soft); }
+  .card[data-endurance="stop"] .battery-health .stat-label::after,
+  .card[data-endurance="critical"] .battery-health .stat-label::after,
+  .card[data-endurance="warn"] .battery-health .stat-label::after {
+    font-size: 9.5px; font-weight: 700; padding: 0 6px; border-radius: 99px; margin-left: 2px; line-height: 15px;
+  }
+  .card[data-endurance="stop"] .battery-health .stat-label::after { content: "停止"; background: var(--status-critical); color: #fff; }
+  .card[data-endurance="critical"] .battery-health .stat-label::after { content: "12h未満"; background: var(--status-critical); color: #fff; }
+  .card[data-endurance="warn"] .battery-health .stat-label::after { content: "24h未満"; background: var(--status-warn); color: #3a2a00; }
+  .battery-health .health-value { font-size: 18px; }
+  .mini-stats .stat-value { font-size: 17px; }
+
+  /* 持ち比較やチップから移動してきたカードを一瞬だけ強調する */
+  @keyframes jumpFlash { 0% { outline-color: var(--accent); } 100% { outline-color: transparent; } }
+  .card.jump-flash, .simple-card.jump-flash { outline: 3px solid var(--accent); outline-offset: 2px; animation: jumpFlash 1.8s ease-out forwards; }
+  @media (prefers-reduced-motion: reduce) { .card.jump-flash, .simple-card.jump-flash { animation: none; } }
+
+  /* 見出しまわりの整理 */
+  h2.view-title { font-size: 21px; letter-spacing: 0.01em; }
+  .toolbar { box-shadow: var(--shadow-soft); border-radius: 12px; }
+  .health-scatter-card, .health-table-card { padding: 14px 16px 12px; }
+  .health-scatter-card h2, .health-table-card h2 { font-size: 15px; }
+  .simple-card { border-radius: 12px; box-shadow: var(--shadow-soft); padding: 12px 14px 12px; }
+  #powerSortBtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); font-weight: 600; }
 </style>
 </head>
 <body>
@@ -749,11 +838,14 @@
             <div class="toolbar">
               <div class="status" id="statusText"><span class="dot pending" id="statusDot"></span>読み込み中…</div>
               <button id="refreshBtn">全拠点を今すぐ更新</button>
+              <button id="powerSortBtn" type="button" aria-pressed="false">並び：河川順</button>
               <button id="healthTableBtn">健全性の一覧</button>
               <button id="tableBtn">表で表示</button>
             </div>
           </div>
         </div>
+
+        <section class="attention-strip" id="attentionStrip" aria-label="いま見るべき拠点" hidden></section>
 
         <div class="card health-scatter-card" id="healthScatterCard">
           <div class="site-card-header">
@@ -935,6 +1027,7 @@
             <button id="graphlistRefreshBtn">全拠点を今すぐ更新</button>
           </div>
         </div>
+        <section class="attention-strip" id="waterAttentionStrip" aria-label="いま見るべき水位" hidden></section>
         <div class="notice-banner" id="forecastDisclaimer">
           ご注意（予測表示について）: 各カードの「6時間後（参考）」「12時間後（参考）」は、AIによる予測ではなく、各拠点自身の直近水位の単純な統計的トレンド（最小二乗法による線形外挿）に、気象庁(JMA)公開のAMeDAS観測点の直近降水量から算出した簡易な補正係数を掛け合わせただけの参考値です。公式の予測・避難判断には使用しないでください。
         </div>
@@ -1424,11 +1517,13 @@
     return isDark() ? {
       textPrimary: "#eaf6fb", textSecondary: "#a9c3cf", textMuted: "#7e97a2",
       gridline: "#1c3641", baseline: "#2c4a56", surface: "#0f2733",
-      pv: "#3987e5", bat: "#d95926", rated: "#e66767", water: "#3987e5", rain: "#4fd1e5"
+      pv: "#3987e5", bat: "#d95926", rated: "#e66767", water: "#3987e5", rain: "#4fd1e5",
+      critical: "#e05c5c", warn: "#fab219", ok: "#0ca30c", calm: "#4f8f6b"
     } : {
       textPrimary: "#0b1c24", textSecondary: "#4c6672", textMuted: "#7d99a3",
       gridline: "#cfe6ee", baseline: "#a9cbd6", surface: "#f3fafd",
-      pv: "#2a78d6", bat: "#eb6834", rated: "#d63b3b", water: "#2a78d6", rain: "#0ea5b3"
+      pv: "#2a78d6", bat: "#eb6834", rated: "#d63b3b", water: "#2a78d6", rain: "#0ea5b3",
+      critical: "#d03b3b", warn: "#e59a00", ok: "#0ca30c", calm: "#8fbfa3"
     };
   }
   function niceRainMaxMm(v) {
@@ -1922,7 +2017,24 @@
         return (a.hours || 0) - (b.hours || 0);
       });
 
-      var rowH = 19, marginTop = 26, marginBottom = 24, marginLeft = 118, marginRight = 58;
+      /* 見た目(2026-10 見直し): 棒は細く(12px)、危ない拠点(12h・24h未満・停止)だけを濃く塗り、
+         余裕のある拠点は淡い色に落として、目が自然に上の数本へ向かうようにする。
+         値の文字は棒の色ではなく文字色で出す(黄色の文字は白地で読めないため)。
+         右の余白は、いちばん長い値の文字に合わせて広げる(「継続可（24h内最低…）」が切れていたため)。 */
+      var rowH = 22, marginTop = 26, marginBottom = 18, marginLeft = 118;
+      var valueTextOf = function (r) {
+        var noSun = r.src.indexOf("日射ゼロ時") === 0;
+        return r.cut ? stopLabel(r.cut)
+          : (r.sustain ? "継続可" + (typeof r.minSoc === "number" ? "（24h内最低" + r.minSoc + "%）" : "")
+            : fmtEndurance(r.hours)) + (noSun ? " ※" : "") + (r.swapped ? " 交換後" : "");
+      };
+      // 幅が狭い(スマホ)ときは、継続可の値を棒の右端の内側に重ねて置き、右の余白は短い値に合わせる
+      var narrowW = (container.clientWidth || 720) < 640;
+      if (narrowW) marginLeft = 108;
+      var longest = rows.reduce(function (m, r) {
+        return (narrowW && r.sustain) ? m : Math.max(m, valueTextOf(r).length);
+      }, 4);
+      var marginRight = Math.min(220, Math.max(64, 16 + longest * 11));
       var H = Math.max(160, marginTop + marginBottom + rows.length * rowH);
       container.style.height = H + "px";
       var W = Math.max(360, container.clientWidth || 720);
@@ -1931,7 +2043,7 @@
       svg.setAttribute("viewBox", "0 0 " + W + " " + H);
       svg.setAttribute("preserveAspectRatio", "none");
       tooltip.style.opacity = 0;
-      if (!rows.length) return;
+      if (!rows.length) { applyEnduranceRanking(rows); return; }
       var pal = palette();
       var maxH = rows.reduce(function (m, r) { return Math.max(m, r.sustain ? 0 : (r.hours || 0)); }, 0);
       var cap = Math.min(ENDURANCE_CHART_CAP_H, Math.max(24, Math.ceil(maxH / 12) * 12));
@@ -1948,20 +2060,22 @@
           fill: isThreshold ? (t === 12 ? (pal.critical || "#d03b3b") : t === 24 ? (pal.warn || "#c98a00") : (pal.ok || "#2e9e63")) : pal.textMuted,
           "font-size": 10, "font-weight": isThreshold ? 600 : 400, "font-family": FONT });
         lbl.textContent = t === 0 ? "今" : (t >= 24 ? (t / 24) + "日" : t + "h");
+        // 狭いときは、しきい値以外の目盛りの文字を省く(重なって読めなくなるため)
+        if (plotW < 360 && !isThreshold && t !== 0) lbl.textContent = "";
         svg.appendChild(lbl);
       }
 
       rows.forEach(function (r, i) {
         var y = marginTop + i * rowH;
         var cy = y + rowH / 2;
-        var cls = r.sustain ? "ok" : enduranceClass(r.hours);
-        var color = cls === "critical" ? (pal.critical || "#d03b3b")
-          : cls === "warn" ? (pal.warn || "#c98a00")
-            : cls === "ok" ? (pal.ok || "#2e9e63") : pal.bat;
+        var cls = r.cut ? "critical" : r.sustain ? "ok" : enduranceClass(r.hours);
+        var urgent = cls === "critical" || cls === "warn";
+        var color = cls === "critical" ? pal.critical : cls === "warn" ? pal.warn : pal.calm;
         // 拠点名
         var nameEl = el("text", { class: "endurance-name", x: marginLeft - 8, y: cy,
           "text-anchor": "end", "dominant-baseline": "middle",
-          fill: pal.textSecondary, "font-size": 11, "font-family": FONT });
+          fill: urgent ? pal.textPrimary : pal.textSecondary, "font-size": 11,
+          "font-weight": urgent ? 600 : 400, "font-family": FONT });
         nameEl.textContent = r.name; svg.appendChild(nameEl);
         // 棒
         var over = !r.sustain && r.hours > cap;
@@ -1969,8 +2083,8 @@
         // 日射予報を使えない拠点(日射ゼロ前提)は、塗りを薄くし枠線を点線にして区別する。
         var noSunRow = r.src.indexOf("日射ゼロ時") === 0;
         var bar = el("rect", { class: "endurance-bar", "data-site": r.id,
-          x: marginLeft, y: y + 3, width: barW, height: rowH - 7, rx: 3,
-          fill: color, opacity: noSunRow ? 0.3 : 0.85,
+          x: marginLeft, y: y + 5, width: barW, height: rowH - 10, rx: 4,
+          fill: color, opacity: noSunRow ? 0.3 : (urgent ? 1 : 0.55),
           stroke: noSunRow ? color : "none", "stroke-width": noSunRow ? 1 : 0,
           "stroke-dasharray": noSunRow ? "3 2" : "" });
         bar.style.cursor = "pointer";
@@ -1979,18 +2093,18 @@
         if (over || r.sustain) {
           var tip = el("path", { d: "M" + (marginLeft + plotW + 2) + " " + (cy - 4) +
             "L" + (marginLeft + plotW + 8) + " " + cy + "L" + (marginLeft + plotW + 2) + " " + (cy + 4) + "Z",
-            fill: color, opacity: 0.85 });
+            fill: color, opacity: urgent ? 1 : 0.55 });
           svg.appendChild(tip);
         }
         // 値
-        var vEl = el("text", { class: "endurance-value", x: W - marginRight + 12, y: cy,
-          "text-anchor": "start", "dominant-baseline": "middle",
-          fill: color, "font-size": 11, "font-weight": 700, "font-family": FONT });
+        var inside = narrowW && r.sustain;
+        var vEl = el("text", { class: "endurance-value", x: inside ? marginLeft + plotW - 6 : W - marginRight + 12, y: cy,
+          "text-anchor": inside ? "end" : "start", "dominant-baseline": "middle",
+          fill: urgent ? pal.textPrimary : pal.textSecondary, "font-size": 11,
+          "font-weight": urgent ? 700 : 500, "font-family": FONT });
         // 今日載せ替えた拠点は、交換後の電池で数えていることが分かるようにする
         // 継続可の拠点は、並び順の根拠になっている「24時間以内の最低残量」を添える
-        vEl.textContent = r.cut ? stopLabel(r.cut)
-          : (r.sustain ? "継続可" + (typeof r.minSoc === "number" ? "（24h内最低" + r.minSoc + "%）" : "")
-            : fmtEndurance(r.hours)) + (noSunRow ? " ※" : "") + (r.swapped ? " 交換後" : "");
+        vEl.textContent = valueTextOf(r);
         svg.appendChild(vEl);
 
         function show() {
@@ -2015,9 +2129,130 @@
         bar.addEventListener("pointerenter", show);
         bar.addEventListener("pointermove", show);
         bar.addEventListener("pointerleave", function () { tooltip.style.opacity = 0; });
+        bar.addEventListener("click", function () { jumpToPowerCard(r.id); });
       });
+      applyEnduranceRanking(rows);
     }
     return { render: render };
+  }
+
+  /* ---------------------------------------------------------------------
+   * いま見るべき拠点(電源監視の先頭) と カードの並び替え
+   * -----------------------------------------------------------------------
+   * 持ち比較と同じ判定で、拠点を「停止中／12時間もたない／24時間もたない／余裕あり」に分け、
+   * 件数と拠点名を先頭に出す(色だけに頼らず、見出しの言葉と記号でも区別する)。
+   * 拠点名を押すと、その拠点のカードへ移動する。
+   * カードは河川順(上流→下流)が既定。「並び：危ない順」に切り替えると持ち比較と同じ順に並ぶ
+   * (並べ替えは CSS の order で行い、要素の順番そのものは変えない)。 */
+  var POWER_SORT_KEY = "powerCardSort";
+  var powerCardSort = "river";
+  try { if (localStorage.getItem(POWER_SORT_KEY) === "risk") powerCardSort = "risk"; } catch (e) { /* 保存できない環境では既定のまま */ }
+  var lastEnduranceRows = [];
+  function enduranceGroupOf(r) {
+    if (r.cut) return "stop";
+    if (r.sustain) return "calm";
+    var c = enduranceClass(r.hours);
+    return c === "critical" ? "critical" : c === "warn" ? "warn" : "calm";
+  }
+  function jumpToPowerCard(siteId) {
+    var st = siteStates[siteId];
+    var card = st && st.powerCardEl;
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("jump-flash");
+    void card.offsetWidth;
+    card.classList.add("jump-flash");
+    setTimeout(function () { card.classList.remove("jump-flash"); }, 1800);
+  }
+  function applyPowerCardOrder() {
+    var rank = {};
+    lastEnduranceRows.forEach(function (r, i) { rank[r.id] = i; });
+    POWER_SITES.forEach(function (site) {
+      var card = siteStates[site.id] && siteStates[site.id].powerCardEl;
+      if (!card) return;
+      card.style.order = powerCardSort === "risk" ? (site.id in rank ? rank[site.id] : 999) : "";
+    });
+    var btn = document.getElementById("powerSortBtn");
+    if (btn) {
+      btn.textContent = powerCardSort === "risk" ? "並び：危ない順" : "並び：河川順";
+      btn.setAttribute("aria-pressed", powerCardSort === "risk" ? "true" : "false");
+    }
+  }
+  function applyEnduranceRanking(rows) {
+    lastEnduranceRows = rows.slice();
+    // カードに「どの区分か」を持たせる(上端の色帯と、持ちの欄の見出しに使う)
+    var groupOf = {};
+    rows.forEach(function (r) { groupOf[r.id] = enduranceGroupOf(r); });
+    POWER_SITES.forEach(function (site) {
+      var card = siteStates[site.id] && siteStates[site.id].powerCardEl;
+      if (!card) return;
+      if (groupOf[site.id]) card.setAttribute("data-endurance", groupOf[site.id]);
+      else card.removeAttribute("data-endurance");
+    });
+    applyPowerCardOrder();
+    renderAttentionStrip(rows);
+  }
+  var ATTENTION_GROUPS = [
+    { key: "stop", mark: "■", title: "停止中", sub: "電池切れ・データ停止を含む", empty: "ありません" },
+    { key: "critical", mark: "▲", title: "12時間もたない", sub: "今夜のうちに下限へ", empty: "ありません" },
+    { key: "warn", mark: "●", title: "24時間もたない", sub: "明日までに下限へ", empty: "ありません" },
+    { key: "calm", mark: "✓", title: "余裕あり", sub: "24時間以上もつ", empty: "—" }
+  ];
+  function renderAttentionStrip(rows) {
+    var box = document.getElementById("attentionStrip");
+    if (!box) return;
+    while (box.firstChild) box.removeChild(box.firstChild);
+    if (!rows.length) { box.hidden = true; return; }
+    box.hidden = false;
+    ATTENTION_GROUPS.forEach(function (g) {
+      var list = rows.filter(function (r) { return enduranceGroupOf(r) === g.key; });
+      var tile = document.createElement("div");
+      tile.className = "attention-tile tone-" + g.key + (list.length ? " has-items" : "");
+      var head = document.createElement("div");
+      head.className = "attention-head";
+      var mark = document.createElement("span");
+      mark.className = "attention-mark"; mark.setAttribute("aria-hidden", "true"); mark.textContent = g.mark;
+      var title = document.createElement("span");
+      title.className = "attention-title"; title.textContent = g.title;
+      head.appendChild(mark); head.appendChild(title);
+      var count = document.createElement("div");
+      count.className = "attention-count";
+      count.innerHTML = '<span class="n"></span><span class="u">拠点</span>';
+      count.querySelector(".n").textContent = list.length;
+      var sub = document.createElement("div");
+      sub.className = "attention-sub"; sub.textContent = g.sub;
+      tile.appendChild(head); tile.appendChild(count); tile.appendChild(sub);
+      var chips = document.createElement("div");
+      chips.className = "attention-chips";
+      if (g.key === "calm") {
+        // 余裕のある拠点は名前を並べず、いちばん短い拠点だけ添える
+        var shortest = list.filter(function (r) { return !r.sustain; })[0];
+        var note = document.createElement("div");
+        note.className = "attention-note";
+        note.textContent = !list.length ? g.empty
+          : shortest ? "いちばん短いのは " + shortest.name + "（" + fmtEndurance(shortest.hours) + "）"
+            : "すべて7日先まで継続可";
+        chips.appendChild(note);
+      } else if (!list.length) {
+        var none = document.createElement("div");
+        none.className = "attention-note"; none.textContent = g.empty;
+        chips.appendChild(none);
+      } else {
+        list.forEach(function (r) {
+          var b = document.createElement("button");
+          b.type = "button"; b.className = "attention-chip";
+          var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = r.name;
+          var vv = document.createElement("span"); vv.className = "vv";
+          vv.textContent = r.cut ? stopLabel(r.cut) : fmtEndurance(r.hours);
+          b.appendChild(nm); b.appendChild(vv);
+          b.title = r.name + "のカードへ移動";
+          b.addEventListener("click", function () { jumpToPowerCard(r.id); });
+          chips.appendChild(b);
+        });
+      }
+      tile.appendChild(chips);
+      box.appendChild(tile);
+    });
   }
 
   var healthScatter = null;
@@ -4563,6 +4798,100 @@
     }
     updateGraphlistDelta(site);
     updateForecastReadouts(site);
+    scheduleWaterStrip();
+  }
+
+  /* ---------------------------------------------------------------------
+   * いま見るべき水位(水位変化グラフ一覧の先頭・2026-10 見直し)
+   * -----------------------------------------------------------------------
+   * 国交省の公式基準水位を超えている拠点と、1時間で20cm以上上がった拠点を先頭にまとめる。
+   * 基準水位は「氾濫注意水位以上(注意・避難判断・特別警戒・氾濫危険・氾濫開始・危険)」と
+   * 「水防団待機水位以上」の2段で数える(観測開始水位は警戒の基準ではないので使わない)。 */
+  var WATER_ALERT_KEYS = ["warnStg", "dsgnMoblzdStg", "spclWarnStg", "dngStg", "fldStgHght", "dngStgHght"];
+  function latestWaterLevel(site) {
+    var s = siteStates[site.id];
+    if (!s) return null;
+    var pts = s.points.filter(waterLevelFilter);
+    return pts.length ? pts[pts.length - 1].waterLevelM : null;
+  }
+  function waterAlertOf(site) {
+    var v = latestWaterLevel(site);
+    if (typeof v !== "number") return null;
+    var th = getThresholdsForSite(site);
+    var hit = null;
+    th.forEach(function (t) {
+      if (typeof t.value !== "number" || v < t.value) return;
+      if (WATER_ALERT_KEYS.indexOf(t.key) >= 0) { if (!hit || hit.level < 2 || t.value > hit.value) hit = { level: 2, label: t.label, value: t.value }; }
+      else if (t.key === "rsrvStg" && !hit) hit = { level: 1, label: t.label, value: t.value };
+    });
+    return { v: v, hit: hit, rise: recentRiseM(site) };
+  }
+  var waterStripTimer = null;
+  function scheduleWaterStrip() {
+    if (waterStripTimer) return;
+    waterStripTimer = setTimeout(function () { waterStripTimer = null; renderWaterStrip(); }, 0);
+  }
+  function jumpToGraphCard(siteId) {
+    var card = siteStates[siteId] && siteStates[siteId].graphCardEl;
+    if (!card) return;
+    card.scrollIntoView({ behavior: "smooth", block: "center" });
+    card.classList.remove("jump-flash"); void card.offsetWidth; card.classList.add("jump-flash");
+    setTimeout(function () { card.classList.remove("jump-flash"); }, 1800);
+  }
+  function renderWaterStrip() {
+    var box = document.getElementById("waterAttentionStrip");
+    if (!box) return;
+    var rows = [];
+    GRAPHLIST_SITES.forEach(function (site) {
+      var a = waterAlertOf(site);
+      if (a) rows.push({ id: site.id, name: site.name.replace(/（.*$/, ""), a: a });
+    });
+    while (box.firstChild) box.removeChild(box.firstChild);
+    if (!rows.length) { box.hidden = true; return; }
+    box.hidden = false;
+    var fmtM = function (v) { return v.toFixed(2) + "m"; };
+    var groups = [
+      { key: "critical", mark: "▲", title: "氾濫注意水位以上", sub: "注意・避難判断・危険水位のいずれか以上",
+        list: rows.filter(function (r) { return r.a.hit && r.a.hit.level === 2; }),
+        val: function (r) { return fmtM(r.a.v) + "（" + r.a.hit.label + " " + fmtM(r.a.hit.value) + "）"; } },
+      { key: "warn", mark: "●", title: "水防団待機水位以上", sub: "国交省の基準水位による",
+        list: rows.filter(function (r) { return r.a.hit && r.a.hit.level === 1; }),
+        val: function (r) { return fmtM(r.a.v); } },
+      { key: "warn", mark: "↑", title: "急に上がっている", sub: "1時間で" + Math.round(RISE_ALERT_THRESHOLD_M * 100) + "cm以上の上昇",
+        list: rows.filter(function (r) { return typeof r.a.rise === "number" && r.a.rise >= RISE_ALERT_THRESHOLD_M; }),
+        val: function (r) { return "+" + Math.round(r.a.rise * 100) + "cm"; } },
+      { key: "calm", mark: "✓", title: "平常", sub: "基準水位未満・急な上昇なし",
+        list: rows.filter(function (r) { return !r.a.hit && !(typeof r.a.rise === "number" && r.a.rise >= RISE_ALERT_THRESHOLD_M); }) }
+    ];
+    groups.forEach(function (g) {
+      var tile = document.createElement("div");
+      tile.className = "attention-tile tone-" + g.key + (g.list.length ? " has-items" : "");
+      var head = document.createElement("div"); head.className = "attention-head";
+      var mark = document.createElement("span"); mark.className = "attention-mark"; mark.setAttribute("aria-hidden", "true"); mark.textContent = g.mark;
+      var title = document.createElement("span"); title.className = "attention-title"; title.textContent = g.title;
+      head.appendChild(mark); head.appendChild(title);
+      var count = document.createElement("div"); count.className = "attention-count";
+      count.innerHTML = '<span class="n"></span><span class="u">拠点</span>';
+      count.querySelector(".n").textContent = g.list.length;
+      var sub = document.createElement("div"); sub.className = "attention-sub"; sub.textContent = g.sub;
+      var chips = document.createElement("div"); chips.className = "attention-chips";
+      if (g.key === "calm" || !g.list.length) {
+        var note = document.createElement("div"); note.className = "attention-note";
+        note.textContent = g.key === "calm" ? "水位を取得できた全" + rows.length + "拠点で確認" : "ありません";
+        chips.appendChild(note);
+      } else {
+        g.list.forEach(function (r) {
+          var b = document.createElement("button"); b.type = "button"; b.className = "attention-chip";
+          var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = r.name;
+          var vv = document.createElement("span"); vv.className = "vv"; vv.textContent = g.val(r);
+          b.appendChild(nm); b.appendChild(vv); b.title = r.name + "のグラフへ移動";
+          b.addEventListener("click", function () { jumpToGraphCard(r.id); });
+          chips.appendChild(b);
+        });
+      }
+      tile.appendChild(head); tile.appendChild(count); tile.appendChild(sub); tile.appendChild(chips);
+      box.appendChild(tile);
+    });
   }
   document.getElementById("graphlistRefreshBtn").addEventListener("click", function () { pollEverythingNow(); });
 
@@ -6166,6 +6495,11 @@
     if (file) importCsvFile(file);
     evt.target.value = "";
   });
+  document.getElementById("powerSortBtn").addEventListener("click", function () {
+    powerCardSort = powerCardSort === "risk" ? "river" : "risk";
+    try { localStorage.setItem(POWER_SORT_KEY, powerCardSort); } catch (e) { /* 保存できなくても並びは切り替わる */ }
+    applyPowerCardOrder();
+  });
   document.getElementById("healthTableBtn").addEventListener("click", function () {
     var card = document.getElementById("healthTableCard");
     var showing = card.classList.toggle("show");
@@ -6751,6 +7085,8 @@
 
   // テストハーネス/デバッグ専用のフック(本番動作には影響しない)。
   window.__dashboardDebug = {
+    // --- 2026-10 デザイン見直し: いま見るべき水位 ---
+    renderWaterStrip: renderWaterStrip, waterAlertOf: waterAlertOf,
     // --- Request N (2026-09-13): ライブカメラ一覧のタイムラプス・桜川の発電対応 ---
     getCamlistPlaybackState: function () { return camlistPlaybackState; },
     startCamlistPlayback: startCamlistPlayback, stopCamlistPlayback: stopCamlistPlayback,
