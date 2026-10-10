@@ -167,6 +167,40 @@ export async function run() {
   r.check("v6-c いずれの説明文も10分間隔に言及",
     counts.camlist.includes("10分") && counts.graphlist.includes("10分") && counts.power.includes("10分"), counts);
 
+  /* ---- 6b. いま見るべき水位(2026-10 デザイン見直し) ----
+     下神川橋(kw01: 氾濫注意2.5m・水防団待機2.0m)の水位を差し込み、先頭のまとめに出るかを見る。 */
+  const water = await page.evaluate(() => {
+    const d = window.__dashboardDebug;
+    d.showView("graphlist");
+    const s = d.siteStates.kw01, keep = s.points.slice();
+    const now = Date.now(), MIN = 60000;
+    const mk = (m, v) => ({ fetchedAt: new Date(now - m * MIN), waterLevelM: v, via: "試験" });
+    const read = () => {
+      d.renderWaterStrip();
+      const box = document.getElementById("waterAttentionStrip");
+      return { hidden: box.hidden, tiles: Array.from(box.querySelectorAll(".attention-tile")).map((t) => ({
+        title: t.querySelector(".attention-title").textContent,
+        chips: Array.from(t.querySelectorAll(".attention-chip")).map((c) => c.textContent) })) };
+    };
+    try {
+      s.points = keep.concat([mk(50, 2.30), mk(5, 2.62)]);          // 50分で32cm上昇・氾濫注意水位超え
+      const high = read();
+      s.points = keep.concat([mk(50, 2.05), mk(5, 2.10)]);          // 水防団待機水位だけ超え
+      const rsrv = read();
+      return { high, rsrv };
+    } finally { s.points = keep; d.renderWaterStrip(); }
+  });
+  const chipsOf = (res, i) => res.tiles[i] ? res.tiles[i].chips.join(" ") : "";
+  r.check("v8-a 水位一覧の先頭に「氾濫注意水位以上／水防団待機水位以上／急に上がっている／平常」を出す",
+    !water.high.hidden && JSON.stringify(water.high.tiles.map((t) => t.title))
+      === JSON.stringify(["氾濫注意水位以上", "水防団待機水位以上", "急に上がっている", "平常"]), water.high.tiles);
+  r.check("v8-b 氾濫注意水位を超えた拠点は、値と基準を添えて先頭の区分に出す",
+    chipsOf(water.high, 0).indexOf("下神川橋") >= 0 && chipsOf(water.high, 0).indexOf("氾濫注意水位 2.50m") >= 0, water.high);
+  r.check("v8-c 1時間で20cm以上上がった拠点は「急に上がっている」に出す",
+    chipsOf(water.high, 2).indexOf("下神川橋") >= 0 && chipsOf(water.high, 2).indexOf("+32cm") >= 0, water.high);
+  r.check("v8-d 水防団待機水位だけ超えた拠点は2段目に出し、1段目には出さない",
+    chipsOf(water.rsrv, 1).indexOf("下神川橋") >= 0 && chipsOf(water.rsrv, 0).indexOf("下神川橋") < 0, water.rsrv);
+
   r.check("v7-a 一連の操作でページ例外が発生しない", page.errMsgs().length === 0, page.errMsgs());
 
   await page.close();

@@ -279,6 +279,45 @@ export async function run() {
   r.check("p8-x3 日射ゼロ前提の拠点は※印で区別し、説明を添える",
     bars.values.every((v) => v.indexOf("※") > 0) && bars.note.indexOf("※印") >= 0, bars.values);
 
+  /* ===== いま見るべき拠点(2026-10 デザイン見直し) =====
+     持ち比較と同じ判定で、先頭に「停止中／12時間もたない／24時間もたない／余裕あり」を並べる。
+     カードの並びは河川順が既定で、「並び：危ない順」で持ち比較と同じ順になる。 */
+  const strip = await pageH.evaluate(async () => {
+    const box = document.getElementById("attentionStrip");
+    const tiles = Array.from(box.querySelectorAll(".attention-tile")).map((t) => ({
+      title: t.querySelector(".attention-title").textContent,
+      n: Number(t.querySelector(".attention-count .n").textContent),
+      chips: Array.from(t.querySelectorAll(".attention-chip .nm")).map((c) => c.textContent),
+      lit: t.classList.contains("has-items")
+    }));
+    const barOrder = Array.from(document.querySelectorAll("#healthScatter rect.endurance-bar")).map((b) => b.getAttribute("data-site"));
+    const grid = document.getElementById("sitesGrid");
+    const orderOf = () => Array.from(grid.children).filter((c) => c.style.order !== "")
+      .sort((a, b) => Number(a.style.order) - Number(b.style.order))
+      .map((c) => c.querySelector("#" + CSS.escape(c.querySelector(".chart-box").id)).id.replace("pchart-bat-", ""));
+    const btn = document.getElementById("powerSortBtn");
+    const before = { label: btn.textContent, ordered: orderOf().length };
+    btn.click();
+    const after = { label: btn.textContent, order: orderOf().slice(0, barOrder.length) };
+    btn.click();
+    const back = { label: btn.textContent, ordered: orderOf().length };
+    const first = grid.querySelector('[data-endurance="critical"]');
+    return { hidden: box.hidden, tiles, barOrder, before, after, back,
+      critCard: !!first, total: tiles.reduce((m, t) => m + t.n, 0) };
+  });
+  r.check("d1-a 先頭に4つの区分(停止中・12時間・24時間・余裕あり)を言葉で出す",
+    !strip.hidden && JSON.stringify(strip.tiles.map((t) => t.title))
+      === JSON.stringify(["停止中", "12時間もたない", "24時間もたない", "余裕あり"]), strip.tiles);
+  r.check("d1-b 区分の件数の合計は持ち比較の本数と同じ", strip.total === strip.barOrder.length, strip);
+  r.check("d1-c 12時間もたない拠点(梅名樋管2号 5.6h)は名前のチップで出し、その区分だけ色を付ける",
+    strip.tiles[1].n >= 1 && strip.tiles[1].chips.some((c) => c.indexOf("梅名樋管2号") === 0) && strip.tiles[1].lit
+    && !strip.tiles[0].lit, strip.tiles);
+  r.check("d1-d カードに区分を持たせる(上端の色帯・「12h未満」の札に使う)", strip.critCard, strip);
+  r.check("d1-e カードの並びは河川順が既定で、「危ない順」にすると持ち比較と同じ順になり、戻せる",
+    strip.before.label === "並び：河川順" && strip.before.ordered === 0
+    && strip.after.label === "並び：危ない順" && JSON.stringify(strip.after.order) === JSON.stringify(strip.barOrder)
+    && strip.back.label === "並び：河川順" && strip.back.ordered === 0, strip);
+
   /* ===== バッテリー健全性の一覧(「健全性の一覧」ボタン) =====
      天気・夜間降下を織り込んだ持ち時間を先頭に、実測(最低電圧・深放電)と
      容量の変化を1つの表にまとめたもの。劣化率は季節の影響と切り分けられないため、
