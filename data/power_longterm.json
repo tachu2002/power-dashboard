@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-10-12T19:10:08.539Z",
+  "generatedAt": "2026-10-25T16:40:44.378Z",
   "source": "relay-daily-api",
   "sites": 27,
   "from": "2026-06-13",
-  "to": "2026-10-12",
+  "to": "2026-10-25",
   "tempC": {
     "2026-06-13": 21.2,
     "2026-06-14": 22.2,
@@ -126,7 +126,20 @@
     "2026-10-09": 20.9,
     "2026-10-10": 20.7,
     "2026-10-11": 21.4,
-    "2026-10-12": 22.2
+    "2026-10-12": 22.2,
+    "2026-10-13": 22,
+    "2026-10-14": 22.2,
+    "2026-10-15": 20.6,
+    "2026-10-16": 21.2,
+    "2026-10-17": 21.2,
+    "2026-10-18": 20.3,
+    "2026-10-19": 22,
+    "2026-10-20": 22.5,
+    "2026-10-21": 23.2,
+    "2026-10-22": 22,
+    "2026-10-23": 18.5,
+    "2026-10-24": 19.5,
+    "2026-10-25": 21.2
   },
   "days": {
     "2026-06-13": {
@@ -29117,6 +29130,2723 @@
         "genWh": 133.2,
         "loadWh": 104.9,
         "pvPeakW": 30.5
+      }
+    },
+    "2026-10-13": {
+      "cam11": {
+        "v0": 12.4,
+        "balWh": 42.9,
+        "vmin": 12.26,
+        "vmax": 13.46,
+        "genWh": 125.1,
+        "loadWh": 82.2,
+        "pvPeakW": 26.3
+      },
+      "cam01": {
+        "v0": 12.42,
+        "balWh": 26.8,
+        "vmin": 12.27,
+        "vmax": 13.64,
+        "genWh": 120.4,
+        "loadWh": 93.6,
+        "pvPeakW": 30.5
+      },
+      "cam41": {
+        "v0": 12.55,
+        "balWh": 13.5,
+        "vmin": 12.45,
+        "vmax": 13.86,
+        "genWh": 29.6,
+        "loadWh": 16.1,
+        "pvPeakW": 8.6
+      },
+      "cam42": {
+        "v0": 12.2,
+        "balWh": 70.1,
+        "vmin": 12.07,
+        "vmax": 14.32,
+        "genWh": 149.5,
+        "loadWh": 79.4,
+        "pvPeakW": 30.6
+      },
+      "cam43": {
+        "v0": 12.15,
+        "balWh": 62.4,
+        "vmin": 12.01,
+        "vmax": 13.46,
+        "genWh": 162.6,
+        "loadWh": 100.2,
+        "pvPeakW": 29.9
+      },
+      "cam44": {
+        "v0": 12.42,
+        "balWh": 17.2,
+        "vmin": 12.31,
+        "vmax": 13.4,
+        "genWh": 51.4,
+        "loadWh": 34.2,
+        "pvPeakW": 11.7
+      },
+      "cam46": {
+        "v0": 12.27,
+        "balWh": 12.6,
+        "vmin": 12.12,
+        "vmax": 13.39,
+        "genWh": 117.4,
+        "loadWh": 104.8,
+        "pvPeakW": 29.6
+      },
+      "cam47": {
+        "v0": 12.26,
+        "balWh": 28.7,
+        "vmin": 12.14,
+        "vmax": 13.55,
+        "genWh": 135.9,
+        "loadWh": 107.2,
+        "pvPeakW": 30
+      },
+      "cam40": {
+        "v0": 12.49,
+        "balWh": 39.4,
+        "vmin": 12.35,
+        "vmax": 13.56,
+        "genWh": 137.2,
+        "loadWh": 97.8,
+        "pvPeakW": 25.6
+      },
+      "cam45": {
+        "v0": 12.54,
+        "balWh": 28.5,
+        "vmin": 12.41,
+        "vmax": 13.62,
+        "genWh": 59.5,
+        "loadWh": 31,
+        "pvPeakW": 13.1
+      },
+      "cam03": {
+        "v0": 12.35,
+        "balWh": 62.5,
+        "vmin": 12.2,
+        "vmax": 13.46,
+        "genWh": 157.3,
+        "loadWh": 94.8,
+        "pvPeakW": 31.1
+      },
+      "cam14": {
+        "v0": 12.4,
+        "balWh": 35.7,
+        "vmin": 12.32,
+        "vmax": 13.63,
+        "genWh": 120.6,
+        "loadWh": 84.9,
+        "pvPeakW": 30.5
+      },
+      "cam13": {
+        "v0": 12.58,
+        "balWh": 51.1,
+        "vmin": 12.43,
+        "vmax": 13.61,
+        "genWh": 142.4,
+        "loadWh": 91.3,
+        "pvPeakW": 25.4
+      },
+      "cam12": {
+        "v0": 12.36,
+        "balWh": 26.8,
+        "vmin": 12.23,
+        "vmax": 13.56,
+        "genWh": 111.3,
+        "loadWh": 84.5,
+        "pvPeakW": 30.5
+      },
+      "cam08": {
+        "v0": 12.21,
+        "balWh": 21.5,
+        "vmin": 12.09,
+        "vmax": 13.59,
+        "genWh": 121.9,
+        "loadWh": 100.4,
+        "pvPeakW": 31.9
+      },
+      "cam09": {
+        "v0": 12.28,
+        "balWh": 34.9,
+        "vmin": 12.14,
+        "vmax": 13.63,
+        "genWh": 158.6,
+        "loadWh": 123.7,
+        "pvPeakW": 33.1
+      },
+      "cam36": {
+        "v0": 12.47,
+        "balWh": 34,
+        "vmin": 12.34,
+        "vmax": 13.65,
+        "genWh": 136.5,
+        "loadWh": 102.5,
+        "pvPeakW": 30.5
+      },
+      "cam04": {
+        "v0": 12.38,
+        "balWh": 33.6,
+        "vmin": 12.24,
+        "vmax": 13.54,
+        "genWh": 132.2,
+        "loadWh": 98.6,
+        "pvPeakW": 24.4
+      },
+      "cam02": {
+        "v0": 12.28,
+        "balWh": 49.3,
+        "vmin": 12.13,
+        "vmax": 13.6,
+        "genWh": 190.8,
+        "loadWh": 141.5,
+        "pvPeakW": 33.1
+      },
+      "cam52": {
+        "v0": 12.15,
+        "balWh": 32.9,
+        "vmin": 12.05,
+        "vmax": 13.58,
+        "genWh": 136.6,
+        "loadWh": 103.7,
+        "pvPeakW": 31.3
+      },
+      "cam53": {
+        "v0": 12.8,
+        "balWh": 47.9,
+        "vmin": 12.48,
+        "vmax": 13.95,
+        "genWh": 98.9,
+        "loadWh": 51,
+        "pvPeakW": 17.3
+      },
+      "cam55": {
+        "v0": 12.51,
+        "balWh": 33.9,
+        "vmin": 12.33,
+        "vmax": 13.58,
+        "genWh": 140.8,
+        "loadWh": 106.9,
+        "pvPeakW": 30.7
+      },
+      "cam54": {
+        "v0": 12.23,
+        "balWh": 32.6,
+        "vmin": 12.1,
+        "vmax": 13.49,
+        "genWh": 141.2,
+        "loadWh": 108.6,
+        "pvPeakW": 30.5
+      }
+    },
+    "2026-10-14": {
+      "cam11": {
+        "v0": 12.4,
+        "balWh": 7.8,
+        "vmin": 12.28,
+        "vmax": 13.56,
+        "genWh": 90.2,
+        "loadWh": 82.4,
+        "pvPeakW": 31.8
+      },
+      "cam01": {
+        "v0": 12.41,
+        "balWh": -0.4,
+        "vmin": 12.28,
+        "vmax": 13.59,
+        "genWh": 92,
+        "loadWh": 92.4,
+        "pvPeakW": 31.5
+      },
+      "cam41": {
+        "v0": 12.55,
+        "balWh": 8.8,
+        "vmin": 12.45,
+        "vmax": 13.76,
+        "genWh": 25.3,
+        "loadWh": 16.5,
+        "pvPeakW": 9.7
+      },
+      "cam42": {
+        "v0": 12.19,
+        "balWh": 13.4,
+        "vmin": 12.04,
+        "vmax": 13.09,
+        "genWh": 91.2,
+        "loadWh": 77.8,
+        "pvPeakW": 30
+      },
+      "cam43": {
+        "v0": 12.14,
+        "balWh": -14.3,
+        "vmin": 11.97,
+        "vmax": 13.12,
+        "genWh": 85.1,
+        "loadWh": 99.4,
+        "pvPeakW": 31.5
+      },
+      "cam44": {
+        "v0": 12.41,
+        "balWh": -5.5,
+        "vmin": 12.3,
+        "vmax": 13.39,
+        "genWh": 27.8,
+        "loadWh": 33.3,
+        "pvPeakW": 15
+      },
+      "cam46": {
+        "v0": 12.26,
+        "balWh": -34,
+        "vmin": 12.07,
+        "vmax": 13.13,
+        "genWh": 78.2,
+        "loadWh": 112.2,
+        "pvPeakW": 29.4
+      },
+      "cam47": {
+        "v0": 12.28,
+        "balWh": -12.7,
+        "vmin": 12.14,
+        "vmax": 13.36,
+        "genWh": 93.3,
+        "loadWh": 106,
+        "pvPeakW": 31.9
+      },
+      "cam40": {
+        "v0": 12.47,
+        "balWh": 9.7,
+        "vmin": 12.37,
+        "vmax": 13.55,
+        "genWh": 106.8,
+        "loadWh": 97.1,
+        "pvPeakW": 31.8
+      },
+      "cam45": {
+        "v0": 12.54,
+        "balWh": 18.7,
+        "vmin": 12.42,
+        "vmax": 13.61,
+        "genWh": 50.7,
+        "loadWh": 32,
+        "pvPeakW": 19.7
+      },
+      "cam03": {
+        "v0": 12.35,
+        "balWh": 56.2,
+        "vmin": 12.2,
+        "vmax": 13.47,
+        "genWh": 149.3,
+        "loadWh": 93.1,
+        "pvPeakW": 33
+      },
+      "cam14": {
+        "v0": 12.37,
+        "balWh": 46.9,
+        "vmin": 12.25,
+        "vmax": 13.45,
+        "genWh": 157.3,
+        "loadWh": 110.4,
+        "pvPeakW": 31
+      },
+      "cam13": {
+        "v0": 12.58,
+        "balWh": 40.5,
+        "vmin": 12.44,
+        "vmax": 13.61,
+        "genWh": 129.2,
+        "loadWh": 88.7,
+        "pvPeakW": 31.8
+      },
+      "cam12": {
+        "v0": 12.35,
+        "balWh": 8.6,
+        "vmin": 12.23,
+        "vmax": 13.3,
+        "genWh": 92.3,
+        "loadWh": 83.7,
+        "pvPeakW": 31.9
+      },
+      "cam08": {
+        "v0": 12.21,
+        "balWh": 4.5,
+        "vmin": 12.11,
+        "vmax": 13.58,
+        "genWh": 105,
+        "loadWh": 100.5,
+        "pvPeakW": 32.4
+      },
+      "cam09": {
+        "v0": 12.26,
+        "balWh": -8.5,
+        "vmin": 12.12,
+        "vmax": 13.65,
+        "genWh": 115.5,
+        "loadWh": 124,
+        "pvPeakW": 33.1
+      },
+      "cam36": {
+        "v0": 12.46,
+        "balWh": 21.4,
+        "vmin": 12.34,
+        "vmax": 13.56,
+        "genWh": 122.4,
+        "loadWh": 101,
+        "pvPeakW": 32.4
+      },
+      "cam04": {
+        "v0": 12.37,
+        "balWh": 24.5,
+        "vmin": 12.24,
+        "vmax": 13.54,
+        "genWh": 121.7,
+        "loadWh": 97.2,
+        "pvPeakW": 31.9
+      },
+      "cam02": {
+        "v0": 12.28,
+        "balWh": 16.9,
+        "vmin": 12.15,
+        "vmax": 13.56,
+        "genWh": 156.4,
+        "loadWh": 139.5,
+        "pvPeakW": 32.8
+      },
+      "cam52": {
+        "v0": 12.16,
+        "balWh": -27.1,
+        "vmin": 12.05,
+        "vmax": 13.19,
+        "genWh": 76.4,
+        "loadWh": 103.5,
+        "pvPeakW": 30.8
+      },
+      "cam53": {
+        "v0": 12.79,
+        "balWh": 31.5,
+        "vmin": 12.48,
+        "vmax": 13.83,
+        "genWh": 84.6,
+        "loadWh": 53.1,
+        "pvPeakW": 21.4
+      },
+      "cam55": {
+        "v0": 12.48,
+        "balWh": -4.7,
+        "vmin": 12.32,
+        "vmax": 13.4,
+        "genWh": 100.4,
+        "loadWh": 105.1,
+        "pvPeakW": 30.7
+      },
+      "cam54": {
+        "v0": 12.25,
+        "balWh": 30.4,
+        "vmin": 12.12,
+        "vmax": 13.43,
+        "genWh": 139.6,
+        "loadWh": 109.2,
+        "pvPeakW": 31.2
+      }
+    },
+    "2026-10-15": {
+      "cam11": {
+        "v0": 12.37,
+        "balWh": 52.6,
+        "vmin": 12.23,
+        "vmax": 13.64,
+        "genWh": 134.3,
+        "loadWh": 81.7,
+        "pvPeakW": 29.6
+      },
+      "cam01": {
+        "v0": 12.34,
+        "balWh": 44.9,
+        "vmin": 12.25,
+        "vmax": 13.61,
+        "genWh": 138.6,
+        "loadWh": 93.7,
+        "pvPeakW": 30.9
+      },
+      "cam41": {
+        "v0": 12.53,
+        "balWh": 11.2,
+        "vmin": 12.43,
+        "vmax": 13.87,
+        "genWh": 27.6,
+        "loadWh": 16.4,
+        "pvPeakW": 9.1
+      },
+      "cam42": {
+        "v0": 12.08,
+        "balWh": 115.3,
+        "vmin": 11.98,
+        "vmax": 14.32,
+        "genWh": 187.5,
+        "loadWh": 72.2,
+        "pvPeakW": 31.2
+      },
+      "cam43": {
+        "v0": 11.97,
+        "balWh": 116.5,
+        "vmin": 11.89,
+        "vmax": 14.24,
+        "genWh": 219.9,
+        "loadWh": 103.4,
+        "pvPeakW": 29.9
+      },
+      "cam44": {
+        "v0": 12.3,
+        "balWh": 39.8,
+        "vmin": 12.26,
+        "vmax": 13.4,
+        "genWh": 71.3,
+        "loadWh": 31.5,
+        "pvPeakW": 13.1
+      },
+      "cam46": {
+        "v0": 12.07,
+        "balWh": 97.7,
+        "vmin": 12,
+        "vmax": 13.53,
+        "genWh": 210.7,
+        "loadWh": 113,
+        "pvPeakW": 29.6
+      },
+      "cam47": {
+        "v0": 12.19,
+        "balWh": 43.3,
+        "vmin": 12.1,
+        "vmax": 13.55,
+        "genWh": 150,
+        "loadWh": 106.7,
+        "pvPeakW": 30.3
+      },
+      "cam40": {
+        "v0": 12.45,
+        "balWh": 56.7,
+        "vmin": 12.35,
+        "vmax": 13.66,
+        "genWh": 153.8,
+        "loadWh": 97.1,
+        "pvPeakW": 29.5
+      },
+      "cam45": {
+        "v0": 12.53,
+        "balWh": 39.9,
+        "vmin": 12.39,
+        "vmax": 13.62,
+        "genWh": 71.7,
+        "loadWh": 31.8,
+        "pvPeakW": 16.8
+      },
+      "cam03": {
+        "v0": 12.34,
+        "balWh": 75.8,
+        "vmin": 12.2,
+        "vmax": 13.47,
+        "genWh": 171.5,
+        "loadWh": 95.7,
+        "pvPeakW": 31.4
+      },
+      "cam14": {
+        "v0": 12.36,
+        "balWh": -45.8,
+        "vmin": 12.25,
+        "vmax": 13.31,
+        "genWh": 7,
+        "loadWh": 52.8,
+        "pvPeakW": 14.1
+      },
+      "cam13": {
+        "v0": 12.57,
+        "balWh": 61.4,
+        "vmin": 12.44,
+        "vmax": 13.71,
+        "genWh": 149.4,
+        "loadWh": 88,
+        "pvPeakW": 30.1
+      },
+      "cam12": {
+        "v0": 12.27,
+        "balWh": 46.8,
+        "vmin": 12.2,
+        "vmax": 13.56,
+        "genWh": 132.1,
+        "loadWh": 85.3,
+        "pvPeakW": 30
+      },
+      "cam08": {
+        "v0": 12.19,
+        "balWh": 23.2,
+        "vmin": 12.09,
+        "vmax": 13.59,
+        "genWh": 122.5,
+        "loadWh": 99.3,
+        "pvPeakW": 31.6
+      },
+      "cam09": {
+        "v0": 12.18,
+        "balWh": 63.7,
+        "vmin": 12.07,
+        "vmax": 13.82,
+        "genWh": 187.1,
+        "loadWh": 123.4,
+        "pvPeakW": 32.8
+      },
+      "cam36": {
+        "v0": 12.45,
+        "balWh": 51,
+        "vmin": 12.33,
+        "vmax": 13.57,
+        "genWh": 156.2,
+        "loadWh": 105.2,
+        "pvPeakW": 29.7
+      },
+      "cam04": {
+        "v0": 12.35,
+        "balWh": 53.6,
+        "vmin": 12.22,
+        "vmax": 13.58,
+        "genWh": 154.7,
+        "loadWh": 101.1,
+        "pvPeakW": 29.4
+      },
+      "cam02": {
+        "v0": 12.26,
+        "balWh": 79.4,
+        "vmin": 12.13,
+        "vmax": 13.61,
+        "genWh": 219.5,
+        "loadWh": 140.1,
+        "pvPeakW": 32.6
+      },
+      "cam52": {
+        "v0": 12.05,
+        "balWh": 76.9,
+        "vmin": 11.98,
+        "vmax": 13.58,
+        "genWh": 180.9,
+        "loadWh": 104,
+        "pvPeakW": 31.6
+      },
+      "cam53": {
+        "v0": 12.77,
+        "balWh": 55.2,
+        "vmin": 12.47,
+        "vmax": 13.98,
+        "genWh": 105.1,
+        "loadWh": 49.9,
+        "pvPeakW": 19.9
+      },
+      "cam55": {
+        "v0": 12.44,
+        "balWh": 66,
+        "vmin": 12.28,
+        "vmax": 13.58,
+        "genWh": 171.9,
+        "loadWh": 105.9,
+        "pvPeakW": 30.4
+      },
+      "cam54": {
+        "v0": 12.28,
+        "balWh": 33.8,
+        "vmin": 12.13,
+        "vmax": 13.49,
+        "genWh": 144.7,
+        "loadWh": 110.9,
+        "pvPeakW": 31
+      }
+    },
+    "2026-10-16": {
+      "cam11": {
+        "v0": 12.4,
+        "balWh": 47.9,
+        "vmin": 12.27,
+        "vmax": 13.73,
+        "genWh": 129.7,
+        "loadWh": 81.8,
+        "pvPeakW": 30.4
+      },
+      "cam01": {
+        "v0": 12.4,
+        "balWh": 38.7,
+        "vmin": 12.27,
+        "vmax": 13.62,
+        "genWh": 131.3,
+        "loadWh": 92.6,
+        "pvPeakW": 31
+      },
+      "cam41": {
+        "v0": 12.54,
+        "balWh": 13.2,
+        "vmin": 12.43,
+        "vmax": 13.89,
+        "genWh": 28.8,
+        "loadWh": 15.6,
+        "pvPeakW": 8.9
+      },
+      "cam42": {
+        "v0": 12.21,
+        "balWh": 86.1,
+        "vmin": 12.09,
+        "vmax": 14.32,
+        "genWh": 165.9,
+        "loadWh": 79.8,
+        "pvPeakW": 29.6
+      },
+      "cam43": {
+        "v0": 12.13,
+        "balWh": 85.9,
+        "vmin": 12.03,
+        "vmax": 13.47,
+        "genWh": 187.6,
+        "loadWh": 101.7,
+        "pvPeakW": 29.6
+      },
+      "cam44": {
+        "v0": 12.4,
+        "balWh": 33.3,
+        "vmin": 12.32,
+        "vmax": 13.43,
+        "genWh": 65.8,
+        "loadWh": 32.5,
+        "pvPeakW": 12.6
+      },
+      "cam46": {
+        "v0": 12.22,
+        "balWh": 92.1,
+        "vmin": 12.09,
+        "vmax": 13.56,
+        "genWh": 204.9,
+        "loadWh": 112.8,
+        "pvPeakW": 29.3
+      },
+      "cam47": {
+        "v0": 12.25,
+        "balWh": 48.1,
+        "vmin": 12.12,
+        "vmax": 13.56,
+        "genWh": 157.1,
+        "loadWh": 109,
+        "pvPeakW": 29.5
+      },
+      "cam40": {
+        "v0": 12.47,
+        "balWh": 52.6,
+        "vmin": 12.37,
+        "vmax": 13.68,
+        "genWh": 150,
+        "loadWh": 97.4,
+        "pvPeakW": 28.7
+      },
+      "cam45": {
+        "v0": 12.55,
+        "balWh": 39.3,
+        "vmin": 12.42,
+        "vmax": 13.62,
+        "genWh": 69.2,
+        "loadWh": 29.9,
+        "pvPeakW": 12.6
+      },
+      "cam03": {
+        "v0": 12.35,
+        "balWh": 72.9,
+        "vmin": 12.21,
+        "vmax": 13.46,
+        "genWh": 168.6,
+        "loadWh": 95.7,
+        "pvPeakW": 31
+      },
+      "cam14": {
+        "v0": 12.28,
+        "balWh": -47.5,
+        "vmin": 12.26,
+        "vmax": 12.56,
+        "genWh": 0,
+        "loadWh": 47.5,
+        "pvPeakW": 0
+      },
+      "cam13": {
+        "v0": 12.57,
+        "balWh": 60.4,
+        "vmin": 12.43,
+        "vmax": 13.69,
+        "genWh": 148.5,
+        "loadWh": 88.1,
+        "pvPeakW": 30.1
+      },
+      "cam12": {
+        "v0": 12.32,
+        "balWh": 46.2,
+        "vmin": 12.22,
+        "vmax": 13.55,
+        "genWh": 130.8,
+        "loadWh": 84.6,
+        "pvPeakW": 29.9
+      },
+      "cam08": {
+        "v0": 12.19,
+        "balWh": 20.9,
+        "vmin": 12.08,
+        "vmax": 13.58,
+        "genWh": 119.4,
+        "loadWh": 98.5,
+        "pvPeakW": 30.7
+      },
+      "cam09": {
+        "v0": 12.24,
+        "balWh": 53.4,
+        "vmin": 12.13,
+        "vmax": 13.79,
+        "genWh": 177.1,
+        "loadWh": 123.7,
+        "pvPeakW": 32.2
+      },
+      "cam36": {
+        "v0": 12.46,
+        "balWh": 45.6,
+        "vmin": 12.34,
+        "vmax": 13.62,
+        "genWh": 148.6,
+        "loadWh": 103,
+        "pvPeakW": 28.6
+      },
+      "cam04": {
+        "v0": 12.36,
+        "balWh": 46,
+        "vmin": 12.25,
+        "vmax": 13.64,
+        "genWh": 145.1,
+        "loadWh": 99.1,
+        "pvPeakW": 30.3
+      },
+      "cam02": {
+        "v0": 12.27,
+        "balWh": 64.3,
+        "vmin": 12.15,
+        "vmax": 13.61,
+        "genWh": 207.4,
+        "loadWh": 143.1,
+        "pvPeakW": 31.5
+      },
+      "cam52": {
+        "v0": 12.17,
+        "balWh": 29,
+        "vmin": 12.07,
+        "vmax": 13.58,
+        "genWh": 132,
+        "loadWh": 103,
+        "pvPeakW": 30.8
+      },
+      "cam53": {
+        "v0": 12.8,
+        "balWh": 41.9,
+        "vmin": 12.48,
+        "vmax": 13.95,
+        "genWh": 89.1,
+        "loadWh": 47.2,
+        "pvPeakW": 18.6
+      },
+      "cam55": {
+        "v0": 12.48,
+        "balWh": 43,
+        "vmin": 12.33,
+        "vmax": 13.58,
+        "genWh": 148.6,
+        "loadWh": 105.6,
+        "pvPeakW": 30.3
+      },
+      "cam54": {
+        "v0": 12.25,
+        "balWh": 42.2,
+        "vmin": 12.1,
+        "vmax": 13.49,
+        "genWh": 149.2,
+        "loadWh": 107,
+        "pvPeakW": 30.6
+      }
+    },
+    "2026-10-17": {
+      "cam11": {
+        "v0": 12.4,
+        "balWh": 47.8,
+        "vmin": 12.27,
+        "vmax": 13.72,
+        "genWh": 129.6,
+        "loadWh": 81.8,
+        "pvPeakW": 27.9
+      },
+      "cam01": {
+        "v0": 12.42,
+        "balWh": 31.5,
+        "vmin": 12.27,
+        "vmax": 13.61,
+        "genWh": 125,
+        "loadWh": 93.5,
+        "pvPeakW": 31
+      },
+      "cam41": {
+        "v0": 12.55,
+        "balWh": 10.1,
+        "vmin": 12.45,
+        "vmax": 13.86,
+        "genWh": 25.3,
+        "loadWh": 15.2,
+        "pvPeakW": 9.5
+      },
+      "cam42": {
+        "v0": 12.2,
+        "balWh": 89.9,
+        "vmin": 12.05,
+        "vmax": 14.32,
+        "genWh": 167.2,
+        "loadWh": 77.3,
+        "pvPeakW": 29.7
+      },
+      "cam43": {
+        "v0": 12.11,
+        "balWh": 82.1,
+        "vmin": 12.02,
+        "vmax": 13.47,
+        "genWh": 184,
+        "loadWh": 101.9,
+        "pvPeakW": 29.6
+      },
+      "cam44": {
+        "v0": 12.42,
+        "balWh": 31.9,
+        "vmin": 12.32,
+        "vmax": 13.4,
+        "genWh": 63.8,
+        "loadWh": 31.9,
+        "pvPeakW": 11.3
+      },
+      "cam46": {
+        "v0": 12.26,
+        "balWh": 89.1,
+        "vmin": 12.13,
+        "vmax": 13.57,
+        "genWh": 202.5,
+        "loadWh": 113.4,
+        "pvPeakW": 29.5
+      },
+      "cam47": {
+        "v0": 12.29,
+        "balWh": 42,
+        "vmin": 12.16,
+        "vmax": 13.56,
+        "genWh": 150.3,
+        "loadWh": 108.3,
+        "pvPeakW": 28.1
+      },
+      "cam40": {
+        "v0": 12.5,
+        "balWh": 51.8,
+        "vmin": 12.36,
+        "vmax": 13.67,
+        "genWh": 149.3,
+        "loadWh": 97.5,
+        "pvPeakW": 27.1
+      },
+      "cam45": {
+        "v0": 12.55,
+        "balWh": 37,
+        "vmin": 12.41,
+        "vmax": 13.62,
+        "genWh": 69,
+        "loadWh": 32,
+        "pvPeakW": 12.5
+      },
+      "cam03": {
+        "v0": 12.34,
+        "balWh": 75.1,
+        "vmin": 12.2,
+        "vmax": 13.48,
+        "genWh": 169,
+        "loadWh": 93.9,
+        "pvPeakW": 31.9
+      },
+      "cam14": {
+        "v0": 12.28,
+        "balWh": -57.4,
+        "vmin": 12.18,
+        "vmax": 13.23,
+        "genWh": 21.8,
+        "loadWh": 79.2,
+        "pvPeakW": 12.4
+      },
+      "cam13": {
+        "v0": 12.58,
+        "balWh": 61,
+        "vmin": 12.43,
+        "vmax": 13.64,
+        "genWh": 152,
+        "loadWh": 91,
+        "pvPeakW": 26.6
+      },
+      "cam12": {
+        "v0": 12.36,
+        "balWh": 48.2,
+        "vmin": 12.23,
+        "vmax": 13.56,
+        "genWh": 130.1,
+        "loadWh": 81.9,
+        "pvPeakW": 28.7
+      },
+      "cam08": {
+        "v0": 12.19,
+        "balWh": 31.4,
+        "vmin": 12.08,
+        "vmax": 13.68,
+        "genWh": 130.8,
+        "loadWh": 99.4,
+        "pvPeakW": 31.7
+      },
+      "cam09": {
+        "v0": 12.26,
+        "balWh": 49.6,
+        "vmin": 12.11,
+        "vmax": 13.81,
+        "genWh": 174.8,
+        "loadWh": 125.2,
+        "pvPeakW": 33.5
+      },
+      "cam36": {
+        "v0": 12.47,
+        "balWh": 49.7,
+        "vmin": 12.34,
+        "vmax": 13.65,
+        "genWh": 151.3,
+        "loadWh": 101.6,
+        "pvPeakW": 29.1
+      },
+      "cam04": {
+        "v0": 12.39,
+        "balWh": 46.2,
+        "vmin": 12.24,
+        "vmax": 13.69,
+        "genWh": 145.5,
+        "loadWh": 99.3,
+        "pvPeakW": 30.7
+      },
+      "cam02": {
+        "v0": 12.29,
+        "balWh": 74,
+        "vmin": 12.13,
+        "vmax": 13.61,
+        "genWh": 215.2,
+        "loadWh": 141.2,
+        "pvPeakW": 32
+      },
+      "cam52": {
+        "v0": 12.12,
+        "balWh": 41.2,
+        "vmin": 12.03,
+        "vmax": 13.58,
+        "genWh": 143.9,
+        "loadWh": 102.7,
+        "pvPeakW": 30.9
+      },
+      "cam53": {
+        "v0": 12.81,
+        "balWh": 54.3,
+        "vmin": 12.48,
+        "vmax": 13.97,
+        "genWh": 105.5,
+        "loadWh": 51.2,
+        "pvPeakW": 18.4
+      },
+      "cam55": {
+        "v0": 12.44,
+        "balWh": 67,
+        "vmin": 12.28,
+        "vmax": 13.58,
+        "genWh": 173.5,
+        "loadWh": 106.5,
+        "pvPeakW": 30.4
+      },
+      "cam54": {
+        "v0": 12.22,
+        "balWh": 60,
+        "vmin": 12.08,
+        "vmax": 13.49,
+        "genWh": 167.7,
+        "loadWh": 107.7,
+        "pvPeakW": 30.5
+      }
+    },
+    "2026-10-18": {
+      "cam11": {
+        "v0": 12.39,
+        "balWh": 46.6,
+        "vmin": 12.25,
+        "vmax": 13.72,
+        "genWh": 128.6,
+        "loadWh": 82,
+        "pvPeakW": 27.4
+      },
+      "cam01": {
+        "v0": 12.39,
+        "balWh": 23.1,
+        "vmin": 12.23,
+        "vmax": 13.61,
+        "genWh": 116.5,
+        "loadWh": 93.4,
+        "pvPeakW": 30.8
+      },
+      "cam41": {
+        "v0": 12.54,
+        "balWh": 12.8,
+        "vmin": 12.43,
+        "vmax": 13.86,
+        "genWh": 29.3,
+        "loadWh": 16.5,
+        "pvPeakW": 8.5
+      },
+      "cam42": {
+        "v0": 12.19,
+        "balWh": 84.2,
+        "vmin": 12.03,
+        "vmax": 14.32,
+        "genWh": 164.4,
+        "loadWh": 80.2,
+        "pvPeakW": 30.4
+      },
+      "cam43": {
+        "v0": 12.12,
+        "balWh": 76.2,
+        "vmin": 11.96,
+        "vmax": 13.47,
+        "genWh": 179,
+        "loadWh": 102.8,
+        "pvPeakW": 29.3
+      },
+      "cam44": {
+        "v0": 12.42,
+        "balWh": 28.1,
+        "vmin": 12.3,
+        "vmax": 13.41,
+        "genWh": 60.5,
+        "loadWh": 32.4,
+        "pvPeakW": 10.4
+      },
+      "cam46": {
+        "v0": 12.26,
+        "balWh": 83.9,
+        "vmin": 12.11,
+        "vmax": 13.57,
+        "genWh": 198,
+        "loadWh": 114.1,
+        "pvPeakW": 29.4
+      },
+      "cam47": {
+        "v0": 12.28,
+        "balWh": 37,
+        "vmin": 12.14,
+        "vmax": 13.55,
+        "genWh": 146.6,
+        "loadWh": 109.6,
+        "pvPeakW": 26.7
+      },
+      "cam40": {
+        "v0": 12.48,
+        "balWh": 47.2,
+        "vmin": 12.34,
+        "vmax": 13.64,
+        "genWh": 144.6,
+        "loadWh": 97.4,
+        "pvPeakW": 25.4
+      },
+      "cam45": {
+        "v0": 12.53,
+        "balWh": 34.3,
+        "vmin": 12.38,
+        "vmax": 13.62,
+        "genWh": 66.6,
+        "loadWh": 32.3,
+        "pvPeakW": 11.3
+      },
+      "cam03": {
+        "v0": 12.34,
+        "balWh": 72.8,
+        "vmin": 12.19,
+        "vmax": 13.47,
+        "genWh": 169.8,
+        "loadWh": 97,
+        "pvPeakW": 31.5
+      },
+      "cam14": {
+        "v0": 12.37,
+        "balWh": 58.5,
+        "vmin": 12.26,
+        "vmax": 13.62,
+        "genWh": 170.5,
+        "loadWh": 112,
+        "pvPeakW": 27.4
+      },
+      "cam13": {
+        "v0": 12.56,
+        "balWh": 61.3,
+        "vmin": 12.42,
+        "vmax": 13.69,
+        "genWh": 151,
+        "loadWh": 89.7,
+        "pvPeakW": 27.3
+      },
+      "cam12": {
+        "v0": 12.33,
+        "balWh": 42.8,
+        "vmin": 12.21,
+        "vmax": 13.55,
+        "genWh": 125.5,
+        "loadWh": 82.7,
+        "pvPeakW": 29.9
+      },
+      "cam08": {
+        "v0": 12.21,
+        "balWh": 25.1,
+        "vmin": 12.08,
+        "vmax": 13.59,
+        "genWh": 127.3,
+        "loadWh": 102.2,
+        "pvPeakW": 30.3
+      },
+      "cam09": {
+        "v0": 12.25,
+        "balWh": 49.5,
+        "vmin": 12.09,
+        "vmax": 13.77,
+        "genWh": 176.1,
+        "loadWh": 126.6,
+        "pvPeakW": 32
+      },
+      "cam36": {
+        "v0": 12.46,
+        "balWh": 45.6,
+        "vmin": 12.32,
+        "vmax": 13.75,
+        "genWh": 147.5,
+        "loadWh": 101.9,
+        "pvPeakW": 29.6
+      },
+      "cam04": {
+        "v0": 12.37,
+        "balWh": 36.4,
+        "vmin": 12.21,
+        "vmax": 13.59,
+        "genWh": 139.1,
+        "loadWh": 102.7,
+        "pvPeakW": 27.4
+      },
+      "cam02": {
+        "v0": 12.27,
+        "balWh": 70.3,
+        "vmin": 12.13,
+        "vmax": 13.61,
+        "genWh": 211.2,
+        "loadWh": 140.9,
+        "pvPeakW": 31.7
+      },
+      "cam52": {
+        "v0": 12.11,
+        "balWh": 37.3,
+        "vmin": 12,
+        "vmax": 13.58,
+        "genWh": 139.8,
+        "loadWh": 102.5,
+        "pvPeakW": 30.9
+      },
+      "cam53": {
+        "v0": 12.78,
+        "balWh": 48.5,
+        "vmin": 12.44,
+        "vmax": 13.96,
+        "genWh": 99.1,
+        "loadWh": 50.6,
+        "pvPeakW": 18
+      },
+      "cam55": {
+        "v0": 12.48,
+        "balWh": 29.6,
+        "vmin": 12.32,
+        "vmax": 13.58,
+        "genWh": 136.5,
+        "loadWh": 106.9,
+        "pvPeakW": 30.1
+      },
+      "cam54": {
+        "v0": 12.27,
+        "balWh": 7.9,
+        "vmin": 12.14,
+        "vmax": 13.49,
+        "genWh": 117.6,
+        "loadWh": 109.7,
+        "pvPeakW": 30.7
+      }
+    },
+    "2026-10-19": {
+      "cam11": {
+        "v0": 12.4,
+        "balWh": 37.7,
+        "vmin": 12.25,
+        "vmax": 13.74,
+        "genWh": 119.1,
+        "loadWh": 81.4,
+        "pvPeakW": 28.5
+      },
+      "cam01": {
+        "v0": 12.38,
+        "balWh": 13.9,
+        "vmin": 12.23,
+        "vmax": 13.6,
+        "genWh": 106.9,
+        "loadWh": 93,
+        "pvPeakW": 30.7
+      },
+      "cam41": {
+        "v0": 12.54,
+        "balWh": 10.6,
+        "vmin": 12.43,
+        "vmax": 13.88,
+        "genWh": 26.5,
+        "loadWh": 15.9,
+        "pvPeakW": 8.6
+      },
+      "cam42": {
+        "v0": 12.19,
+        "balWh": 69.1,
+        "vmin": 12.04,
+        "vmax": 14.31,
+        "genWh": 139.6,
+        "loadWh": 70.5,
+        "pvPeakW": 29.7
+      },
+      "cam43": {
+        "v0": 12.11,
+        "balWh": 60.3,
+        "vmin": 11.98,
+        "vmax": 13.45,
+        "genWh": 161.1,
+        "loadWh": 100.8,
+        "pvPeakW": 29.9
+      },
+      "cam44": {
+        "v0": 12.42,
+        "balWh": 21,
+        "vmin": 12.31,
+        "vmax": 13.48,
+        "genWh": 53.2,
+        "loadWh": 32.2,
+        "pvPeakW": 11.9
+      },
+      "cam46": {
+        "v0": 12.25,
+        "balWh": 64.8,
+        "vmin": 12.11,
+        "vmax": 13.57,
+        "genWh": 177.9,
+        "loadWh": 113.1,
+        "pvPeakW": 29.8
+      },
+      "cam47": {
+        "v0": 12.28,
+        "balWh": 43.4,
+        "vmin": 12.13,
+        "vmax": 13.56,
+        "genWh": 150.1,
+        "loadWh": 106.7,
+        "pvPeakW": 28.9
+      },
+      "cam40": {
+        "v0": 12.48,
+        "balWh": 39.2,
+        "vmin": 12.35,
+        "vmax": 13.64,
+        "genWh": 136.9,
+        "loadWh": 97.7,
+        "pvPeakW": 26.9
+      },
+      "cam45": {
+        "v0": 12.55,
+        "balWh": 30.8,
+        "vmin": 12.4,
+        "vmax": 13.61,
+        "genWh": 59.8,
+        "loadWh": 29,
+        "pvPeakW": 12.4
+      },
+      "cam03": {
+        "v0": 12.34,
+        "balWh": 32.7,
+        "vmin": 12.19,
+        "vmax": 13.46,
+        "genWh": 126.9,
+        "loadWh": 94.2,
+        "pvPeakW": 30.8
+      },
+      "cam14": {
+        "v0": 12.37,
+        "balWh": 35.1,
+        "vmin": 12.26,
+        "vmax": 13.62,
+        "genWh": 143.6,
+        "loadWh": 108.5,
+        "pvPeakW": 28.5
+      },
+      "cam13": {
+        "v0": 12.57,
+        "balWh": 47.3,
+        "vmin": 12.43,
+        "vmax": 13.7,
+        "genWh": 138.7,
+        "loadWh": 91.4,
+        "pvPeakW": 28.4
+      },
+      "cam12": {
+        "v0": 12.32,
+        "balWh": 54.1,
+        "vmin": 12.21,
+        "vmax": 13.56,
+        "genWh": 137.8,
+        "loadWh": 83.7,
+        "pvPeakW": 29
+      },
+      "cam08": {
+        "v0": 12.19,
+        "balWh": 20.5,
+        "vmin": 12.07,
+        "vmax": 13.58,
+        "genWh": 119.3,
+        "loadWh": 98.8,
+        "pvPeakW": 31.1
+      },
+      "cam09": {
+        "v0": 12.23,
+        "balWh": 20.9,
+        "vmin": 12.08,
+        "vmax": 13.72,
+        "genWh": 145.7,
+        "loadWh": 124.8,
+        "pvPeakW": 33.3
+      },
+      "cam36": {
+        "v0": 12.45,
+        "balWh": 35,
+        "vmin": 12.32,
+        "vmax": 13.62,
+        "genWh": 136,
+        "loadWh": 101,
+        "pvPeakW": 29.1
+      },
+      "cam04": {
+        "v0": 12.37,
+        "balWh": 33.7,
+        "vmin": 12.22,
+        "vmax": 13.6,
+        "genWh": 132.5,
+        "loadWh": 98.8,
+        "pvPeakW": 26.6
+      },
+      "cam02": {
+        "v0": 12.26,
+        "balWh": 43.3,
+        "vmin": 12.12,
+        "vmax": 13.6,
+        "genWh": 184,
+        "loadWh": 140.7,
+        "pvPeakW": 32.1
+      },
+      "cam52": {
+        "v0": 12.12,
+        "balWh": 33.8,
+        "vmin": 12.01,
+        "vmax": 13.57,
+        "genWh": 138.3,
+        "loadWh": 104.5,
+        "pvPeakW": 31
+      },
+      "cam53": {
+        "v0": 12.81,
+        "balWh": 50.3,
+        "vmin": 12.46,
+        "vmax": 13.96,
+        "genWh": 100.9,
+        "loadWh": 50.6,
+        "pvPeakW": 18.5
+      },
+      "cam55": {
+        "v0": 12.41,
+        "balWh": 42.5,
+        "vmin": 12.28,
+        "vmax": 13.57,
+        "genWh": 147.2,
+        "loadWh": 104.7,
+        "pvPeakW": 30.4
+      },
+      "cam54": {
+        "v0": 12.16,
+        "balWh": 18.5,
+        "vmin": 12.07,
+        "vmax": 13.33,
+        "genWh": 126.1,
+        "loadWh": 107.6,
+        "pvPeakW": 30.8
+      }
+    },
+    "2026-10-20": {
+      "cam11": {
+        "v0": 12.4,
+        "balWh": -12.4,
+        "vmin": 12.28,
+        "vmax": 13.55,
+        "genWh": 68.9,
+        "loadWh": 81.3,
+        "pvPeakW": 30.9
+      },
+      "cam01": {
+        "v0": 12.37,
+        "balWh": -24.5,
+        "vmin": 12.26,
+        "vmax": 13.42,
+        "genWh": 68.5,
+        "loadWh": 93,
+        "pvPeakW": 30.9
+      },
+      "cam41": {
+        "v0": 12.55,
+        "balWh": 8.5,
+        "vmin": 12.45,
+        "vmax": 13.47,
+        "genWh": 25,
+        "loadWh": 16.5,
+        "pvPeakW": 10.2
+      },
+      "cam42": {
+        "v0": 12.19,
+        "balWh": -6.6,
+        "vmin": 12.05,
+        "vmax": 13,
+        "genWh": 72.2,
+        "loadWh": 78.8,
+        "pvPeakW": 29.5
+      },
+      "cam43": {
+        "v0": 12.13,
+        "balWh": -32.8,
+        "vmin": 11.93,
+        "vmax": 12.96,
+        "genWh": 68.4,
+        "loadWh": 101.2,
+        "pvPeakW": 29.7
+      },
+      "cam44": {
+        "v0": 12.43,
+        "balWh": -5.4,
+        "vmin": 12.32,
+        "vmax": 13.34,
+        "genWh": 26,
+        "loadWh": 31.4,
+        "pvPeakW": 17.6
+      },
+      "cam46": {
+        "v0": 12.26,
+        "balWh": -47.8,
+        "vmin": 12.05,
+        "vmax": 13.04,
+        "genWh": 66.4,
+        "loadWh": 114.2,
+        "pvPeakW": 29.1
+      },
+      "cam47": {
+        "v0": 12.3,
+        "balWh": -36.1,
+        "vmin": 12.15,
+        "vmax": 13.24,
+        "genWh": 68.8,
+        "loadWh": 104.9,
+        "pvPeakW": 30.1
+      },
+      "cam40": {
+        "v0": 12.49,
+        "balWh": -19.5,
+        "vmin": 12.38,
+        "vmax": 13.51,
+        "genWh": 76.8,
+        "loadWh": 96.3,
+        "pvPeakW": 25.8
+      },
+      "cam45": {
+        "v0": 12.56,
+        "balWh": 8.2,
+        "vmin": 12.43,
+        "vmax": 13.61,
+        "genWh": 40,
+        "loadWh": 31.8,
+        "pvPeakW": 24.4
+      },
+      "cam03": {
+        "v0": 12.34,
+        "balWh": 17.7,
+        "vmin": 12.19,
+        "vmax": 13.51,
+        "genWh": 109.3,
+        "loadWh": 91.6,
+        "pvPeakW": 33
+      },
+      "cam14": {
+        "v0": 12.38,
+        "balWh": -16.9,
+        "vmin": 12.26,
+        "vmax": 13.45,
+        "genWh": 91,
+        "loadWh": 107.9,
+        "pvPeakW": 30.2
+      },
+      "cam13": {
+        "v0": 12.57,
+        "balWh": 7.5,
+        "vmin": 12.44,
+        "vmax": 13.61,
+        "genWh": 97.6,
+        "loadWh": 90.1,
+        "pvPeakW": 30.3
+      },
+      "cam12": {
+        "v0": 12.37,
+        "balWh": -21.4,
+        "vmin": 12.24,
+        "vmax": 13.16,
+        "genWh": 60.8,
+        "loadWh": 82.2,
+        "pvPeakW": 24.1
+      },
+      "cam08": {
+        "v0": 12.21,
+        "balWh": -13.8,
+        "vmin": 12.11,
+        "vmax": 13.76,
+        "genWh": 85.5,
+        "loadWh": 99.3,
+        "pvPeakW": 31.6
+      },
+      "cam09": {
+        "v0": 12.24,
+        "balWh": -64.6,
+        "vmin": 12.11,
+        "vmax": 12.77,
+        "genWh": 49.1,
+        "loadWh": 113.7,
+        "pvPeakW": 15.5
+      },
+      "cam36": {
+        "v0": 12.46,
+        "balWh": -17.1,
+        "vmin": 12.33,
+        "vmax": 13.55,
+        "genWh": 85.4,
+        "loadWh": 102.5,
+        "pvPeakW": 30.1
+      },
+      "cam04": {
+        "v0": 12.39,
+        "balWh": -2.4,
+        "vmin": 12.26,
+        "vmax": 13.53,
+        "genWh": 95.5,
+        "loadWh": 97.9,
+        "pvPeakW": 31.9
+      },
+      "cam02": {
+        "v0": 12.29,
+        "balWh": -30,
+        "vmin": 12.16,
+        "vmax": 13.31,
+        "genWh": 112.3,
+        "loadWh": 142.3,
+        "pvPeakW": 32.2
+      },
+      "cam52": {
+        "v0": 12.15,
+        "balWh": -35.4,
+        "vmin": 12.02,
+        "vmax": 13.12,
+        "genWh": 70.2,
+        "loadWh": 105.6,
+        "pvPeakW": 30.7
+      },
+      "cam53": {
+        "v0": 12.82,
+        "balWh": 19.6,
+        "vmin": 12.45,
+        "vmax": 13.65,
+        "genWh": 76.2,
+        "loadWh": 56.6,
+        "pvPeakW": 19.1
+      },
+      "cam55": {
+        "v0": 12.46,
+        "balWh": -30.2,
+        "vmin": 12.31,
+        "vmax": 13.27,
+        "genWh": 74.1,
+        "loadWh": 104.3,
+        "pvPeakW": 30.5
+      },
+      "cam54": {
+        "v0": 12.22,
+        "balWh": -19.3,
+        "vmin": 12.09,
+        "vmax": 13.16,
+        "genWh": 88.3,
+        "loadWh": 107.6,
+        "pvPeakW": 30.6
+      }
+    },
+    "2026-10-21": {
+      "cam11": {
+        "v0": 12.29,
+        "balWh": 51.9,
+        "vmin": 12.25,
+        "vmax": 13.81,
+        "genWh": 133.7,
+        "loadWh": 81.8,
+        "pvPeakW": 31.3
+      },
+      "cam01": {
+        "v0": 12.27,
+        "balWh": 14.9,
+        "vmin": 12.23,
+        "vmax": 13.57,
+        "genWh": 108.1,
+        "loadWh": 93.2,
+        "pvPeakW": 31.1
+      },
+      "cam41": {
+        "v0": 12.53,
+        "balWh": 15.9,
+        "vmin": 12.45,
+        "vmax": 13.86,
+        "genWh": 31.8,
+        "loadWh": 15.9,
+        "pvPeakW": 15.6
+      },
+      "cam42": {
+        "v0": 12.05,
+        "balWh": 76.4,
+        "vmin": 11.99,
+        "vmax": 14.13,
+        "genWh": 155.8,
+        "loadWh": 79.4,
+        "pvPeakW": 29.6
+      },
+      "cam43": {
+        "v0": 11.93,
+        "balWh": 39.6,
+        "vmin": 11.86,
+        "vmax": 12.9,
+        "genWh": 140.4,
+        "loadWh": 100.8,
+        "pvPeakW": 29.6
+      },
+      "cam44": {
+        "v0": 12.32,
+        "balWh": 21.9,
+        "vmin": 12.29,
+        "vmax": 13.39,
+        "genWh": 55,
+        "loadWh": 33.1,
+        "pvPeakW": 19.4
+      },
+      "cam46": {
+        "v0": 12.05,
+        "balWh": 12.7,
+        "vmin": 11.98,
+        "vmax": 12.89,
+        "genWh": 125.9,
+        "loadWh": 113.2,
+        "pvPeakW": 29
+      },
+      "cam47": {
+        "v0": 12.15,
+        "balWh": 5,
+        "vmin": 12.11,
+        "vmax": 13.18,
+        "genWh": 112.2,
+        "loadWh": 107.2,
+        "pvPeakW": 30.8
+      },
+      "cam40": {
+        "v0": 12.42,
+        "balWh": 42.1,
+        "vmin": 12.37,
+        "vmax": 13.62,
+        "genWh": 138.5,
+        "loadWh": 96.4,
+        "pvPeakW": 31.7
+      },
+      "cam45": {
+        "v0": 12.5,
+        "balWh": 30.7,
+        "vmin": 12.42,
+        "vmax": 13.62,
+        "genWh": 61,
+        "loadWh": 30.3,
+        "pvPeakW": 20.2
+      },
+      "cam03": {
+        "v0": 12.32,
+        "balWh": 68.7,
+        "vmin": 12.2,
+        "vmax": 13.47,
+        "genWh": 162.5,
+        "loadWh": 93.8,
+        "pvPeakW": 32.2
+      },
+      "cam14": {
+        "v0": 12.29,
+        "balWh": 41.3,
+        "vmin": 12.22,
+        "vmax": 13.54,
+        "genWh": 151,
+        "loadWh": 109.7,
+        "pvPeakW": 30.4
+      },
+      "cam13": {
+        "v0": 12.57,
+        "balWh": 37.7,
+        "vmin": 12.45,
+        "vmax": 13.61,
+        "genWh": 125.9,
+        "loadWh": 88.2,
+        "pvPeakW": 30.2
+      },
+      "cam12": {
+        "v0": 12.24,
+        "balWh": -4.6,
+        "vmin": 12.2,
+        "vmax": 13.14,
+        "genWh": 81,
+        "loadWh": 85.6,
+        "pvPeakW": 29.6
+      },
+      "cam08": {
+        "v0": 12.25,
+        "balWh": 3.6,
+        "vmin": 12.14,
+        "vmax": 13.68,
+        "genWh": 100.8,
+        "loadWh": 97.2,
+        "pvPeakW": 32
+      },
+      "cam09": {
+        "v0": 12.11,
+        "balWh": 3.1,
+        "vmin": 12.03,
+        "vmax": 13.46,
+        "genWh": 126.1,
+        "loadWh": 123,
+        "pvPeakW": 34.1
+      },
+      "cam36": {
+        "v0": 12.4,
+        "balWh": 26.5,
+        "vmin": 12.32,
+        "vmax": 13.58,
+        "genWh": 128.5,
+        "loadWh": 102,
+        "pvPeakW": 31.7
+      },
+      "cam04": {
+        "v0": 12.36,
+        "balWh": 2.4,
+        "vmin": 12.26,
+        "vmax": 13.49,
+        "genWh": 102.5,
+        "loadWh": 100.1,
+        "pvPeakW": 32.6
+      },
+      "cam02": {
+        "v0": 12.21,
+        "balWh": -24.8,
+        "vmin": 12.13,
+        "vmax": 13.18,
+        "genWh": 116.4,
+        "loadWh": 141.2,
+        "pvPeakW": 32.1
+      },
+      "cam52": {
+        "v0": 12.02,
+        "balWh": 24.8,
+        "vmin": 11.97,
+        "vmax": 13.07,
+        "genWh": 126.8,
+        "loadWh": 102,
+        "pvPeakW": 31.1
+      },
+      "cam53": {
+        "v0": 12.79,
+        "balWh": 49.4,
+        "vmin": 12.47,
+        "vmax": 13.71,
+        "genWh": 101.9,
+        "loadWh": 52.5,
+        "pvPeakW": 33.7
+      },
+      "cam55": {
+        "v0": 12.31,
+        "balWh": 46.4,
+        "vmin": 12.24,
+        "vmax": 13.38,
+        "genWh": 151.8,
+        "loadWh": 105.4,
+        "pvPeakW": 30.4
+      },
+      "cam54": {
+        "v0": 12.15,
+        "balWh": 26.4,
+        "vmin": 12.06,
+        "vmax": 13.17,
+        "genWh": 136.1,
+        "loadWh": 109.7,
+        "pvPeakW": 30.4
+      }
+    },
+    "2026-10-22": {
+      "cam11": {
+        "v0": 12.42,
+        "balWh": 54.3,
+        "vmin": 12.33,
+        "vmax": 13.65,
+        "genWh": 135.3,
+        "loadWh": 81,
+        "pvPeakW": 30.3
+      },
+      "cam01": {
+        "v0": 12.35,
+        "balWh": 30.4,
+        "vmin": 12.24,
+        "vmax": 13.59,
+        "genWh": 123.6,
+        "loadWh": 93.2,
+        "pvPeakW": 30.7
+      },
+      "cam41": {
+        "v0": 12.56,
+        "balWh": 10.9,
+        "vmin": 12.47,
+        "vmax": 13.88,
+        "genWh": 27.2,
+        "loadWh": 16.3,
+        "pvPeakW": 18.4
+      },
+      "cam42": {
+        "v0": 12.17,
+        "balWh": 101.2,
+        "vmin": 12.06,
+        "vmax": 14.32,
+        "genWh": 181.1,
+        "loadWh": 79.9,
+        "pvPeakW": 30.5
+      },
+      "cam43": {
+        "v0": 11.95,
+        "balWh": 96.1,
+        "vmin": 11.83,
+        "vmax": 13.22,
+        "genWh": 197.9,
+        "loadWh": 101.8,
+        "pvPeakW": 30
+      },
+      "cam44": {
+        "v0": 12.43,
+        "balWh": 35.2,
+        "vmin": 12.33,
+        "vmax": 13.4,
+        "genWh": 66.3,
+        "loadWh": 31.1,
+        "pvPeakW": 13.8
+      },
+      "cam46": {
+        "v0": 12.03,
+        "balWh": 87.1,
+        "vmin": 11.91,
+        "vmax": 13.15,
+        "genWh": 201.5,
+        "loadWh": 114.4,
+        "pvPeakW": 29.1
+      },
+      "cam47": {
+        "v0": 12.2,
+        "balWh": 61.4,
+        "vmin": 12.1,
+        "vmax": 13.56,
+        "genWh": 170.9,
+        "loadWh": 109.5,
+        "pvPeakW": 30.6
+      },
+      "cam40": {
+        "v0": 12.5,
+        "balWh": 54.7,
+        "vmin": 12.4,
+        "vmax": 13.59,
+        "genWh": 152,
+        "loadWh": 97.3,
+        "pvPeakW": 29.2
+      },
+      "cam45": {
+        "v0": 12.58,
+        "balWh": 37.8,
+        "vmin": 12.47,
+        "vmax": 13.62,
+        "genWh": 67.6,
+        "loadWh": 29.8,
+        "pvPeakW": 14.6
+      },
+      "cam03": {
+        "v0": 12.37,
+        "balWh": 70.8,
+        "vmin": 12.25,
+        "vmax": 13.47,
+        "genWh": 167.2,
+        "loadWh": 96.4,
+        "pvPeakW": 31
+      },
+      "cam14": {
+        "v0": 12.37,
+        "balWh": 75.1,
+        "vmin": 12.25,
+        "vmax": 13.55,
+        "genWh": 186.9,
+        "loadWh": 111.8,
+        "pvPeakW": 30.1
+      },
+      "cam13": {
+        "v0": 12.59,
+        "balWh": 57.4,
+        "vmin": 12.49,
+        "vmax": 13.63,
+        "genWh": 148.2,
+        "loadWh": 90.8,
+        "pvPeakW": 30.2
+      },
+      "cam12": {
+        "v0": 12.23,
+        "balWh": 65.7,
+        "vmin": 12.16,
+        "vmax": 13.54,
+        "genWh": 150.8,
+        "loadWh": 85.1,
+        "pvPeakW": 30.4
+      },
+      "cam08": {
+        "v0": 12.3,
+        "balWh": 6.9,
+        "vmin": 12.19,
+        "vmax": 13.59,
+        "genWh": 106.7,
+        "loadWh": 99.8,
+        "pvPeakW": 29.1
+      },
+      "cam09": {
+        "v0": 12.08,
+        "balWh": 84,
+        "vmin": 11.98,
+        "vmax": 14.28,
+        "genWh": 212.2,
+        "loadWh": 128.2,
+        "pvPeakW": 33.5
+      },
+      "cam36": {
+        "v0": 12.47,
+        "balWh": 55.2,
+        "vmin": 12.36,
+        "vmax": 13.59,
+        "genWh": 156.4,
+        "loadWh": 101.2,
+        "pvPeakW": 29.8
+      },
+      "cam04": {
+        "v0": 12.37,
+        "balWh": 57.5,
+        "vmin": 12.25,
+        "vmax": 13.54,
+        "genWh": 156.6,
+        "loadWh": 99.1,
+        "pvPeakW": 30.1
+      },
+      "cam02": {
+        "v0": 12.19,
+        "balWh": 85.6,
+        "vmin": 12.08,
+        "vmax": 13.61,
+        "genWh": 231.2,
+        "loadWh": 145.6,
+        "pvPeakW": 32.2
+      },
+      "cam52": {
+        "v0": 12.08,
+        "balWh": 83,
+        "vmin": 11.97,
+        "vmax": 13.58,
+        "genWh": 188.4,
+        "loadWh": 105.4,
+        "pvPeakW": 30.8
+      },
+      "cam53": {
+        "v0": 12.83,
+        "balWh": 56.5,
+        "vmin": 12.54,
+        "vmax": 13.97,
+        "genWh": 107.4,
+        "loadWh": 50.9,
+        "pvPeakW": 20
+      },
+      "cam55": {
+        "v0": 12.47,
+        "balWh": 79.5,
+        "vmin": 12.32,
+        "vmax": 13.58,
+        "genWh": 182.8,
+        "loadWh": 103.3,
+        "pvPeakW": 30.4
+      },
+      "cam54": {
+        "v0": 12.2,
+        "balWh": 59,
+        "vmin": 12.08,
+        "vmax": 13.37,
+        "genWh": 168.2,
+        "loadWh": 109.2,
+        "pvPeakW": 30.4
+      }
+    },
+    "2026-10-23": {
+      "cam11": {
+        "v0": 12.39,
+        "balWh": 31.6,
+        "vmin": 12.28,
+        "vmax": 13.63,
+        "genWh": 113.8,
+        "loadWh": 82.2,
+        "pvPeakW": 30.6
+      },
+      "cam01": {
+        "v0": 12.34,
+        "balWh": 22,
+        "vmin": 12.22,
+        "vmax": 13.6,
+        "genWh": 115.9,
+        "loadWh": 93.9,
+        "pvPeakW": 31.7
+      },
+      "cam41": {
+        "v0": 12.53,
+        "balWh": 11.7,
+        "vmin": 12.42,
+        "vmax": 13.85,
+        "genWh": 27.4,
+        "loadWh": 15.7,
+        "pvPeakW": 8.6
+      },
+      "cam42": {
+        "v0": 12.19,
+        "balWh": 25.5,
+        "vmin": 12.07,
+        "vmax": 14.31,
+        "genWh": 89,
+        "loadWh": 63.5,
+        "pvPeakW": 26
+      },
+      "cam43": {
+        "v0": 12.05,
+        "balWh": 58.1,
+        "vmin": 11.94,
+        "vmax": 14,
+        "genWh": 157.5,
+        "loadWh": 99.4,
+        "pvPeakW": 30.7
+      },
+      "cam44": {
+        "v0": 12.42,
+        "balWh": 15.6,
+        "vmin": 12.33,
+        "vmax": 13.4,
+        "genWh": 49.8,
+        "loadWh": 34.2,
+        "pvPeakW": 13.5
+      },
+      "cam46": {
+        "v0": 12.13,
+        "balWh": 43.4,
+        "vmin": 12.01,
+        "vmax": 13.21,
+        "genWh": 156.7,
+        "loadWh": 113.3,
+        "pvPeakW": 29.1
+      },
+      "cam47": {
+        "v0": 12.27,
+        "balWh": 28,
+        "vmin": 12.16,
+        "vmax": 13.56,
+        "genWh": 135.3,
+        "loadWh": 107.3,
+        "pvPeakW": 28.9
+      },
+      "cam40": {
+        "v0": 12.48,
+        "balWh": 33.1,
+        "vmin": 12.37,
+        "vmax": 13.68,
+        "genWh": 130.7,
+        "loadWh": 97.6,
+        "pvPeakW": 29
+      },
+      "cam45": {
+        "v0": 12.53,
+        "balWh": 24.8,
+        "vmin": 12.4,
+        "vmax": 13.61,
+        "genWh": 55.8,
+        "loadWh": 31,
+        "pvPeakW": 13.6
+      },
+      "cam03": {
+        "v0": 12.34,
+        "balWh": 42.7,
+        "vmin": 12.19,
+        "vmax": 13.46,
+        "genWh": 136.3,
+        "loadWh": 93.6,
+        "pvPeakW": 31.6
+      },
+      "cam14": {
+        "v0": 12.37,
+        "balWh": 15.2,
+        "vmin": 12.25,
+        "vmax": 13.46,
+        "genWh": 126,
+        "loadWh": 110.8,
+        "pvPeakW": 26.4
+      },
+      "cam13": {
+        "v0": 12.56,
+        "balWh": 38.5,
+        "vmin": 12.42,
+        "vmax": 13.61,
+        "genWh": 126.9,
+        "loadWh": 88.4,
+        "pvPeakW": 24.6
+      },
+      "cam12": {
+        "v0": 12.31,
+        "balWh": 53,
+        "vmin": 12.22,
+        "vmax": 13.57,
+        "genWh": 138.3,
+        "loadWh": 85.3,
+        "pvPeakW": 31
+      },
+      "cam08": {
+        "v0": 12.19,
+        "balWh": 27.9,
+        "vmin": 12.11,
+        "vmax": 13.83,
+        "genWh": 128.2,
+        "loadWh": 100.3,
+        "pvPeakW": 33.3
+      },
+      "cam09": {
+        "v0": 12.22,
+        "balWh": 30.4,
+        "vmin": 12.09,
+        "vmax": 13.74,
+        "genWh": 155.7,
+        "loadWh": 125.3,
+        "pvPeakW": 34.2
+      },
+      "cam36": {
+        "v0": 12.45,
+        "balWh": 26.6,
+        "vmin": 12.34,
+        "vmax": 13.58,
+        "genWh": 128.5,
+        "loadWh": 101.9,
+        "pvPeakW": 27
+      },
+      "cam04": {
+        "v0": 12.36,
+        "balWh": 36.8,
+        "vmin": 12.23,
+        "vmax": 13.58,
+        "genWh": 137.7,
+        "loadWh": 100.9,
+        "pvPeakW": 31.2
+      },
+      "cam02": {
+        "v0": 12.27,
+        "balWh": 36.6,
+        "vmin": 12.16,
+        "vmax": 13.61,
+        "genWh": 177.5,
+        "loadWh": 140.9,
+        "pvPeakW": 32.7
+      },
+      "cam52": {
+        "v0": 12.15,
+        "balWh": 22.4,
+        "vmin": 12.05,
+        "vmax": 13.58,
+        "genWh": 126.3,
+        "loadWh": 103.9,
+        "pvPeakW": 31.3
+      },
+      "cam53": {
+        "v0": 12.81,
+        "balWh": 40.6,
+        "vmin": 12.47,
+        "vmax": 13.99,
+        "genWh": 90.4,
+        "loadWh": 49.8,
+        "pvPeakW": 18.3
+      },
+      "cam55": {
+        "v0": 12.49,
+        "balWh": 24.4,
+        "vmin": 12.34,
+        "vmax": 13.58,
+        "genWh": 126.8,
+        "loadWh": 102.4,
+        "pvPeakW": 30.6
+      },
+      "cam54": {
+        "v0": 12.28,
+        "balWh": 13.5,
+        "vmin": 12.15,
+        "vmax": 13.48,
+        "genWh": 120.9,
+        "loadWh": 107.4,
+        "pvPeakW": 30.8
+      }
+    },
+    "2026-10-24": {
+      "cam11": {
+        "v0": 12.38,
+        "balWh": -49.1,
+        "vmin": 12.19,
+        "vmax": 12.78,
+        "genWh": 33.6,
+        "loadWh": 82.7,
+        "pvPeakW": 9.1
+      },
+      "cam01": {
+        "v0": 12.34,
+        "balWh": -65.6,
+        "vmin": 12.12,
+        "vmax": 12.59,
+        "genWh": 27.7,
+        "loadWh": 93.3,
+        "pvPeakW": 8.6
+      },
+      "cam41": {
+        "v0": 12.53,
+        "balWh": -3.5,
+        "vmin": 12.39,
+        "vmax": 13.01,
+        "genWh": 11.8,
+        "loadWh": 15.3,
+        "pvPeakW": 3.3
+      },
+      "cam42": {
+        "v0": 12.21,
+        "balWh": -44.1,
+        "vmin": 11.95,
+        "vmax": 12.45,
+        "genWh": 27.2,
+        "loadWh": 71.3,
+        "pvPeakW": 10
+      },
+      "cam43": {
+        "v0": 12.05,
+        "balWh": -65.7,
+        "vmin": 11.73,
+        "vmax": 12.24,
+        "genWh": 34.1,
+        "loadWh": 99.8,
+        "pvPeakW": 9.3
+      },
+      "cam44": {
+        "v0": 12.4,
+        "balWh": -21.8,
+        "vmin": 12.23,
+        "vmax": 12.48,
+        "genWh": 9.4,
+        "loadWh": 31.2,
+        "pvPeakW": 2.8
+      },
+      "cam46": {
+        "v0": 12.13,
+        "balWh": -77.3,
+        "vmin": 11.82,
+        "vmax": 12.28,
+        "genWh": 36,
+        "loadWh": 113.3,
+        "pvPeakW": 9.4
+      },
+      "cam47": {
+        "v0": 12.26,
+        "balWh": -66.7,
+        "vmin": 12.04,
+        "vmax": 12.63,
+        "genWh": 39.5,
+        "loadWh": 106.2,
+        "pvPeakW": 10.1
+      },
+      "cam40": {
+        "v0": 12.47,
+        "balWh": -60.3,
+        "vmin": 12.29,
+        "vmax": 12.85,
+        "genWh": 37.5,
+        "loadWh": 97.8,
+        "pvPeakW": 10.2
+      },
+      "cam45": {
+        "v0": 12.52,
+        "balWh": -17.6,
+        "vmin": 12.32,
+        "vmax": 12.77,
+        "genWh": 13.8,
+        "loadWh": 31.4,
+        "pvPeakW": 3.9
+      },
+      "cam03": {
+        "v0": 12.31,
+        "balWh": -67.3,
+        "vmin": 12.07,
+        "vmax": 12.35,
+        "genWh": 22.7,
+        "loadWh": 90,
+        "pvPeakW": 7.1
+      },
+      "cam14": {
+        "v0": 12.31,
+        "balWh": -82.4,
+        "vmin": 12.12,
+        "vmax": 12.5,
+        "genWh": 28.5,
+        "loadWh": 110.9,
+        "pvPeakW": 7.7
+      },
+      "cam13": {
+        "v0": 12.55,
+        "balWh": -52.7,
+        "vmin": 12.36,
+        "vmax": 12.85,
+        "genWh": 36.8,
+        "loadWh": 89.5,
+        "pvPeakW": 10.1
+      },
+      "cam12": {
+        "v0": 12.34,
+        "balWh": -52.9,
+        "vmin": 12.12,
+        "vmax": 12.52,
+        "genWh": 31.4,
+        "loadWh": 84.3,
+        "pvPeakW": 8.8
+      },
+      "cam08": {
+        "v0": 12.22,
+        "balWh": -64.9,
+        "vmin": 12.05,
+        "vmax": 12.66,
+        "genWh": 33.6,
+        "loadWh": 98.5,
+        "pvPeakW": 9.7
+      },
+      "cam09": {
+        "v0": 12.19,
+        "balWh": -85.9,
+        "vmin": 11.9,
+        "vmax": 12.37,
+        "genWh": 36.9,
+        "loadWh": 122.8,
+        "pvPeakW": 9.5
+      },
+      "cam36": {
+        "v0": 12.43,
+        "balWh": -68.1,
+        "vmin": 12.25,
+        "vmax": 12.74,
+        "genWh": 36.3,
+        "loadWh": 104.4,
+        "pvPeakW": 10.1
+      },
+      "cam04": {
+        "v0": 12.36,
+        "balWh": -63.6,
+        "vmin": 12.15,
+        "vmax": 12.78,
+        "genWh": 36.1,
+        "loadWh": 99.7,
+        "pvPeakW": 9.4
+      },
+      "cam02": {
+        "v0": 12.26,
+        "balWh": -100.7,
+        "vmin": 11.99,
+        "vmax": 12.57,
+        "genWh": 39.2,
+        "loadWh": 139.9,
+        "pvPeakW": 10.9
+      },
+      "cam52": {
+        "v0": 12.1,
+        "balWh": -66.3,
+        "vmin": 11.91,
+        "vmax": 12.54,
+        "genWh": 38.6,
+        "loadWh": 104.9,
+        "pvPeakW": 10.3
+      },
+      "cam53": {
+        "v0": 12.8,
+        "balWh": -43,
+        "vmin": 12.33,
+        "vmax": 13.08,
+        "genWh": 38.3,
+        "loadWh": 81.3,
+        "pvPeakW": 9.7
+      },
+      "cam55": {
+        "v0": 12.41,
+        "balWh": -64.5,
+        "vmin": 12.22,
+        "vmax": 12.57,
+        "genWh": 38.9,
+        "loadWh": 103.4,
+        "pvPeakW": 10.2
+      },
+      "cam54": {
+        "v0": 12.19,
+        "balWh": -69.7,
+        "vmin": 11.97,
+        "vmax": 12.37,
+        "genWh": 36.7,
+        "loadWh": 106.4,
+        "pvPeakW": 10.1
+      }
+    },
+    "2026-10-25": {
+      "cam11": {
+        "v0": 12.18,
+        "balWh": -64.5,
+        "vmin": 12.05,
+        "vmax": 12.58,
+        "genWh": 19.1,
+        "loadWh": 83.6,
+        "pvPeakW": 6.4
+      },
+      "cam01": {
+        "v0": 12.12,
+        "balWh": -77.5,
+        "vmin": 11.97,
+        "vmax": 12.38,
+        "genWh": 15.5,
+        "loadWh": 93,
+        "pvPeakW": 7.8
+      },
+      "cam41": {
+        "v0": 12.4,
+        "balWh": -8.6,
+        "vmin": 12.32,
+        "vmax": 12.85,
+        "genWh": 6.4,
+        "loadWh": 15,
+        "pvPeakW": 2.5
+      },
+      "cam42": {
+        "v0": 11.97,
+        "balWh": -55.7,
+        "vmin": 11.74,
+        "vmax": 12.18,
+        "genWh": 22.1,
+        "loadWh": 77.8,
+        "pvPeakW": 7.1
+      },
+      "cam43": {
+        "v0": 11.74,
+        "balWh": -79.4,
+        "vmin": 11.44,
+        "vmax": 11.93,
+        "genWh": 20.4,
+        "loadWh": 99.8,
+        "pvPeakW": 6.8
+      },
+      "cam44": {
+        "v0": 12.22,
+        "balWh": -26.7,
+        "vmin": 12.15,
+        "vmax": 12.44,
+        "genWh": 5.3,
+        "loadWh": 32,
+        "pvPeakW": 1.9
+      },
+      "cam46": {
+        "v0": 11.82,
+        "balWh": -91,
+        "vmin": 11.53,
+        "vmax": 12.03,
+        "genWh": 24,
+        "loadWh": 115,
+        "pvPeakW": 11.4
+      },
+      "cam47": {
+        "v0": 12.04,
+        "balWh": -82.1,
+        "vmin": 11.87,
+        "vmax": 12.34,
+        "genWh": 26,
+        "loadWh": 108.1,
+        "pvPeakW": 9.1
+      },
+      "cam40": {
+        "v0": 12.29,
+        "balWh": -74,
+        "vmin": 12.18,
+        "vmax": 12.59,
+        "genWh": 25.6,
+        "loadWh": 99.6,
+        "pvPeakW": 9.2
+      },
+      "cam45": {
+        "v0": 12.31,
+        "balWh": -21.5,
+        "vmin": 12.15,
+        "vmax": 12.55,
+        "genWh": 8.9,
+        "loadWh": 30.4,
+        "pvPeakW": 3.7
+      },
+      "cam03": {
+        "v0": 12.07,
+        "balWh": -71.2,
+        "vmin": 11.87,
+        "vmax": 12.19,
+        "genWh": 16.7,
+        "loadWh": 87.9,
+        "pvPeakW": 8.3
+      },
+      "cam14": {
+        "v0": 12.12,
+        "balWh": -84.6,
+        "vmin": 11.95,
+        "vmax": 12.4,
+        "genWh": 24.4,
+        "loadWh": 109,
+        "pvPeakW": 11.9
+      },
+      "cam13": {
+        "v0": 12.36,
+        "balWh": -59.4,
+        "vmin": 12.24,
+        "vmax": 12.88,
+        "genWh": 31.6,
+        "loadWh": 91,
+        "pvPeakW": 14.2
+      },
+      "cam12": {
+        "v0": 12.13,
+        "balWh": -57,
+        "vmin": 11.99,
+        "vmax": 12.44,
+        "genWh": 26.8,
+        "loadWh": 83.8,
+        "pvPeakW": 10.2
+      },
+      "cam08": {
+        "v0": 12.05,
+        "balWh": -61.9,
+        "vmin": 11.96,
+        "vmax": 12.67,
+        "genWh": 31.8,
+        "loadWh": 93.7,
+        "pvPeakW": 15
+      },
+      "cam09": {
+        "v0": 11.89,
+        "balWh": -92.4,
+        "vmin": 11.66,
+        "vmax": 12.23,
+        "genWh": 31.3,
+        "loadWh": 123.7,
+        "pvPeakW": 12.1
+      },
+      "cam36": {
+        "v0": 12.26,
+        "balWh": -70.7,
+        "vmin": 12.13,
+        "vmax": 12.72,
+        "genWh": 31,
+        "loadWh": 101.7,
+        "pvPeakW": 13.7
+      },
+      "cam04": {
+        "v0": 12.16,
+        "balWh": -68.6,
+        "vmin": 12.01,
+        "vmax": 12.69,
+        "genWh": 29.7,
+        "loadWh": 98.3,
+        "pvPeakW": 12.3
+      },
+      "cam02": {
+        "v0": 11.99,
+        "balWh": -114.1,
+        "vmin": 11.76,
+        "vmax": 12.4,
+        "genWh": 29.3,
+        "loadWh": 143.4,
+        "pvPeakW": 13.1
+      },
+      "cam52": {
+        "v0": 11.91,
+        "balWh": -82.3,
+        "vmin": 11.71,
+        "vmax": 12.16,
+        "genWh": 21.8,
+        "loadWh": 104.1,
+        "pvPeakW": 6.2
+      },
+      "cam53": {
+        "v0": 12.33,
+        "balWh": -67.5,
+        "vmin": 12.14,
+        "vmax": 12.82,
+        "genWh": 31.5,
+        "loadWh": 99,
+        "pvPeakW": 13.5
+      },
+      "cam55": {
+        "v0": 12.24,
+        "balWh": -82.2,
+        "vmin": 12.05,
+        "vmax": 12.28,
+        "genWh": 21.2,
+        "loadWh": 103.4,
+        "pvPeakW": 6.3
+      },
+      "cam54": {
+        "v0": 12,
+        "balWh": -76.5,
+        "vmin": 11.81,
+        "vmax": 12.29,
+        "genWh": 31.1,
+        "loadWh": 107.6,
+        "pvPeakW": 13.2
       }
     }
   }
