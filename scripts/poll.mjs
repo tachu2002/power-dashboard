@@ -565,6 +565,7 @@ const BATTERY_WINDOW_DAYS = 35;     // 容量を1回測るのに使う日数
 const BATTERY_DEGRADE_MIN_SPAN = 70;// これだけ日数がないと「初期」と「直近」を比べない
 const BATTERY_VMIN_KEEP_DAYS = 60;  // 画面側で深放電日を数えるために渡す最低電圧の日数
 const BATTERY_NIGHT_WINDOW = 15;    // へたり具合(mV/Ah)を比べる夜数
+const BATTERY_MV_MAX_V0 = 12.25;    // へたり具合に使う夜の0時電圧の上限(満充電に近い夜は降下が大きく出る)
 // 鉛蓄電池(12V)の休止時開回路電圧 → 残量(SOC)。0:00は充電の下駄が抜けているのでこの表が使える。
 const BATTERY_OCV_TABLE = [
   [11.36, 0], [11.51, 10], [11.66, 20], [11.81, 30], [11.96, 40], [12.10, 50],
@@ -618,7 +619,14 @@ function fitLine(points) {
  * 20分を超えて間が空いた2点は、途中が0Vでつながっている場合だけ比べる。 */
 // 日次集計の「当日の載せ替え検出」の版。2 = 電池切れで負荷が切れた形を交換とみなさない。
 // これより古い版で集計した日は取り直す(負荷切れを交換と誤判定したまま残っているため)。
-const SWAP_CHECK_VERSION = 2;
+const SWAP_CHECK_VERSION = 3;
+/* 版3(2026-10-28): 充電中の電圧の段を交換とみなさない。
+   10月の5分データでは、昼の充電中に 13.3V→14.3V のような跳ね(充電制御が吸収充電へ移る段)が
+   発電の増えないまま起き、北沢 1拠点で15回など「交換」が大量に記録されていた。
+   本物の交換はどれも、弱った電池(12.0V前後以下)から休止状態の電池(12.3〜12.7V)への跳ね。
+   跳ねる前が SWAP_MAX_BEFORE_V 未満、跳ねた後が SWAP_MAX_AFTER_V 以下のときだけ交換とみなす。 */
+const SWAP_MAX_BEFORE_V = 12.6;
+const SWAP_MAX_AFTER_V = 12.9;
 const SWAP_STEP_V = 0.35;
 const SWAP_MAX_PV_RISE_W = 1;
 const SWAP_NORMAL_GAP_MS = 20 * 60 * 1000;
@@ -654,6 +662,7 @@ function findIntradaySwap(rows) {
       const pvA = typeof prev.pv === "number" ? prev.pv : 0;
       const pvB = typeof p.pv === "number" ? p.pv : 0;
       if (gapOk && p.bat - prev.bat >= SWAP_STEP_V && pvB - pvA <= SWAP_MAX_PV_RISE_W
+        && prev.bat < SWAP_MAX_BEFORE_V && p.bat <= SWAP_MAX_AFTER_V
         && !loadCollapsedAt(rows, idx, prev.loadW)) {
         found = { at: p.fetchedAt.toISOString(), vBefore: prev.bat, vAfter: p.bat };
       }
@@ -893,16 +902,31 @@ function mergeDailyStores(store, longTerm) {
 //   「翌日の0時電圧 − 当日の0時電圧」 = α + β × 「当日の収支[Wh]」
 // の回帰で 1/β = 「1Vあたり何Wh入るか」が求まる。これを0%→100%の電圧幅(1.34V)に換算する。
 // 毎日の待機消費のような系統的な偏りはαが吸収するので、差分で取るのが要点。
-function capacityFromSeries(series, tempC) {
-  const pts = [], temps = [];
+/* 【満充電の日は回帰に使わない】(2026-10-28)
+   晴れが続いた10月は、ほとんどの拠点が毎晩 12.33〜12.39V に張り付いた(満充電)。満充電の電池には
+   黒字(+60〜90Wh)がそれ以上入らないので、「黒字なのに翌日の電圧がほぼ上がらない」日が並び、
+   傾きβが小さく出て容量が過大になっていた(多呂樋管 177Ah・定格比362%、梅名樋管2号 91Ah など)。
+   黒字の日で、翌日0時の電圧が満充電の水準(BATTERY_FULL_REST_V)以上の組は、入りきらなかった分が
+   捨てられているので使わない。使える組が減るぶん、直近から数えて BATTERY_WINDOW_DAYS 組まで、
+   最大 BATTERY_WINDOW_SEARCH_DAYS 日さかのぼって集める。 */
+const BATTERY_FULL_REST_V = 12.30;
+const BATTERY_WINDOW_SEARCH_DAYS = 90;
+function capacityPairs(series, tempC, keepFull) {
+  const pts = [];
   for (let i = 0; i < series.length - 1; i++) {
     const a = series[i], b = series[i + 1];
     if ((Date.parse(b.day) - Date.parse(a.day)) !== 86400000) continue;   // 日が飛んだらまたがせない
     if (typeof a.d.v0 !== "number" || typeof b.d.v0 !== "number" || typeof a.d.balWh !== "number") continue;
-    pts.push({ x: a.d.balWh, y: b.d.v0 - a.d.v0 });
+    if (!keepFull && a.d.balWh > 0 && b.d.v0 >= BATTERY_FULL_REST_V) continue;   // 満充電で入りきらなかった日
     const t = tempC ? tempC[a.day] : null;
-    if (typeof t === "number") temps.push(t);
+    pts.push({ x: a.d.balWh, y: b.d.v0 - a.d.v0, day: a.day, t: typeof t === "number" ? t : null });
   }
+  return pts;
+}
+function capacityFromSeries(series, tempC, keepFull) {
+  const pts = capacityPairs(series, tempC, !!keepFull).slice(-BATTERY_WINDOW_DAYS);
+  const keptFull = !!keepFull;
+  const temps = pts.map(function (p) { return p.t; }).filter(function (t) { return t !== null; });
   if (pts.length < BATTERY_MIN_DAYS) return null;
   const fit = fitLine(pts);
   if (!fit || !(fit.b > 1e-6)) return null;
@@ -915,9 +939,9 @@ function capacityFromSeries(series, tempC) {
   // 25℃相当に揃えた値。初期と直近を比べるときはこちらを使う。
   const cap25 = tMean === null ? capAh : capAh / (1 + BATTERY_TEMP_COEF * (tMean - BATTERY_TEMP_REF_C));
   return {
-    capAh: capAh, cap25Ah: cap25, r: fit.r, pairs: pts.length,
+    capAh: capAh, cap25Ah: cap25, r: fit.r, pairs: pts.length, keptFull: keptFull,
     tempC: tMean === null ? null : Math.round(tMean * 10) / 10,
-    from: series[0].day, to: series[series.length - 1].day
+    from: pts[0].day, to: series[series.length - 1].day
   };
 }
 
@@ -1113,14 +1137,23 @@ function computeBatteryEndurance(store, longTerm) {
       return c && c.r >= BATTERY_MIN_R && c.capAh >= BATTERY_CAP_RANGE_AH[0] && c.capAh <= BATTERY_CAP_RANGE_AH[1];
     };
     const current = segments[segments.length - 1];
-    const afterCap = capacityFromSeries(current.slice(-BATTERY_WINDOW_DAYS), tempC);
+    const afterCap = capacityFromSeries(current.slice(-BATTERY_WINDOW_SEARCH_DAYS), tempC);
     let cap = null, placeholder = false;
     if (goodFit(afterCap)) {
       cap = afterCap;
     } else {
       for (let k = segments.length - 2; k >= 0 && !cap; k--) {
-        const c = capacityFromSeries(segments[k].slice(-BATTERY_WINDOW_DAYS), tempC);
+        const c = capacityFromSeries(segments[k].slice(-BATTERY_WINDOW_SEARCH_DAYS), tempC);
         if (goodFit(c)) { cap = c; placeholder = true; }
+      }
+    }
+    // 消費がごく小さく、いつも満充電の拠点(こも池など)は、満充電の日を除くとどの区間にも組が残らない。
+    // その場合だけ、満充電の日も含めて測る(容量はやや大きめに出るが、持ちはもともと「継続可」)。
+    let keptFull = false;
+    if (!cap) {
+      for (let k = segments.length - 1; k >= 0 && !cap; k--) {
+        const c = capacityFromSeries(segments[k].slice(-BATTERY_WINDOW_SEARCH_DAYS), tempC, true);
+        if (goodFit(c)) { cap = c; keptFull = true; placeholder = k < segments.length - 1; }
       }
     }
     // どの区間でも測れなければ、いまの電池の区間の結果(当てはまりが悪くても)を「測定中」の表示用に残す
@@ -1129,6 +1162,7 @@ function computeBatteryEndurance(store, longTerm) {
     entry.capAfterSwap = !!(entry.lastSwapAt && goodFit(afterCap));
     entry.capStale = !!(entry.lastSwapAt && !goodFit(afterCap));
     entry.capPlaceholder = placeholder;       // 前の電池の区間で仮置きしているか
+    entry.capKeptFull = keptFull;             // 満充電の日も含めて測ったか(いつも満充電の拠点)
     if (cap && !entry.mains) {
       const capAh = cap.capAh;
       entry.fitR = Math.round(cap.r * 1000) / 1000;
@@ -1184,6 +1218,11 @@ function computeBatteryEndurance(store, longTerm) {
       const d = p.d;
       if (typeof d.nightVPerH !== "number" || typeof d.nightA !== "number") return null;
       if (!(d.nightVPerH > 0.0008) || !(d.nightA >= BATTERY_MIN_NIGHT_A)) return null;
+      // 満充電に近い夜(0時の電圧が高い夜)は、同じ電池でも1Ahあたりの降下が約2倍に出る
+      // (実測 10月: 12.3V台で始まる夜 15〜25mV/Ah、12.0V前後で始まる夜 9〜10mV/Ah)。
+      // 9月(残量が低め)と10月(満充電が続いた)を比べて全拠点が「3〜6割速くなった＝要対応」と
+      // 出ていたため、残量が中ほどの夜(0時 BATTERY_MV_MAX_V0 以下)だけで比べる。
+      if (!(typeof d.v0 === "number" && d.v0 <= BATTERY_MV_MAX_V0)) return null;
       // 前日の発電量が分かっていて、かつ中央値を超えている夜は表面電荷の影響が乗るので外す
       const pg = prevGenOf[p.day];
       if (genMid !== null && typeof pg === "number" && pg > genMid) return null;
@@ -1243,7 +1282,129 @@ function computeBatteryEndurance(store, longTerm) {
     }
     sites[id] = entry;
   });
+  attachDegradation(sites, dayMap, days);
   return sites;
+}
+
+/* 劣化スコア(10.0満点・高いほど良好)と交換の優先度
+ * -----------------------------------------------------------------------
+ * 全拠点は同じ地域にあり日射は共通。だから「同じ時期に全拠点が同じように動いた分」は天気や季節
+ * のせいで、その拠点だけが余計に悪化した分が電池のへたりだと考えられる。そこで3つの指標を、
+ * 全拠点の中央値を基準にして点数にする。
+ *   ① 容量(40%)   … 実効容量 ÷ 定格(定格比)。95%以上=10点、50%以下=0点(80%≒6.7点、70%≒4.4点)。
+ *   ② 放電の速さ(30%) … 1Ahあたりの降下(mV/Ah)が前15夜からどれだけ増えたかを、
+ *                       全拠点の増え方(季節による共通の変化)と比べる。同じなら10点、+50%で0点。
+ *   ③ 朝の回復(30%) … 朝の最低電圧(直近14日 ← その前14日)の動きを、全拠点の中央値と比べる。
+ *                       日射が共通なので、その差が「同じ日照条件で戻りきれなくなった分」。
+ *                       全拠点並みなら10点、0.5V余計に下がれば0点。
+ * 取れなかった指標は除いて重みを配り直す。交換直後の拠点は交換前の値が当てにならないので採点しない。 */
+const DEGRADE_WEIGHTS = { capacity: 0.4, discharge: 0.3, recovery: 0.3 };
+const DEGRADE_VMIN_HALF_DAYS = 14;      // 朝の電圧を比べる半分の期間
+const DEGRADE_VMIN_MIN_POINTS = 8;      // その半分に必要な日数
+const DEGRADE_MIN_FLEET = 4;            // 全拠点の基準を作るのに必要な拠点数
+const DEGRADE_FRESH_DAYS = 14;          // 交換してからこの日数に満たなければ「交換直後」
+const DEGRADE_SOH_FLOOR = 50, DEGRADE_SOH_FULL = 95;   // 定格比の誤差が±15%程度あるので、満点は95%以上
+const DEGRADE_MV_BAD_REL = 0.5;         // 全拠点より放電が5割多く悪化したら0点
+const DEGRADE_VMIN_BAD_V = 0.5;         // 全拠点より朝の電圧が0.5V余計に下がったら0点
+const DEGRADE_GRADES = [                // 点数の下限 → 区分
+  { min: 8.0, key: "good", label: "良好" },
+  { min: 6.0, key: "watch", label: "経過観察" },
+  { min: 4.0, key: "plan", label: "交換を検討" },
+  { min: 0, key: "replace", label: "要交換" }
+];
+function degradeGradeOf(score) {
+  for (let i = 0; i < DEGRADE_GRADES.length; i++) if (score >= DEGRADE_GRADES[i].min) return DEGRADE_GRADES[i];
+  return DEGRADE_GRADES[DEGRADE_GRADES.length - 1];
+}
+function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+function attachDegradation(sites, dayMap, days) {
+  const ids = Object.keys(sites).filter(function (id) { return !sites[id].mains; });
+  const lastDay = days.length ? days[days.length - 1] : null;
+  // 朝の最低電圧の変化(直近の半分 − その前の半分)。暦の日付で全拠点そろえる。
+  const half = DEGRADE_VMIN_HALF_DAYS;
+  const vminDelta = {};
+  if (lastDay) {
+    const dayAt = function (back) { return new Date(Date.parse(lastDay) - back * 86400000).toISOString().slice(0, 10); };
+    const winVals = function (id, from, to) {   // 暦の back=from..to-1 日前
+      const v = [];
+      for (let b = from; b < to; b++) {
+        const d = (dayMap[dayAt(b)] || {})[id];
+        if (d && typeof d.vmin === "number" && d.vmin > 0) v.push(d.vmin);
+      }
+      return v;
+    };
+    ids.forEach(function (id) {
+      const e = sites[id];
+      // 交換が窓の中に入っていたら比べない(電池が別物になる)
+      if (e.lastSwapAt && e.lastSwapAt > dayAt(half * 2 - 1)) { vminDelta[id] = null; return; }
+      const nowV = winVals(id, 0, half), prevV = winVals(id, half, half * 2);
+      if (nowV.length < DEGRADE_VMIN_MIN_POINTS || prevV.length < DEGRADE_VMIN_MIN_POINTS) { vminDelta[id] = null; return; }
+      vminDelta[id] = medianOf(nowV) - medianOf(prevV);
+    });
+  }
+  const mvRatio = {};
+  ids.forEach(function (id) {
+    const e = sites[id];
+    mvRatio[id] = (!e.mvSpansSwap && typeof e.mvPerAhNow === "number" && typeof e.mvPerAhPrev === "number" && e.mvPerAhPrev > 0)
+      ? e.mvPerAhNow / e.mvPerAhPrev : null;
+  });
+  const valid = function (m) { return ids.map(function (id) { return m[id]; }).filter(function (x) { return typeof x === "number"; }); };
+  const mvVals = valid(mvRatio), dvVals = valid(vminDelta);
+  const mvBase = mvVals.length >= DEGRADE_MIN_FLEET ? medianOf(mvVals) : null;
+  const dvBase = dvVals.length >= DEGRADE_MIN_FLEET ? medianOf(dvVals) : null;
+  ids.forEach(function (id) {
+    const e = sites[id];
+    const fresh = !!(e.lastSwapAt && typeof e.capDaysAfterSwap === "number" && e.capDaysAfterSwap < DEGRADE_FRESH_DAYS);
+    // 交換から日が経っているのに、いまの電池の容量がまだ測れていない(当てはまりが悪い)拠点は容量を採点しない
+    const capKnown = !(e.capStale || e.capPlaceholder);
+    const deg = { score: null, grade: null, gradeLabel: null, confidence: null, fresh: fresh, parts: [],
+      baseline: { mvRatio: mvBase === null ? null : Math.round(mvBase * 1000) / 1000,
+        vminDeltaV: dvBase === null ? null : Math.round(dvBase * 1000) / 1000, fleet: ids.length } };
+    if (fresh) {
+      deg.reason = "交換直後";
+      e.degrade = deg;
+      return;
+    }
+    // ① 容量
+    let uncertain = false;
+    if (capKnown && typeof e.sohPct === "number") {
+      if (e.sohPct > 130) uncertain = true;     // 測定のばらつき。満点扱いにするが確からしさは下げる
+      const soh = Math.min(e.sohPct, DEGRADE_SOH_FULL);
+      deg.parts.push({ key: "capacity", label: "容量", weight: DEGRADE_WEIGHTS.capacity,
+        score: Math.round(clamp01((soh - DEGRADE_SOH_FLOOR) / (DEGRADE_SOH_FULL - DEGRADE_SOH_FLOOR)) * 100) / 10,
+        value: e.sohPct, text: "定格比 " + e.sohPct + "%" + (uncertain ? "(測定ばらつき)" : "") });
+    }
+    // ② 放電の速さ(全拠点の変化に対する余分な悪化)
+    if (mvBase !== null && typeof mvRatio[id] === "number") {
+      const rel = mvRatio[id] / mvBase - 1;
+      deg.parts.push({ key: "discharge", label: "放電の速さ", weight: DEGRADE_WEIGHTS.discharge,
+        score: Math.round((1 - clamp01(rel / DEGRADE_MV_BAD_REL)) * 100) / 10,
+        value: Math.round(rel * 1000) / 1000,
+        text: "全拠点比 " + (rel >= 0 ? "+" : "") + Math.round(rel * 100) + "%" });
+    }
+    // ③ 朝の回復(全拠点の変化に対する余分な低下)
+    if (dvBase !== null && typeof vminDelta[id] === "number") {
+      const rel = vminDelta[id] - dvBase;
+      deg.parts.push({ key: "recovery", label: "朝の回復", weight: DEGRADE_WEIGHTS.recovery,
+        score: Math.round((1 - clamp01(-rel / DEGRADE_VMIN_BAD_V)) * 100) / 10,
+        value: Math.round(rel * 1000) / 1000,
+        text: "全拠点比 " + (rel >= 0 ? "+" : "") + rel.toFixed(2) + "V" });
+    }
+    const wsum = deg.parts.reduce(function (a, p) { return a + p.weight; }, 0);
+    const hasCap = deg.parts.some(function (p) { return p.key === "capacity"; });
+    if (deg.parts.length < 2 || !hasCap) {
+      deg.reason = "測定中";
+      e.degrade = deg;
+      return;
+    }
+    deg.score = Math.round(deg.parts.reduce(function (a, p) { return a + p.score * p.weight; }, 0) / wsum * 10) / 10;
+    const g = degradeGradeOf(deg.score);
+    deg.grade = g.key;
+    deg.gradeLabel = g.label;
+    deg.confidence = (deg.parts.length === 3 && !uncertain && (e.fitR || 0) >= 0.85) ? "高"
+      : (deg.parts.length >= 2 && !uncertain) ? "中" : "低";
+    e.degrade = deg;
+  });
 }
 async function updateBatteryHealthFile() {
   const prev = await readJsonSafe(BATTERY_HEALTH_JSON_PATH, null);
@@ -1755,5 +1916,8 @@ export {
   fetchLongTermDaily, fetchDailyMeanTemps, updatePowerLongTermFile,
   mergeDailyStores, capacityFromSeries,
   detectBatterySwaps, snapRatedAh, bestCapacityAh, findIntradaySwap,
-  BATTERY_RATED_CANDIDATES, BATTERY_NIGHT_WINDOW
+  BATTERY_RATED_CANDIDATES, BATTERY_NIGHT_WINDOW,
+  BATTERY_FULL_REST_V, BATTERY_WINDOW_SEARCH_DAYS, BATTERY_MV_MAX_V0, SWAP_MAX_BEFORE_V, SWAP_MAX_AFTER_V,
+  SWAP_CHECK_VERSION, capacityPairs,
+  DEGRADE_WEIGHTS, DEGRADE_GRADES, degradeGradeOf, attachDegradation
 };
