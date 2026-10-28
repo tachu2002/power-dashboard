@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-28T21:50:06.253Z",
+  "generatedAt": "2026-10-28T22:50:14.146Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -17,28 +17,23 @@
       "socPct": 49,
       "nightA": 1.029,
       "vmin": 12.33,
-      "capacityAh": 53,
-      "fitR": 0.891,
-      "whPerV": 489,
-      "enduranceH": 14.9,
-      "usableAh": 15.36,
-      "capacityInitialAh": 58.2,
-      "capacityNowAh": 54.2,
-      "degradePct": 93,
+      "capacityAh": 41.2,
+      "fitR": 0.953,
+      "whPerV": 380,
+      "enduranceH": 11.6,
+      "usableAh": 11.94,
+      "capacityInitialAh": null,
+      "capacityNowAh": 41.8,
+      "degradePct": null,
       "capWindow": {
-        "from": "2026-09-25",
+        "from": "2026-08-29",
         "to": "2026-10-29",
-        "days": 34,
-        "tempC": 21.3,
+        "days": 26,
+        "tempC": 22.5,
         "whole": false,
         "placeholder": false
       },
-      "initialWindow": {
-        "from": "2026-06-13",
-        "to": "2026-07-17",
-        "days": 33,
-        "tempC": 23.6
-      },
+      "initialWindow": null,
       "spanDays": 139,
       "pvPeakNowW": 28.2,
       "pvPeakInitialW": 26.6,
@@ -102,7 +97,7 @@
         12.278,
         12.185,
         12.053,
-        11.877,
+        11.873,
         11.82,
         11.754,
         11.987
@@ -118,11 +113,42 @@
       "capDaysAfterSwap": null,
       "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 108,
-      "mvPerAhNow": 16,
-      "mvPerAhPrev": 10.4,
-      "nightNights": 22,
-      "nightGenMaxWh": 125
+      "sohPct": 84,
+      "mvPerAhNow": 9.4,
+      "mvPerAhPrev": null,
+      "nightNights": 12,
+      "nightGenMaxWh": 125,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 8.6,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 7.6,
+            "value": 84,
+            "text": "定格比 84%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": 0.009,
+            "text": "全拠点比 +0.01V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam01": {
       "days": 139,
@@ -131,27 +157,27 @@
       "socPct": 27,
       "nightA": 1.082,
       "vmin": 12.269,
-      "capacityAh": 55,
-      "fitR": 0.927,
-      "whPerV": 506,
-      "enduranceH": 3.6,
-      "usableAh": 3.85,
-      "capacityInitialAh": 51.6,
-      "capacityNowAh": 56.2,
-      "degradePct": 109,
+      "capacityAh": 44,
+      "fitR": 0.973,
+      "whPerV": 405,
+      "enduranceH": 2.8,
+      "usableAh": 3.08,
+      "capacityInitialAh": 43.4,
+      "capacityNowAh": 44.6,
+      "degradePct": 103,
       "capWindow": {
-        "from": "2026-09-25",
+        "from": "2026-08-29",
         "to": "2026-10-29",
         "days": 34,
-        "tempC": 21.3,
+        "tempC": 22.9,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": {
-        "from": "2026-06-13",
+        "from": "2026-06-20",
         "to": "2026-07-17",
-        "days": 33,
-        "tempC": 23.6
+        "days": 15,
+        "tempC": 23.2
       },
       "spanDays": 139,
       "pvPeakNowW": 30.6,
@@ -232,11 +258,42 @@
       "capDaysAfterSwap": null,
       "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 112,
-      "mvPerAhNow": 21.7,
-      "mvPerAhPrev": 9.6,
-      "nightNights": 26,
-      "nightGenMaxWh": 131
+      "sohPct": 89,
+      "mvPerAhNow": 9.4,
+      "mvPerAhPrev": null,
+      "nightNights": 14,
+      "nightGenMaxWh": 131,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 9.1,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 8.7,
+            "value": 89,
+            "text": "定格比 89%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 9.7,
+            "value": -0.013,
+            "text": "全拠点比 -0.01V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam41": {
       "days": 139,
@@ -245,21 +302,21 @@
       "socPct": 84,
       "nightA": 0.073,
       "vmin": 12.49,
-      "capacityAh": 13.9,
-      "fitR": 0.912,
-      "whPerV": 131,
-      "enduranceH": 122.1,
-      "usableAh": 8.92,
+      "capacityAh": 20.4,
+      "fitR": 0.897,
+      "whPerV": 191,
+      "enduranceH": 178.8,
+      "usableAh": 13.05,
       "capacityInitialAh": null,
-      "capacityNowAh": 13.9,
+      "capacityNowAh": 20.9,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-08-14",
-        "to": "2026-09-17",
-        "days": 31,
-        "tempC": 25.7,
-        "whole": false,
-        "placeholder": true
+        "from": "2026-10-11",
+        "to": "2026-10-29",
+        "days": 18,
+        "tempC": 20.9,
+        "whole": true,
+        "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 139,
@@ -337,25 +394,38 @@
         "2026-10-03",
         "2026-10-08",
         "2026-10-09",
-        "2026-10-11",
-        "2026-10-19",
-        "2026-10-20"
+        "2026-10-11"
       ],
-      "lastSwapAt": "2026-10-20",
-      "lastSwapTime": "2026-10-19T02:51:30.000Z",
-      "lastSwapVBefore": 13.486,
-      "lastSwapVAfter": 13.878,
+      "lastSwapAt": "2026-10-11",
+      "lastSwapTime": "2026-10-10T05:02:18.000Z",
+      "lastSwapVBefore": 13.5,
+      "lastSwapVAfter": 13.869,
       "capAfterSwap": false,
       "capStale": true,
-      "capPlaceholder": true,
-      "capDaysAfterSwap": 10,
-      "mvSpansSwap": true,
+      "capPlaceholder": false,
+      "capDaysAfterSwap": 19,
+      "mvSpansSwap": false,
       "ratedAh": 20,
-      "sohPct": 69,
-      "mvPerAhNow": 239.3,
-      "mvPerAhPrev": 76.3,
-      "nightNights": 25,
-      "nightGenMaxWh": 29
+      "sohPct": 105,
+      "mvPerAhNow": 45.2,
+      "mvPerAhPrev": null,
+      "nightNights": 1,
+      "nightGenMaxWh": 29,
+      "capKeptFull": true,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": false,
+        "parts": [],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "測定中"
+      }
     },
     "cam42": {
       "days": 139,
@@ -364,19 +434,19 @@
       "socPct": 59,
       "nightA": 0.946,
       "vmin": 12.2,
-      "capacityAh": 54.9,
-      "fitR": 0.876,
-      "whPerV": 503,
-      "enduranceH": 22.6,
-      "usableAh": 21.42,
+      "capacityAh": 61.2,
+      "fitR": 0.897,
+      "whPerV": 560,
+      "enduranceH": 25.2,
+      "usableAh": 23.87,
       "capacityInitialAh": null,
-      "capacityNowAh": 54.7,
+      "capacityNowAh": 62.6,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-08-11",
-        "to": "2026-09-14",
-        "days": 31,
-        "tempC": 25.8,
+        "from": "2026-10-11",
+        "to": "2026-10-26",
+        "days": 15,
+        "tempC": 21.3,
         "whole": false,
         "placeholder": true
       },
@@ -445,7 +515,7 @@
         11.952,
         11.737,
         11.653,
-        12.128,
+        12.11,
         11.948,
         12.115
       ],
@@ -460,10 +530,6 @@
         "2026-10-07",
         "2026-10-10",
         "2026-10-11",
-        "2026-10-17",
-        "2026-10-19",
-        "2026-10-22",
-        "2026-10-23",
         "2026-10-27"
       ],
       "lastSwapAt": "2026-10-27",
@@ -476,11 +542,26 @@
       "capDaysAfterSwap": 3,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 109,
+      "sohPct": 125,
       "mvPerAhNow": 19.9,
-      "mvPerAhPrev": 17,
-      "nightNights": 29,
-      "nightGenMaxWh": 161
+      "mvPerAhPrev": 13.2,
+      "nightNights": 26,
+      "nightGenMaxWh": 161,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": true,
+        "parts": [],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "交換直後"
+      }
     },
     "cam43": {
       "days": 139,
@@ -489,19 +570,19 @@
       "socPct": 54,
       "nightA": 1.477,
       "vmin": 11.979,
-      "capacityAh": 52.3,
-      "fitR": 0.963,
-      "whPerV": 469,
-      "enduranceH": 12,
-      "usableAh": 17.79,
+      "capacityAh": 54.5,
+      "fitR": 0.949,
+      "whPerV": 488,
+      "enduranceH": 12.5,
+      "usableAh": 18.53,
       "capacityInitialAh": null,
-      "capacityNowAh": 53.5,
+      "capacityNowAh": 55.7,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-10-16",
+        "from": "2026-10-09",
         "to": "2026-10-26",
-        "days": 10,
-        "tempC": 21.2,
+        "days": 17,
+        "tempC": 21.3,
         "whole": false,
         "placeholder": true
       },
@@ -570,7 +651,7 @@
         11.732,
         11.438,
         11.315,
-        12.071,
+        12.067,
         11.974,
         11.992
       ],
@@ -579,7 +660,6 @@
         "2026-10-01",
         "2026-10-06",
         "2026-10-09",
-        "2026-10-16",
         "2026-10-27"
       ],
       "lastSwapAt": "2026-10-27",
@@ -592,11 +672,26 @@
       "capDaysAfterSwap": 3,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 107,
+      "sohPct": 111,
       "mvPerAhNow": 14.5,
       "mvPerAhPrev": 11.5,
       "nightNights": 25,
-      "nightGenMaxWh": 165
+      "nightGenMaxWh": 165,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": true,
+        "parts": [],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "交換直後"
+      }
     },
     "cam44": {
       "days": 139,
@@ -605,19 +700,19 @@
       "socPct": 57,
       "nightA": 0.305,
       "vmin": 12.29,
-      "capacityAh": 34.9,
-      "fitR": 0.881,
-      "whPerV": 320,
-      "enduranceH": 42.3,
-      "usableAh": 12.9,
+      "capacityAh": 28.9,
+      "fitR": 0.932,
+      "whPerV": 265,
+      "enduranceH": 35,
+      "usableAh": 10.69,
       "capacityInitialAh": null,
-      "capacityNowAh": 35.7,
+      "capacityNowAh": 29.5,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-09-25",
+        "from": "2026-09-19",
         "to": "2026-10-29",
-        "days": 34,
-        "tempC": 21.3,
+        "days": 22,
+        "tempC": 21.7,
         "whole": false,
         "placeholder": false
       },
@@ -702,13 +797,44 @@
       "capStale": false,
       "capPlaceholder": false,
       "capDaysAfterSwap": 41,
-      "mvSpansSwap": true,
-      "ratedAh": 50,
-      "sohPct": 71,
-      "mvPerAhNow": 17.8,
-      "mvPerAhPrev": 19.7,
-      "nightNights": 18,
-      "nightGenMaxWh": 45
+      "mvSpansSwap": false,
+      "ratedAh": 20,
+      "sohPct": 147,
+      "mvPerAhNow": 17.6,
+      "mvPerAhPrev": null,
+      "nightNights": 13,
+      "nightGenMaxWh": 45,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "低",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 10,
+            "value": 147,
+            "text": "定格比 147%(測定ばらつき)"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": 0.064,
+            "text": "全拠点比 +0.06V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam46": {
       "days": 139,
@@ -717,13 +843,13 @@
       "socPct": 56,
       "nightA": 1.677,
       "vmin": 12.119,
-      "capacityAh": 61.2,
-      "fitR": 0.912,
-      "whPerV": 557,
-      "enduranceH": 13.1,
-      "usableAh": 22.02,
+      "capacityAh": 58.2,
+      "fitR": 0.933,
+      "whPerV": 530,
+      "enduranceH": 12.5,
+      "usableAh": 20.96,
       "capacityInitialAh": null,
-      "capacityNowAh": 62.5,
+      "capacityNowAh": 59.5,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-29",
@@ -819,11 +945,26 @@
       "capDaysAfterSwap": 3,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 125,
+      "sohPct": 119,
       "mvPerAhNow": 10.2,
-      "mvPerAhPrev": 8.8,
-      "nightNights": 23,
-      "nightGenMaxWh": 176
+      "mvPerAhPrev": 8.9,
+      "nightNights": 19,
+      "nightGenMaxWh": 176,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": true,
+        "parts": [],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "交換直後"
+      }
     },
     "cam47": {
       "days": 139,
@@ -832,19 +973,19 @@
       "socPct": 28,
       "nightA": 1.297,
       "vmin": 12.23,
-      "capacityAh": 54.5,
-      "fitR": 0.908,
-      "whPerV": 498,
-      "enduranceH": 3.4,
-      "usableAh": 4.36,
+      "capacityAh": 50.9,
+      "fitR": 0.925,
+      "whPerV": 466,
+      "enduranceH": 3.1,
+      "usableAh": 4.07,
       "capacityInitialAh": null,
-      "capacityNowAh": 55.7,
+      "capacityNowAh": 52,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-09-25",
+        "from": "2026-09-24",
         "to": "2026-10-29",
-        "days": 34,
-        "tempC": 21.3,
+        "days": 35,
+        "tempC": 21.4,
         "whole": false,
         "placeholder": false
       },
@@ -912,7 +1053,7 @@
         12.159,
         12.04,
         11.873,
-        11.653,
+        11.649,
         11.583,
         11.535,
         11.688
@@ -930,11 +1071,42 @@
       "capDaysAfterSwap": 42,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 111,
-      "mvPerAhNow": 14.6,
-      "mvPerAhPrev": 9.6,
-      "nightNights": 26,
-      "nightGenMaxWh": 149
+      "sohPct": 104,
+      "mvPerAhNow": 10.8,
+      "mvPerAhPrev": 10.2,
+      "nightNights": 20,
+      "nightGenMaxWh": 149,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 10,
+            "value": 104,
+            "text": "定格比 104%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": 0.018,
+            "text": "全拠点比 +0.02V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam40": {
       "days": 139,
@@ -943,28 +1115,23 @@
       "socPct": 61,
       "nightA": 1.249,
       "vmin": 12.352,
-      "capacityAh": 69,
-      "fitR": 0.843,
-      "whPerV": 641,
-      "enduranceH": 22.7,
-      "usableAh": 28.3,
-      "capacityInitialAh": 72.5,
-      "capacityNowAh": 70.6,
-      "degradePct": 97,
+      "capacityAh": 50.1,
+      "fitR": 0.906,
+      "whPerV": 465,
+      "enduranceH": 16.4,
+      "usableAh": 20.54,
+      "capacityInitialAh": null,
+      "capacityNowAh": 50.9,
+      "degradePct": null,
       "capWindow": {
-        "from": "2026-09-25",
+        "from": "2026-08-29",
         "to": "2026-10-29",
-        "days": 34,
-        "tempC": 21.3,
+        "days": 23,
+        "tempC": 22.3,
         "whole": false,
         "placeholder": false
       },
-      "initialWindow": {
-        "from": "2026-06-13",
-        "to": "2026-07-17",
-        "days": 33,
-        "tempC": 23.6
-      },
+      "initialWindow": null,
       "spanDays": 139,
       "pvPeakNowW": 27,
       "pvPeakInitialW": 25.6,
@@ -1044,11 +1211,42 @@
       "capDaysAfterSwap": null,
       "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 141,
-      "mvPerAhNow": 10.5,
-      "mvPerAhPrev": 7.1,
-      "nightNights": 20,
-      "nightGenMaxWh": 136
+      "sohPct": 102,
+      "mvPerAhNow": 7.2,
+      "mvPerAhPrev": null,
+      "nightNights": 6,
+      "nightGenMaxWh": 136,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 10,
+            "value": 102,
+            "text": "定格比 102%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": 0.015,
+            "text": "全拠点比 +0.02V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam45": {
       "days": 139,
@@ -1057,19 +1255,19 @@
       "socPct": 49,
       "nightA": 0.343,
       "vmin": 12.43,
-      "capacityAh": 25.2,
-      "fitR": 0.895,
-      "whPerV": 234,
-      "enduranceH": 21.3,
-      "usableAh": 7.29,
+      "capacityAh": 17.3,
+      "fitR": 0.954,
+      "whPerV": 162,
+      "enduranceH": 14.7,
+      "usableAh": 5.03,
       "capacityInitialAh": null,
-      "capacityNowAh": 25.8,
+      "capacityNowAh": 17.6,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-10-17",
+        "from": "2026-08-29",
         "to": "2026-10-29",
-        "days": 12,
-        "tempC": 20.6,
+        "days": 24,
+        "tempC": 22.4,
         "whole": false,
         "placeholder": false
       },
@@ -1138,28 +1336,57 @@
         12.317,
         12.154,
         11.921,
-        11.86,
+        11.847,
         11.759,
         11.979
       ],
-      "swaps": [
-        "2026-10-17"
-      ],
-      "lastSwapAt": "2026-10-17",
-      "lastSwapTime": "2026-10-16T05:45:20.000Z",
-      "lastSwapVBefore": 13.157,
-      "lastSwapVAfter": 13.61,
-      "capAfterSwap": true,
+      "swaps": [],
+      "lastSwapAt": null,
+      "lastSwapTime": null,
+      "lastSwapVBefore": null,
+      "lastSwapVAfter": null,
+      "capAfterSwap": false,
       "capStale": false,
       "capPlaceholder": false,
-      "capDaysAfterSwap": 13,
-      "mvSpansSwap": true,
-      "ratedAh": 50,
-      "sohPct": 52,
-      "mvPerAhNow": 47.1,
-      "mvPerAhPrev": 29.9,
-      "nightNights": 23,
-      "nightGenMaxWh": 62
+      "capDaysAfterSwap": null,
+      "mvSpansSwap": false,
+      "ratedAh": 20,
+      "sohPct": 88,
+      "mvPerAhNow": 30.6,
+      "mvPerAhPrev": null,
+      "nightNights": 9,
+      "nightGenMaxWh": 62,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 9.1,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 8.4,
+            "value": 88,
+            "text": "定格比 88%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": 0.015,
+            "text": "全拠点比 +0.02V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam03": {
       "days": 139,
@@ -1168,21 +1395,21 @@
       "socPct": 20,
       "nightA": 0.966,
       "vmin": 12.198,
-      "capacityAh": 75.2,
-      "fitR": 0.816,
-      "whPerV": 685,
+      "capacityAh": 42.5,
+      "fitR": 0.875,
+      "whPerV": 387,
       "enduranceH": 0,
       "usableAh": 0,
       "capacityInitialAh": null,
-      "capacityNowAh": 77,
+      "capacityNowAh": 43,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-09-30",
-        "to": "2026-10-29",
-        "days": 29,
-        "tempC": 21.2,
+        "from": "2026-09-10",
+        "to": "2026-09-29",
+        "days": 15,
+        "tempC": 23.2,
         "whole": false,
-        "placeholder": false
+        "placeholder": true
       },
       "initialWindow": null,
       "spanDays": 139,
@@ -1261,17 +1488,41 @@
       "lastSwapTime": "2026-09-29T07:03:30.000Z",
       "lastSwapVBefore": 11.341,
       "lastSwapVAfter": 12.304,
-      "capAfterSwap": true,
-      "capStale": false,
-      "capPlaceholder": false,
+      "capAfterSwap": false,
+      "capStale": true,
+      "capPlaceholder": true,
       "capDaysAfterSwap": 30,
-      "mvSpansSwap": true,
+      "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 154,
-      "mvPerAhNow": 14.1,
-      "mvPerAhPrev": 10.4,
-      "nightNights": 19,
-      "nightGenMaxWh": 138
+      "sohPct": 86,
+      "mvPerAhNow": 11.6,
+      "mvPerAhPrev": null,
+      "nightNights": 14,
+      "nightGenMaxWh": 138,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": false,
+        "parts": [
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": -0.002,
+            "text": "全拠点比 -0.00V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "測定中"
+      }
     },
     "cam14": {
       "days": 139,
@@ -1280,19 +1531,19 @@
       "socPct": 32,
       "nightA": 1.369,
       "vmin": 12.223,
-      "capacityAh": 177.2,
-      "fitR": 0.716,
-      "whPerV": 1617,
-      "enduranceH": 15.5,
-      "usableAh": 21.26,
+      "capacityAh": 37.6,
+      "fitR": 0.955,
+      "whPerV": 344,
+      "enduranceH": 3.3,
+      "usableAh": 4.52,
       "capacityInitialAh": null,
-      "capacityNowAh": 180.8,
+      "capacityNowAh": 38,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-10-01",
-        "to": "2026-10-17",
-        "days": 16,
-        "tempC": 21.6,
+        "from": "2026-09-11",
+        "to": "2026-09-30",
+        "days": 15,
+        "tempC": 23.2,
         "whole": false,
         "placeholder": true
       },
@@ -1361,32 +1612,54 @@
         12.115,
         11.948,
         11.706,
-        11.627,
+        11.614,
         -0.001,
         11.724
       ],
       "swaps": [
         "2026-07-02",
         "2026-09-11",
-        "2026-10-01",
-        "2026-10-18",
-        "2026-10-24"
+        "2026-10-01"
       ],
-      "lastSwapAt": "2026-10-24",
-      "lastSwapTime": "2026-10-22T22:25:12.000Z",
-      "lastSwapVBefore": 12.493,
-      "lastSwapVAfter": 12.976,
+      "lastSwapAt": "2026-10-01",
+      "lastSwapTime": null,
+      "lastSwapVBefore": null,
+      "lastSwapVAfter": null,
       "capAfterSwap": false,
       "capStale": true,
       "capPlaceholder": true,
-      "capDaysAfterSwap": 6,
-      "mvSpansSwap": true,
+      "capDaysAfterSwap": 29,
+      "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 362,
-      "mvPerAhNow": 14,
-      "mvPerAhPrev": 10,
-      "nightNights": 25,
-      "nightGenMaxWh": 138
+      "sohPct": 76,
+      "mvPerAhNow": 9.2,
+      "mvPerAhPrev": null,
+      "nightNights": 14,
+      "nightGenMaxWh": 138,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": false,
+        "parts": [
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 9.2,
+            "value": -0.042,
+            "text": "全拠点比 -0.04V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "測定中"
+      }
     },
     "cam13": {
       "days": 139,
@@ -1395,21 +1668,21 @@
       "socPct": 63,
       "nightA": 0.784,
       "vmin": 12.52,
-      "capacityAh": 53.2,
-      "fitR": 0.896,
-      "whPerV": 499,
-      "enduranceH": 29.2,
-      "usableAh": 22.88,
+      "capacityAh": 45.4,
+      "fitR": 0.898,
+      "whPerV": 426,
+      "enduranceH": 24.9,
+      "usableAh": 19.53,
       "capacityInitialAh": null,
-      "capacityNowAh": 54.1,
+      "capacityNowAh": 46.2,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-09-15",
-        "to": "2026-10-19",
-        "days": 34,
-        "tempC": 22.3,
+        "from": "2026-08-29",
+        "to": "2026-10-29",
+        "days": 21,
+        "tempC": 22.1,
         "whole": false,
-        "placeholder": true
+        "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 139,
@@ -1475,29 +1748,58 @@
         12.423,
         12.361,
         12.238,
-        12.058,
+        12.053,
         12.001,
         11.961,
         12.185
       ],
-      "swaps": [
-        "2026-10-20"
-      ],
-      "lastSwapAt": "2026-10-20",
-      "lastSwapTime": "2026-10-19T05:14:47.000Z",
-      "lastSwapVBefore": 13.188,
-      "lastSwapVAfter": 13.601,
+      "swaps": [],
+      "lastSwapAt": null,
+      "lastSwapTime": null,
+      "lastSwapVBefore": null,
+      "lastSwapVAfter": null,
       "capAfterSwap": false,
-      "capStale": true,
-      "capPlaceholder": true,
-      "capDaysAfterSwap": 10,
-      "mvSpansSwap": true,
+      "capStale": false,
+      "capPlaceholder": false,
+      "capDaysAfterSwap": null,
+      "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 108,
-      "mvPerAhNow": 19.7,
-      "mvPerAhPrev": 12.2,
-      "nightNights": 22,
-      "nightGenMaxWh": 139
+      "sohPct": 92,
+      "mvPerAhNow": 13.6,
+      "mvPerAhPrev": null,
+      "nightNights": 6,
+      "nightGenMaxWh": 139,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 9.6,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 9.3,
+            "value": 92,
+            "text": "定格比 92%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": 0.007,
+            "text": "全拠点比 +0.01V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam12": {
       "days": 139,
@@ -1506,21 +1808,21 @@
       "socPct": 28,
       "nightA": 0.798,
       "vmin": 12.238,
-      "capacityAh": 58.6,
-      "fitR": 0.907,
-      "whPerV": 539,
-      "enduranceH": 5.9,
-      "usableAh": 4.69,
+      "capacityAh": 40.5,
+      "fitR": 0.978,
+      "whPerV": 372,
+      "enduranceH": 4.1,
+      "usableAh": 3.24,
       "capacityInitialAh": null,
-      "capacityNowAh": 60.1,
+      "capacityNowAh": 41,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-10-09",
-        "to": "2026-10-29",
-        "days": 20,
-        "tempC": 20.9,
+        "from": "2026-09-19",
+        "to": "2026-09-30",
+        "days": 11,
+        "tempC": 23.3,
         "whole": false,
-        "placeholder": false
+        "placeholder": true
       },
       "initialWindow": null,
       "spanDays": 139,
@@ -1586,7 +1888,7 @@
         12.22,
         12.124,
         11.987,
-        11.785,
+        11.781,
         11.671,
         11.596,
         11.671
@@ -1600,17 +1902,32 @@
       "lastSwapTime": "2026-10-08T02:04:15.000Z",
       "lastSwapVBefore": 13.073,
       "lastSwapVAfter": 13.552,
-      "capAfterSwap": true,
-      "capStale": false,
-      "capPlaceholder": false,
+      "capAfterSwap": false,
+      "capStale": true,
+      "capPlaceholder": true,
       "capDaysAfterSwap": 21,
-      "mvSpansSwap": true,
+      "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 120,
-      "mvPerAhNow": 17.8,
-      "mvPerAhPrev": 13.6,
-      "nightNights": 24,
-      "nightGenMaxWh": 126
+      "sohPct": 82,
+      "mvPerAhNow": 14.4,
+      "mvPerAhPrev": null,
+      "nightNights": 15,
+      "nightGenMaxWh": 126,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": false,
+        "parts": [],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "測定中"
+      }
     },
     "cam39": {
       "days": 115,
@@ -1679,7 +1996,7 @@
         13.372,
         13.372,
         13.372,
-        13.381,
+        13.372,
         13.377,
         13.372,
         13.372,
@@ -1712,7 +2029,8 @@
       "mvPerAhNow": null,
       "mvPerAhPrev": null,
       "nightNights": 0,
-      "nightGenMaxWh": 275
+      "nightGenMaxWh": 275,
+      "capKeptFull": false
     },
     "cam08": {
       "days": 139,
@@ -1721,18 +2039,18 @@
       "socPct": 49,
       "nightA": 1.337,
       "vmin": 12.185,
-      "capacityAh": 56.9,
-      "fitR": 0.851,
-      "whPerV": 520,
-      "enduranceH": 12.4,
-      "usableAh": 16.51,
+      "capacityAh": 54.9,
+      "fitR": 0.874,
+      "whPerV": 502,
+      "enduranceH": 11.9,
+      "usableAh": 15.93,
       "capacityInitialAh": null,
-      "capacityNowAh": 58.2,
+      "capacityNowAh": 56.2,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-25",
         "to": "2026-10-29",
-        "days": 34,
+        "days": 33,
         "tempC": 21.3,
         "whole": false,
         "placeholder": false
@@ -1801,7 +2119,7 @@
         12.106,
         12.053,
         11.957,
-        11.803,
+        11.798,
         11.754,
         11.741,
         12.018
@@ -1819,11 +2137,42 @@
       "capDaysAfterSwap": 35,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 116,
-      "mvPerAhNow": 12.9,
+      "sohPct": 112,
+      "mvPerAhNow": 12.1,
       "mvPerAhPrev": 8.8,
-      "nightNights": 25,
-      "nightGenMaxWh": 116
+      "nightNights": 23,
+      "nightGenMaxWh": 116,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 10,
+            "value": 112,
+            "text": "定格比 112%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 9.9,
+            "value": -0.006,
+            "text": "全拠点比 -0.01V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam09": {
       "days": 139,
@@ -1832,19 +2181,19 @@
       "socPct": 0,
       "nightA": 1.579,
       "vmin": 11.865,
-      "capacityAh": 91,
-      "fitR": 0.787,
-      "whPerV": 813,
+      "capacityAh": 59.7,
+      "fitR": 0.933,
+      "whPerV": 533,
       "enduranceH": 0,
       "usableAh": 0,
       "capacityInitialAh": null,
-      "capacityNowAh": 92.9,
+      "capacityNowAh": 61,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-30",
-        "to": "2026-10-18",
-        "days": 18,
-        "tempC": 21.6,
+        "to": "2026-10-27",
+        "days": 27,
+        "tempC": 21.4,
         "whole": false,
         "placeholder": true
       },
@@ -1913,7 +2262,7 @@
         11.904,
         11.658,
         11.31,
-        11.139,
+        11.126,
         10.928,
         11.104
       ],
@@ -1925,8 +2274,6 @@
         "2026-09-25",
         "2026-09-26",
         "2026-09-30",
-        "2026-10-19",
-        "2026-10-23",
         "2026-10-28"
       ],
       "lastSwapAt": "2026-10-28",
@@ -1939,11 +2286,26 @@
       "capDaysAfterSwap": 2,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 186,
+      "sohPct": 122,
       "mvPerAhNow": 11,
       "mvPerAhPrev": 11.5,
       "nightNights": 20,
-      "nightGenMaxWh": 145
+      "nightGenMaxWh": 145,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": true,
+        "parts": [],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "交換直後"
+      }
     },
     "cam36": {
       "days": 139,
@@ -1952,18 +2314,18 @@
       "socPct": 51,
       "nightA": 1.257,
       "vmin": 12.31,
-      "capacityAh": 80.8,
-      "fitR": 0.755,
-      "whPerV": 749,
-      "enduranceH": 19.9,
-      "usableAh": 25.06,
+      "capacityAh": 47.3,
+      "fitR": 0.963,
+      "whPerV": 438,
+      "enduranceH": 11.7,
+      "usableAh": 14.66,
       "capacityInitialAh": null,
-      "capacityNowAh": 82.6,
+      "capacityNowAh": 48.4,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-09-25",
+        "from": "2026-09-20",
         "to": "2026-10-29",
-        "days": 34,
+        "days": 13,
         "tempC": 21.3,
         "whole": false,
         "placeholder": false
@@ -2050,11 +2412,42 @@
       "capDaysAfterSwap": 40,
       "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 165,
-      "mvPerAhNow": 11.9,
-      "mvPerAhPrev": 7.6,
-      "nightNights": 20,
-      "nightGenMaxWh": 137
+      "sohPct": 97,
+      "mvPerAhNow": 7.9,
+      "mvPerAhPrev": null,
+      "nightNights": 6,
+      "nightGenMaxWh": 137,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 10,
+            "value": 97,
+            "text": "定格比 97%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": 0,
+            "text": "全拠点比 -0.00V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam04": {
       "days": 139,
@@ -2063,28 +2456,23 @@
       "socPct": 44,
       "nightA": 1.228,
       "vmin": 12.349,
-      "capacityAh": 60.1,
-      "fitR": 0.868,
-      "whPerV": 556,
-      "enduranceH": 11.7,
-      "usableAh": 14.42,
-      "capacityInitialAh": 68.6,
-      "capacityNowAh": 61.4,
-      "degradePct": 90,
+      "capacityAh": 41.3,
+      "fitR": 0.935,
+      "whPerV": 382,
+      "enduranceH": 8.1,
+      "usableAh": 9.92,
+      "capacityInitialAh": null,
+      "capacityNowAh": 42,
+      "degradePct": null,
       "capWindow": {
-        "from": "2026-09-25",
+        "from": "2026-08-29",
         "to": "2026-10-29",
-        "days": 34,
-        "tempC": 21.3,
+        "days": 27,
+        "tempC": 22.4,
         "whole": false,
         "placeholder": false
       },
-      "initialWindow": {
-        "from": "2026-06-13",
-        "to": "2026-07-17",
-        "days": 33,
-        "tempC": 23.6
-      },
+      "initialWindow": null,
       "spanDays": 139,
       "pvPeakNowW": 29.3,
       "pvPeakInitialW": 24.5,
@@ -2164,11 +2552,42 @@
       "capDaysAfterSwap": null,
       "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 123,
-      "mvPerAhNow": 18.3,
-      "mvPerAhPrev": 8.9,
-      "nightNights": 24,
-      "nightGenMaxWh": 141
+      "sohPct": 84,
+      "mvPerAhNow": 8.1,
+      "mvPerAhPrev": null,
+      "nightNights": 12,
+      "nightGenMaxWh": 141,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 8.6,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 7.6,
+            "value": 84,
+            "text": "定格比 84%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": 0,
+            "text": "全拠点比 +0.00V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam02": {
       "days": 139,
@@ -2177,19 +2596,19 @@
       "socPct": 64,
       "nightA": 1.756,
       "vmin": 12.14,
-      "capacityAh": 53.3,
-      "fitR": 0.924,
-      "whPerV": 488,
-      "enduranceH": 13.4,
-      "usableAh": 23.45,
+      "capacityAh": 80.3,
+      "fitR": 0.861,
+      "whPerV": 735,
+      "enduranceH": 20.1,
+      "usableAh": 35.34,
       "capacityInitialAh": null,
-      "capacityNowAh": 53.7,
+      "capacityNowAh": 82.1,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-09-13",
-        "to": "2026-09-29",
-        "days": 16,
-        "tempC": 23.6,
+        "from": "2026-09-30",
+        "to": "2026-10-26",
+        "days": 26,
+        "tempC": 21.4,
         "whole": false,
         "placeholder": true
       },
@@ -2265,7 +2684,6 @@
       "swaps": [
         "2026-09-13",
         "2026-09-30",
-        "2026-10-19",
         "2026-10-27"
       ],
       "lastSwapAt": "2026-10-27",
@@ -2276,13 +2694,28 @@
       "capStale": true,
       "capPlaceholder": true,
       "capDaysAfterSwap": 3,
-      "mvSpansSwap": true,
+      "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 107,
-      "mvPerAhNow": 11.5,
-      "mvPerAhPrev": 7.2,
-      "nightNights": 25,
-      "nightGenMaxWh": 192
+      "sohPct": 164,
+      "mvPerAhNow": 8.2,
+      "mvPerAhPrev": null,
+      "nightNights": 15,
+      "nightGenMaxWh": 192,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": true,
+        "parts": [],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "交換直後"
+      }
     },
     "cam48": {
       "days": 115,
@@ -2384,7 +2817,8 @@
       "mvPerAhNow": null,
       "mvPerAhPrev": null,
       "nightNights": 0,
-      "nightGenMaxWh": 78
+      "nightGenMaxWh": 78,
+      "capKeptFull": false
     },
     "cam50": {
       "days": 115,
@@ -2486,7 +2920,8 @@
       "mvPerAhNow": null,
       "mvPerAhPrev": null,
       "nightNights": 0,
-      "nightGenMaxWh": 288
+      "nightGenMaxWh": 288,
+      "capKeptFull": false
     },
     "cam51": {
       "days": 115,
@@ -2555,7 +2990,7 @@
         13.596,
         13.596,
         13.596,
-        13.601,
+        13.596,
         13.601,
         13.596,
         13.596,
@@ -2588,7 +3023,8 @@
       "mvPerAhNow": null,
       "mvPerAhPrev": null,
       "nightNights": 0,
-      "nightGenMaxWh": 382
+      "nightGenMaxWh": 382,
+      "capKeptFull": false
     },
     "cam52": {
       "days": 139,
@@ -2597,13 +3033,13 @@
       "socPct": 7,
       "nightA": 1.299,
       "vmin": 12.06,
-      "capacityAh": 56,
-      "fitR": 0.843,
-      "whPerV": 505,
+      "capacityAh": 53,
+      "fitR": 0.865,
+      "whPerV": 478,
       "enduranceH": 0,
       "usableAh": 0,
       "capacityInitialAh": null,
-      "capacityNowAh": 57.3,
+      "capacityNowAh": 54.2,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-30",
@@ -2678,7 +3114,7 @@
         11.913,
         11.706,
         11.438,
-        11.244,
+        11.222,
         11.069,
         11.244
       ],
@@ -2696,11 +3132,42 @@
       "capDaysAfterSwap": 30,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 115,
+      "sohPct": 108,
       "mvPerAhNow": 12.5,
       "mvPerAhPrev": 9.1,
       "nightNights": 27,
-      "nightGenMaxWh": 138
+      "nightGenMaxWh": 138,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 9.4,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 10,
+            "value": 108,
+            "text": "定格比 108%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 8.7,
+            "value": -0.066,
+            "text": "全拠点比 -0.07V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam53": {
       "days": 139,
@@ -2709,21 +3176,21 @@
       "socPct": 39,
       "nightA": 0.143,
       "vmin": 12.44,
-      "capacityAh": 39.9,
-      "fitR": 0.854,
-      "whPerV": 375,
-      "enduranceH": 53.1,
-      "usableAh": 7.59,
+      "capacityAh": 44.7,
+      "fitR": 0.769,
+      "whPerV": 420,
+      "enduranceH": 59.5,
+      "usableAh": 8.5,
       "capacityInitialAh": null,
-      "capacityNowAh": 41.1,
+      "capacityNowAh": 45.2,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-10-18",
-        "to": "2026-10-29",
-        "days": 11,
-        "tempC": 20.5,
+        "from": "2026-08-29",
+        "to": "2026-09-28",
+        "days": 19,
+        "tempC": 23.4,
         "whole": false,
-        "placeholder": false
+        "placeholder": true
       },
       "initialWindow": null,
       "spanDays": 139,
@@ -2795,24 +3262,47 @@
         11.838
       ],
       "swaps": [
-        "2026-09-29",
-        "2026-10-18"
+        "2026-09-29"
       ],
-      "lastSwapAt": "2026-10-18",
-      "lastSwapTime": "2026-10-17T06:44:43.000Z",
-      "lastSwapVBefore": 13.596,
-      "lastSwapVAfter": 13.966,
-      "capAfterSwap": true,
-      "capStale": false,
-      "capPlaceholder": false,
-      "capDaysAfterSwap": 12,
-      "mvSpansSwap": true,
+      "lastSwapAt": "2026-09-29",
+      "lastSwapTime": "2026-09-28T07:22:48.000Z",
+      "lastSwapVBefore": 12.058,
+      "lastSwapVAfter": 12.572,
+      "capAfterSwap": false,
+      "capStale": true,
+      "capPlaceholder": true,
+      "capDaysAfterSwap": 31,
+      "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 82,
-      "mvPerAhNow": 107.3,
-      "mvPerAhPrev": 11.6,
-      "nightNights": 23,
-      "nightGenMaxWh": 103
+      "sohPct": 90,
+      "mvPerAhNow": 11.6,
+      "mvPerAhPrev": null,
+      "nightNights": 10,
+      "nightGenMaxWh": 103,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": false,
+        "parts": [
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 10,
+            "value": 0.014,
+            "text": "全拠点比 +0.01V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "測定中"
+      }
     },
     "cam55": {
       "days": 139,
@@ -2821,19 +3311,19 @@
       "socPct": 37,
       "nightA": 0.97,
       "vmin": 12.282,
-      "capacityAh": 58.2,
-      "fitR": 0.898,
-      "whPerV": 536,
-      "enduranceH": 10.2,
-      "usableAh": 9.89,
+      "capacityAh": 45.7,
+      "fitR": 0.992,
+      "whPerV": 421,
+      "enduranceH": 8,
+      "usableAh": 7.77,
       "capacityInitialAh": null,
-      "capacityNowAh": 59.5,
+      "capacityNowAh": 46.8,
       "degradePct": null,
       "capWindow": {
-        "from": "2026-09-25",
+        "from": "2026-09-23",
         "to": "2026-10-29",
-        "days": 34,
-        "tempC": 21.3,
+        "days": 13,
+        "tempC": 21.2,
         "whole": false,
         "placeholder": false
       },
@@ -2918,13 +3408,44 @@
       "capStale": false,
       "capPlaceholder": false,
       "capDaysAfterSwap": 38,
-      "mvSpansSwap": true,
+      "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 119,
-      "mvPerAhNow": 15.4,
-      "mvPerAhPrev": 9.1,
-      "nightNights": 25,
-      "nightGenMaxWh": 147
+      "sohPct": 94,
+      "mvPerAhNow": 9.1,
+      "mvPerAhPrev": null,
+      "nightNights": 11,
+      "nightGenMaxWh": 147,
+      "capKeptFull": false,
+      "degrade": {
+        "score": 9.6,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "中",
+        "fresh": false,
+        "parts": [
+          {
+            "key": "capacity",
+            "label": "容量",
+            "weight": 0.4,
+            "score": 9.8,
+            "value": 94,
+            "text": "定格比 94%"
+          },
+          {
+            "key": "recovery",
+            "label": "朝の回復",
+            "weight": 0.3,
+            "score": 9.4,
+            "value": -0.031,
+            "text": "全拠点比 -0.03V"
+          }
+        ],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        }
+      }
     },
     "cam54": {
       "days": 139,
@@ -2933,19 +3454,19 @@
       "socPct": 61,
       "nightA": 1.194,
       "vmin": 12.211,
-      "capacityAh": 63.5,
-      "fitR": 0.771,
-      "whPerV": 581,
-      "enduranceH": 21.8,
-      "usableAh": 26.05,
+      "capacityAh": 55.3,
+      "fitR": 0.808,
+      "whPerV": 506,
+      "enduranceH": 19,
+      "usableAh": 22.67,
       "capacityInitialAh": null,
-      "capacityNowAh": 64.9,
+      "capacityNowAh": 56.5,
       "degradePct": null,
       "capWindow": {
         "from": "2026-10-01",
         "to": "2026-10-26",
-        "days": 25,
-        "tempC": 21.5,
+        "days": 21,
+        "tempC": 21.4,
         "whole": false,
         "placeholder": true
       },
@@ -3034,11 +3555,26 @@
       "capDaysAfterSwap": 3,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 130,
+      "sohPct": 113,
       "mvPerAhNow": 16.1,
-      "mvPerAhPrev": 10.8,
-      "nightNights": 30,
-      "nightGenMaxWh": 143
+      "mvPerAhPrev": 9.7,
+      "nightNights": 24,
+      "nightGenMaxWh": 143,
+      "capKeptFull": false,
+      "degrade": {
+        "score": null,
+        "grade": null,
+        "gradeLabel": null,
+        "confidence": null,
+        "fresh": true,
+        "parts": [],
+        "baseline": {
+          "mvRatio": null,
+          "vminDeltaV": -0.024,
+          "fleet": 23
+        },
+        "reason": "交換直後"
+      }
     }
   }
 }
