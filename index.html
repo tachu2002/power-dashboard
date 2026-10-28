@@ -470,6 +470,39 @@
   .health-scatter-card .chart-box { height: 280px; min-height: 160px; }
   .health-scatter-card h2 { font-size: 14px; margin: 0; }
   .health-scatter-card .subtitle { font-size: 11px; margin: 2px 0 0; }
+  /* バッテリー交換ランキング(「交換ランキング」ボタンで開閉)。10.0満点で、低いほど交換が近い。 */
+  .rank-card { margin-bottom: 10px; display: none; padding: 14px 16px 12px; }
+  .rank-card.show { display: block; }
+  .rank-card h2 { font-size: 15px; margin: 0; }
+  .rank-card .subtitle { font-size: 11px; margin: 2px 0 0; }
+  .rk-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .rk-row { display: grid; grid-template-columns: 30px minmax(120px, 1.1fr) 92px minmax(90px, 0.9fr) 84px minmax(0, 2fr);
+    gap: 4px 12px; align-items: center; padding: 8px 10px; border: 1px solid var(--gridline); border-radius: 8px;
+    background: var(--surface-1); }
+  .rk-row.rk-replace { border-color: var(--critical-border); background: var(--critical-bg); }
+  .rk-row.rk-plan { border-color: var(--warn-border); background: var(--warn-bg); }
+  .rk-no { font-size: 15px; font-weight: 700; color: var(--text-secondary); text-align: center; font-variant-numeric: tabular-nums; }
+  .rk-name { font-weight: 600; font-size: 13px; }
+  .rk-sub { font-size: 10.5px; color: var(--text-muted); margin-top: 1px; }
+  .rk-score { white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rk-score .rk-num { font-size: 20px; font-weight: 700; }
+  .rk-score .rk-max { font-size: 11px; color: var(--text-muted); margin-left: 1px; }
+  .rk-gauge { height: 8px; background: var(--gridline); border-radius: 4px; overflow: hidden; }
+  .rk-gauge > i { display: block; height: 100%; border-radius: 4px; }
+  .rk-parts { display: flex; flex-wrap: wrap; gap: 4px 6px; }
+  .rk-part { font-size: 10.5px; color: var(--text-secondary); background: var(--surface-2); border: 1px solid var(--gridline);
+    border-radius: 6px; padding: 1px 6px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .rk-part b { color: var(--text-primary); }
+  .rk-part.rk-low b { color: var(--critical-border); }
+  .rk-part.rk-none { color: var(--text-muted); }
+  .ht-pill.watch { background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--gridline); }
+  .rk-other { margin-top: 12px; font-size: 12px; line-height: 1.8; color: var(--text-secondary); }
+  .rk-other b { color: var(--text-primary); }
+  @media (max-width: 720px) {
+    .rk-row { grid-template-columns: 26px 1fr auto; }
+    .rk-row .rk-gauge, .rk-row .rk-parts { grid-column: 1 / -1; }
+    .rk-row .rk-pill { grid-column: 2 / -1; justify-self: start; }
+  }
   /* バッテリー健全性の一覧(「健全性の一覧」ボタンで開閉)。
      左ほど「今すぐ困るか」、右ほど「これから困りそうか」の順に並べている。 */
   .health-table-card { margin-bottom: 10px; display: none; }
@@ -840,6 +873,7 @@
               <button id="refreshBtn">全拠点を今すぐ更新</button>
               <button id="powerSortBtn" type="button" aria-pressed="false">並び：河川順</button>
               <button id="healthTableBtn">健全性の一覧</button>
+              <button id="rankBtn" type="button">交換ランキング</button>
               <button id="tableBtn">表で表示</button>
             </div>
           </div>
@@ -889,7 +923,7 @@
           <div class="health-note">
             <b>各列の根拠</b><br>
             ・<b>あと何時間</b>／<b>実効容量</b> … 「1日の収支（発電−消費）」と「翌日の0時基準電圧の変化」の回帰から実効容量を出し、夜間の実測降下と日射予報を織り込んで10分ごとに計算しています。容量は<b>直近35日ぶん</b>で測り直しているので、劣化が進んだ拠点でも持ち時間が長く出ることはありません。<br>
-            ・<b>朝の最低電圧／下限までの余裕</b> … 実測そのもの。モデルを挟まないので最も信頼できます。下限は拠点ごとに異なります（北沢アンダーパス 9.5V／多呂樋管・梅名樋管2号・芝橋 10.5V／既定 11.5V）。<br>
+            ・<b>朝の最低電圧／下限までの余裕</b> … 実測そのもの。モデルを挟まないので最も信頼できます。下限は拠点ごとに異なります（北沢アンダーパス 9.5V／多呂樋管・梅名樋管2号・芝橋・中村橋 10.5V／既定 11.5V）。<br>
             ・<b>深放電した日</b> … 11.8V（残量30%相当）を下回った日数。鉛蓄電池の寿命を削る直接の原因なので、劣化の「進み具合」ではなく「進む勢い」を表します。<br>
             ・<b>1日の収支・消費</b> … 直近35日の中央値。マイナスが続くと残量が戻りません。<br>
             ・<b>放電の速さ</b> … 充電されない夜間（0:00〜4:00）の電圧降下[V/h] ÷ そのときの放電電流[A]。「1Ah取り出すと何V下がるか」で、容量に反比例します。<b>放電が速い＝弱っている</b>という、日射も季節も気温もほとんど効かない実測値なので、劣化の進み具合はこの列で見てください。ただし<b>よく晴れた日の夜は充電直後の表面電荷が抜ける分だけ余計に下がる</b>ため（実測で4割以上ずれます）、前日の発電量がその拠点の中央値以下だった夜だけを使っています。前の15夜より1割以上速くなっていれば▲（3割以上なら「要対応」）。<br>
@@ -898,6 +932,29 @@
         </div>
 
         <div class="grid-power" id="sitesGrid"></div>
+
+        <div class="card rank-card" id="rankCard">
+          <div class="site-card-header">
+            <div class="site-title-wrap">
+              <h2>バッテリー交換ランキング</h2>
+              <p class="subtitle" id="rankNote">算出中…</p>
+            </div>
+          </div>
+          <ol class="rk-list" id="rankList"></ol>
+          <div class="rk-other" id="rankOther"></div>
+          <div class="health-note" id="rankHowto">
+            <b>劣化スコアの見かた</b>（10.0が良好・低いほど交換が近い）<br>
+            全拠点は同じ地域で日射が共通なので、「同じ時期に全拠点が同じように動いた分」は天気や季節のせい、
+            <b>その拠点だけ余計に悪くなった分が電池のへたり</b>と考えて点数にしています。<br>
+            ・<b>容量</b>（重み40%）… 実効容量 ÷ 定格。95%以上で10.0、80%で約6.7、70%で約4.4、50%以下で0。<br>
+            ・<b>放電の速さ</b>（重み30%）… 夜間に1Ah取り出したときの電圧降下が前15夜からどれだけ増えたかを、全拠点の増え方と比べます。全拠点並みなら10.0、5割多く悪化すれば0。<br>
+            ・<b>朝の回復</b>（重み30%）… 朝の最低電圧（直近14日 ← その前14日）の動きを全拠点の中央値と比べます。全拠点並みなら10.0、0.5V余計に下がれば0。<br>
+            測れなかった指標は除き、残りで重みを配り直します（確からしさが下がるので「確度」に出します）。
+            電池を交換して2週間以内の拠点は交換前の値が当てにならないため、採点せず「交換直後」に分けています。
+            区分は 8.0以上＝良好／6.0〜8.0＝経過観察／4.0〜6.0＝交換を検討／4.0未満＝要交換。
+            定格比の誤差は±15%程度あり、観測も夏〜秋の短い期間なので、<b>点数は順位をつけるための目安</b>です。
+          </div>
+        </div>
 
         <div class="table-section" id="tableSection">
           <div class="table-scroll">
@@ -1345,7 +1402,7 @@
    * 実際の運用に合わせてご指定により12.7Vへ変更)。ただし下限(0%とみなす電圧)が
    * 異なる拠点があるため、拠点ごとの上書き表を持つ。
    *   北沢アンダーパス(cam03) 9.5V / 多呂樋管(cam14) 10.5V /
-   *   梅名樋管2号(cam09) 10.5V / 芝橋(cam43) 10.5V
+   *   梅名樋管2号(cam09) 10.5V / 芝橋(cam43) 10.5V / 中村橋(cam52) 10.5V
    * --------------------------------------------------------------------- */
   var BATTERY_FULL_VOLTAGE = 12.7;
   var BATTERY_EMPTY_VOLTAGE_DEFAULT = 11.5;
@@ -1353,7 +1410,8 @@
     cam03: 9.5,   // 北沢アンダーパス
     cam14: 10.5,  // 多呂樋管
     cam09: 10.5,  // 梅名樋管2号(梅名第二)
-    cam43: 10.5   // 芝橋
+    cam43: 10.5,  // 芝橋
+    cam52: 10.5   // 中村橋(大場川 / 佐野)。2026-10-28 利用者の指定で既定11.5Vから変更
   };
   function batteryEmptyVoltageFor(siteId) {
     var v = BATTERY_EMPTY_VOLTAGE_OVERRIDE[siteId];
@@ -1829,7 +1887,7 @@
   }
   function batteryHealthEntry(siteId) { return batteryHealthState.sites[siteId] || null; }
   /* 「もう使えない」とみなす下限は拠点ごとに違う(BATTERY_EMPTY_VOLTAGE_OVERRIDE)。
-     北沢アンダーパス 9.5V / 多呂樋管・梅名樋管2号・芝橋 10.5V / 既定 11.5V。
+     北沢アンダーパス 9.5V / 多呂樋管・梅名樋管2号・芝橋・中村橋 10.5V / 既定 11.5V。
      持ち時間はこの電圧に達するまでで測る。以前は全拠点一律に残量20%(=11.66V)で
      打ち切っていたため、下限の低い拠点(北沢など)の持ち時間が実態より大幅に短く出ていた。 */
   function reserveSocFor(siteId) {
@@ -2280,6 +2338,7 @@
       + "。※印は日射予報や発電実績が足りず、日射ゼロの前提で出している拠点です。"
       + "10分ごとに計算し直しています" + (stamp ? "（最終計算 " + stamp + "）" : "") + "。";
     renderHealthTable();
+    if (document.getElementById("rankCard").classList.contains("show")) renderRankCard();
   }
   /* ---------------------------------------------------------------------
    * バッテリー健全性の一覧(「健全性の一覧」ボタンで開閉)
@@ -2363,6 +2422,7 @@
     return !!(e && typeof e.mvPerAhNow === "number" && typeof e.mvPerAhPrev === "number"
       && e.mvPerAhNow > e.mvPerAhPrev * HEALTH_MV_WORSE_RATIO);
   }
+  var SOH_PLAUSIBLE_MAX = 130;   // 定格比がこれを超えたら、測定のばらつきとして数字を出さない
   function healthStateOf(r) {
     var deepNow = r.deep ? r.deep.now.days : 0;
     var deepPrev = r.deep ? r.deep.prev.days : 0;
@@ -2374,6 +2434,98 @@
       || deepNow >= 1 || deepNow > deepPrev || (r.bal !== null && r.bal <= -20)
       || mvWorsening(r.e)) return ["注意", "warn"];
     return ["良好", "ok"];
+  }
+  /* ---------------------------------------------------------------------
+   * 交換ランキング(「交換ランキング」ボタンで開閉)
+   * 劣化スコアは scripts/poll.mjs が battery_health.json の degrade に書き出す(10.0満点・高いほど良好)。
+   * ここでは点数の低い順(=交換が近い順)に並べ直して見せるだけ。同点は同じ順位にする。
+   * 採点できないものは順位をつけず、「測定中」「交換直後」として下に分ける。
+   * --------------------------------------------------------------------- */
+  var RANK_PART_ORDER = [["capacity", "容量"], ["discharge", "放電の速さ"], ["recovery", "朝の回復"]];
+  var RANK_GRADE_CLASS = { good: "ok", watch: "watch", plan: "warn", replace: "bad" };
+  function fmtDegradeScore(v) { return typeof v === "number" ? v.toFixed(1) + "/10.0" : "—"; }
+  function degradeRows() {
+    var rows = [];
+    POWER_SITES.forEach(function (site) {
+      var e = batteryHealthEntry(site.id);
+      if (!e || e.mains || !e.degrade) return;
+      rows.push({ id: site.id, name: site.name, e: e, d: e.degrade });
+    });
+    var hoursOf = {};
+    healthTableRows().forEach(function (r) { hoursOf[r.id] = r.sustain ? 1e8 : (r.hours === null ? 1e9 : r.hours); });
+    var scored = rows.filter(function (r) { return typeof r.d.score === "number"; });
+    scored.sort(function (a, b) { return (a.d.score - b.d.score) || (hoursOf[a.id] - hoursOf[b.id]); });
+    var rank = 0;
+    scored.forEach(function (r, i) {
+      if (i === 0 || r.d.score !== scored[i - 1].d.score) rank = i + 1;
+      r.rank = rank;
+    });
+    return {
+      scored: scored,
+      fresh: rows.filter(function (r) { return r.d.fresh; }),
+      pending: rows.filter(function (r) { return !r.d.fresh && typeof r.d.score !== "number"; }),
+      hoursOf: hoursOf
+    };
+  }
+  function renderRankCard() {
+    var list = document.getElementById("rankList");
+    if (!list) return;
+    var res = degradeRows();
+    var note = document.getElementById("rankNote");
+    var other = document.getElementById("rankOther");
+    if (!res.scored.length && !res.fresh.length && !res.pending.length) {
+      list.innerHTML = "";
+      other.innerHTML = "";
+      note.textContent = "劣化スコアはまだありません。次の再計算（1時間ごと）で出ます。";
+      return;
+    }
+    list.innerHTML = res.scored.map(function (r) {
+      var d = r.d, e = r.e;
+      var cls = RANK_GRADE_CLASS[d.grade] || "ok";
+      var col = d.grade === "replace" ? "var(--critical-border)" : d.grade === "plan" ? "var(--warn-border)"
+        : d.grade === "watch" ? "var(--text-muted)" : "var(--ok-border)";
+      var parts = RANK_PART_ORDER.map(function (k) {
+        var p = (d.parts || []).filter(function (x) { return x.key === k[0]; })[0];
+        if (!p) return '<span class="rk-part rk-none">' + k[1] + " —</span>";
+        return '<span class="rk-part' + (p.score < 5 ? " rk-low" : "") + '" title="' + p.text + '">' + k[1]
+          + " <b>" + p.score.toFixed(1) + "</b></span>";
+      }).join("");
+      var sub = [];
+      if (typeof e.sohPct === "number" && !e.capStale && !e.capPlaceholder) {
+        sub.push("定格比 " + (e.sohPct > SOH_PLAUSIBLE_MAX ? "測定ばらつき" : e.sohPct + "%"));
+      }
+      if (e.lastSwapAt) sub.push("最終交換 " + e.lastSwapAt.slice(5).replace("-", "/"));
+      var h = res.hoursOf[r.id];
+      if (h < 1e8) sub.push("あと" + fmtEndurance(h));
+      sub.push("確度 " + d.confidence);
+      var shortName = r.name.replace(/\s*[（(][^）)]*[）)]\s*$/, "");
+      return '<li class="rk-row rk-' + d.grade + '" data-site="' + r.id + '">'
+        + '<div class="rk-no">' + r.rank + "</div>"
+        + '<div><div class="rk-name" title="' + r.name + '">' + shortName + '</div><div class="rk-sub">' + sub.join("・") + "</div></div>"
+        + '<div class="rk-score"><span class="rk-num">' + d.score.toFixed(1) + '</span><span class="rk-max">/10.0</span></div>'
+        + '<div class="rk-gauge"><i style="width:' + Math.max(3, d.score * 10) + "%;background:" + col + '"></i></div>'
+        + '<div class="rk-pill"><span class="ht-pill ' + cls + '">' + d.gradeLabel + "</span></div>"
+        + '<div class="rk-parts">' + parts + "</div></li>";
+    }).join("");
+    var names = function (arr) {
+      return arr.map(function (r) { return r.name.replace(/\s*[（(][^）)]*[）)]\s*$/, ""); }).join("、");
+    };
+    var htm = "";
+    if (res.fresh.length) {
+      htm += "<b>交換直後（採点しません）</b> … " + names(res.fresh)
+        + "。交換して2週間以内で、交換前の値が当てにならないため。新しい電池の容量が測れ次第、採点します。<br>";
+    }
+    if (res.pending.length) {
+      htm += "<b>測定中</b> … " + names(res.pending) + "。いまの電池の容量がまだ測れていません。<br>";
+    }
+    other.innerHTML = htm;
+    var urgent = res.scored.filter(function (r) { return r.d.grade === "replace" || r.d.grade === "plan"; });
+    var stamp = batteryHealthState.generatedAt ? fmtOutlookWhen(batteryHealthState.generatedAt.getTime()) : "";
+    note.textContent = (urgent.length
+      ? "交換を検討したい拠点が " + urgent.length + "拠点あります。"
+      : "いま交換を急ぐ拠点はありません。")
+      + "点数は10.0が良好で、低いほど交換が近い順に並べています（採点 " + res.scored.length + "拠点）"
+      + (stamp ? "／最終計算 " + stamp : "") + "。";
   }
   function renderHealthTable() {
     var body = document.getElementById("healthTableBody");
@@ -2419,7 +2571,12 @@
         capCell = '<span class="num">' + e.capacityAh + "Ah</span>";
       }
       var degCell = '<span class="ht-mute">—</span>';
-      if (typeof e.sohPct === "number") {
+      // 定格を大きく超える値(130%超)は、電池が良いのではなく測り方のばらつき(交換直後の仮置き、
+      // 定格の見誤りなど)なので、数字としては出さない(2026-10-28: 多呂樋管が362%と出ていた)。
+      if (typeof e.sohPct === "number" && e.sohPct > SOH_PLAUSIBLE_MAX) {
+        degCell = '<span class="ht-mute" title="測った容量が定格を大きく上回っています（' + e.sohPct
+          + '%）。交換直後の仮置きや定格の見誤りによるばらつきとみられるため、数字では出していません。">測定ばらつき</span>';
+      } else if (typeof e.sohPct === "number") {
         degCell = '<span class="num ' + (e.sohPct < 60 ? "ht-bad" : e.sohPct < 80 ? "ht-warn" : "ht-ok") + '">'
           + e.sohPct + "%</span>";
       }
@@ -2480,7 +2637,7 @@
     }
     var caveat = document.getElementById("healthTableCaveat");
     if (caveat) {
-      var withDeg = rows.filter(function (r) { return typeof r.e.sohPct === "number"; });
+      var withDeg = rows.filter(function (r) { return typeof r.e.sohPct === "number" && r.e.sohPct <= SOH_PLAUSIBLE_MAX; });
       var pcts = withDeg.map(function (r) { return r.e.sohPct; }).sort(function (a, b) { return a - b; });
       var med = pcts.length ? pcts[Math.floor(pcts.length / 2)] : null;
       caveat.innerHTML = "<b>「定格比」は参考値です（誤差±15%程度）。</b>"
@@ -5744,6 +5901,11 @@
   var SWAP_NORMAL_GAP_MS = 20 * 60 * 1000;// 通常の計測間隔の上限
   var SWAP_WORK_GAP_MS = 3 * HOUR_MS;     // 作業中(0V)をはさむ場合に許す間隔
   var SWAP_MIN_VALID_V = 5;               // これ未満は作業中の欠測(0V)として扱う
+  /* 充電中の電圧の段は交換ではない(2026-10-28・サーバー側と同じ判定)。
+     昼の充電中に 13.3V→14.3V のような跳ね(充電制御が吸収充電へ移る段)が発電の増えないまま起き、
+     交換と取り違えていた。本物の交換は、弱った電池(12.0V前後以下)から休止状態の電池(12.3〜12.7V)への跳ね。 */
+  var SWAP_MAX_BEFORE_V = 12.6;
+  var SWAP_MAX_AFTER_V = 12.9;
   var SWAP_CHARGING_PV_W = 2;             // 交換直後の発電がこれ以上なら、電圧に充電の下駄が乗っている
   var SWAP_CHARGING_CAP_V = 12.55;        // その場合の残量の上限(休止電圧でこれ以上とはみなさない)
   // 中継サーバーの5分データの取得経路名。サーバー経由(「サーバー(mini.lhlab-vps.net 電源CSV)」)と
@@ -5799,10 +5961,12 @@
         var gapOk = gap <= SWAP_NORMAL_GAP_MS || (sawDropout && gap <= SWAP_WORK_GAP_MS);
         var pvA = typeof prev.pv === "number" ? prev.pv : 0;
         var pvB = typeof p.pv === "number" ? p.pv : 0;
+        // 負荷切れ(電池切れで負荷が止まった跳ね)は電圧帯を問わず拾う。交換だけ電圧帯で絞る。
         if (gapOk && p.bat - prev.bat >= SWAP_STEP_V && pvB - pvA <= SWAP_MAX_PV_RISE_W) {
           var ev = { at: p.fetchedAt.getTime(), vBefore: prev.bat, vAfter: p.bat, pvAfter: pvB,
             loadBefore: prev.loadW, loadAfter: p.loadW };
-          if (loadCollapsedAt(list, idx, prev.loadW)) cut = ev; else swap = ev;
+          if (loadCollapsedAt(list, idx, prev.loadW)) cut = ev;
+          else if (prev.bat < SWAP_MAX_BEFORE_V && p.bat <= SWAP_MAX_AFTER_V) swap = ev;
         }
       }
       prev = p; sawDropout = false;
@@ -6521,6 +6685,12 @@
     this.textContent = showing ? "一覧を隠す" : "健全性の一覧";
     if (showing) renderHealthTable();
   });
+  document.getElementById("rankBtn").addEventListener("click", function () {
+    var card = document.getElementById("rankCard");
+    var showing = card.classList.toggle("show");
+    this.textContent = showing ? "ランキングを隠す" : "交換ランキング";
+    if (showing) renderRankCard();
+  });
   document.getElementById("tableBtn").addEventListener("click", function () {
     var showing = tableSection.classList.toggle("show");
     this.textContent = showing ? "表を隠す" : "表で表示";
@@ -7206,6 +7376,7 @@
     currentEmpty: currentEmpty, siteSocPct: siteSocPct, currentStop: currentStop, relayListSince: relayListSince,
     getHealthRenderCount: function () { return healthRenderCount; },
     renderHealthTable: renderHealthTable, healthTableRows: healthTableRows,
+    renderRankCard: renderRankCard, degradeRows: degradeRows,
     healthStateOf: healthStateOf, deepDischargeCounts: deepDischargeCounts,
     recentVminMedian: recentVminMedian, HEALTH_DEEP_V: HEALTH_DEEP_V,
     getHealthScatter: function () { return healthScatter; },
