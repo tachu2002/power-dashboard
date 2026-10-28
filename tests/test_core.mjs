@@ -49,7 +49,7 @@ export async function run() {
       def: { v115: f("cam02", 11.5), v121: f("cam02", 12.1), v127: f("cam02", 12.7), v135: f("cam02", 13.5), v110: f("cam02", 11.0) },
       kitazawa: { v95: f("cam03", 9.5), v111: f("cam03", 11.1), v127: f("cam03", 12.7) },
       taro: { v105: f("cam14", 10.5), v116: f("cam14", 11.6), v127: f("cam14", 12.7) },
-      umena: f("cam09", 10.5), shibahashi: f("cam43", 10.5),
+      umena: f("cam09", 10.5), shibahashi: f("cam43", 10.5), nakamura: f("cam52", 10.5), nakamura116: f("cam52", 11.6),
       nulls: [f("cam02", null), f("cam02", undefined), f("cam02", NaN), f("cam02", "12.0")],
       emptyOf: [d.batteryEmptyVoltageFor("cam02"), d.batteryEmptyVoltageFor("cam03"), d.batteryEmptyVoltageFor("cam41")]
     };
@@ -66,8 +66,10 @@ export async function run() {
   r.check("c2-i 多呂樋管 10.5V=0% / 11.6V=50% / 12.7V=100%",
     bat.taro.v105 === 0 && bat.taro.v116 === 50 && bat.taro.v127 === 100, bat.taro);
   r.check("c2-j 梅名樋管2号・芝橋の下限も10.5V", bat.umena === 0 && bat.shibahashi === 0, [bat.umena, bat.shibahashi]);
+  // 2026-10-28 利用者の指定: 中村橋(大場川 / 佐野・cam52)の下限は10.5V(以前は既定の11.5Vで扱っていた)
+  r.check("c2-j2 中村橋の下限も10.5V(10.5V=0% / 11.6V=50%)", bat.nakamura === 0 && bat.nakamura116 === 50, [bat.nakamura, bat.nakamura116]);
   r.check("c2-k 数値以外はnull", bat.nulls.every((v) => v === null), bat.nulls);
-  r.check("c2-l 下限の上書き表が4拠点", Object.keys(bat.override).length === 4, bat.override);
+  r.check("c2-l 下限の上書き表が5拠点(北沢・多呂・梅名2号・芝橋・中村橋)", Object.keys(bat.override).length === 5, bat.override);
   r.check("c2-m Phase Q追加拠点(こも池)の下限は既定の11.5V", bat.emptyOf[2] === 11.5, bat.emptyOf);
 
   const mono = await page.evaluate(() => {

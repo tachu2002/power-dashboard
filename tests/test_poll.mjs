@@ -11,6 +11,21 @@ import { createReporter } from "./harness.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.join(__dirname, "..");
+// テスト開始時点の data/ の中身(ファイル名・大きさ・更新時刻)。本番の複製(clone)には data/ があるので、
+// 「data/ が無いこと」ではなく「テストの前後で data/ が変わっていないこと」を確かめる。
+function dataDirStamp() {
+  const dir = path.join(REPO_ROOT, "data");
+  if (!fs.existsSync(dir)) return "(none)";
+  const out = [];
+  (function walk(d) {
+    fs.readdirSync(d, { withFileTypes: true }).forEach((e) => {
+      const f = path.join(d, e.name);
+      if (e.isDirectory()) walk(f); else { const st = fs.statSync(f); out.push(path.relative(dir, f) + ":" + st.size + ":" + st.mtimeMs); }
+    });
+  })(dir);
+  return out.sort().join("|");
+}
+const DATA_STAMP_BEFORE = dataDirStamp();
 
 const TINY_JPEG = Buffer.from(
   "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAALCAABAAEBAREA/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAD8AKp//2Q==",
@@ -459,7 +474,7 @@ export async function run() {
   const WH_PER_V = 500;
   const OCV_SPAN = 12.70 - 11.36;
   const plan = {
-    cam11: { v0: 12.40, nightA: 1.00, mains: false },   // 標準的な拠点
+    cam11: { v0: 12.15, nightA: 1.00, mains: false },   // 標準的な拠点
     cam03: { v0: 12.03, nightA: 0.96, mains: false },   // 残量が少ない拠点
     cam41: { v0: 12.58, nightA: 0.07, mains: false },   // 消費が極端に小さい拠点
     cam39: { v0: 13.45, nightA: 0.00, mains: true },    // 常時電源
@@ -481,7 +496,7 @@ export async function run() {
       // nightVPerH を持たせておく(持たない日は「古い形式」とみなして取り直されるため)
       // swapChecked も同様(当日の載せ替え検出を済ませた新しい形式の印)
       daysOut[k][id] = { v0: Math.round(v * 1000) / 1000, balWh: b,
-        nightA: plan[id].nightA || null, nightVPerH: 0.015, swapChecked: 2,
+        nightA: plan[id].nightA || null, nightVPerH: 0.015, swapChecked: 3,
         vmin: Math.round((v - 0.05) * 1000) / 1000 };
       v += (plan[id].noisy ? 0 : b / WH_PER_V) + noise;
     }
@@ -525,7 +540,7 @@ export async function run() {
   // 遡って取りに行った日ぶんは同じCSVを返すため完全な直線にはならない。0.9以上あれば十分。
   r.check("s19-d 当てはまりの良さ(r)を持つ", h11 && h11.fitR >= 0.9, h11 && h11.fitR);
   r.check("s19-e 0時電圧から残量(SOC)を出す",
-    h11 && h11.socPct >= 65 && h11.socPct <= 80 && h03 && h03.socPct < h11.socPct,
+    h11 && h11.socPct >= 40 && h11.socPct <= 60 && h03 && h03.socPct < h11.socPct,
     { cam11: h11 && h11.socPct, cam03: h03 && h03.socPct });
   // 持ち時間 = 容量 × (残量% − 20%) ÷ 100 ÷ 夜間電流
   const wantH = (e) => e.capacityAh * (e.socPct - 20) / 100 / e.nightA;
@@ -761,7 +776,7 @@ export async function run() {
     const b = LT_BAL[back % LT_BAL.length];
     if (k === bAt) mv = 12.4;                        // 1回目の交換
     if (k === cAt) mv = 12.5;                        // 2回目の交換(直近3日しかない)
-    const e = { v0: Math.round(mv * 1000) / 1000, balWh: b, nightA: 1, nightVPerH: 0.015, vmin: 11.9, swapChecked: 2 };
+    const e = { v0: Math.round(mv * 1000) / 1000, balWh: b, nightA: 1, nightVPerH: 0.015, vmin: 11.9, swapChecked: 3 };
     const prevK = dayKey(now - (back + 1) * 24 * HOUR);
     if (k === bAt) Object.assign(multi.days[prevK].cam54, { swapAt: at(16, 0).toISOString(), swapVBefore: 11.5, swapVAfter: 12.4 });
     multi.days[k] = { cam54: e };
@@ -777,14 +792,14 @@ export async function run() {
   const sum = M.summarizePowerDay(stepRows);
   r.check("s21-d 日次集計に交換の時刻と前後の電圧を持つ",
     sum.cam03 && sum.cam03.swapAt === at(16, 3).toISOString() && sum.cam03.swapVAfter === 12.3
-    && sum.cam03.swapChecked === 2, sum.cam03);
+    && sum.cam03.swapChecked === 3, sum.cam03);
   // 昨日の午後に載せ替えた拠点: 日次の段差だけなら3日待つが、5分データで見つけたらすぐ確定する
   const swapStore = { days: {} };
   for (let back = 40; back >= 1; back--) {
     const k = dayKey(now - back * 24 * HOUR);
     const b = LT_BAL[back % LT_BAL.length];
     swapStore.days[k] = { cam03: { v0: 12.0 + (back % 3) * 0.01, balWh: b, nightA: 1, nightVPerH: 0.015,
-      vmin: 11.8, swapChecked: 2 } };
+      vmin: 11.8, swapChecked: 3 } };
   }
   swapStore.days[dayKey(now - 24 * HOUR)].cam03.swapAt = at(16, 3).toISOString();
   swapStore.days[dayKey(now - 24 * HOUR)].cam03.swapVBefore = 11.34;
@@ -804,14 +819,14 @@ export async function run() {
     const k = dayKey(now - back * 24 * HOUR);
     const b = LT_BAL[back % LT_BAL.length];
     goodStore.days[k] = { cam03: { v0: Math.round(gv * 1000) / 1000, balWh: b, nightA: 1, nightVPerH: 0.015,
-      vmin: 11.8, swapChecked: 2 } };
+      vmin: 11.8, swapChecked: 3 } };
     gv += b / 400;                                    // 400Wh/V の電池(当てはまりは良い)
   }
   const yk = dayKey(now - 24 * HOUR);
   Object.assign(goodStore.days[yk].cam03, { swapAt: at(16, 3).toISOString(), swapVBefore: 11.34, swapVAfter: 12.3 });
   // 今日の0時電圧は交換後の電池の値(前日より1V高い)
   goodStore.days[dayKey(now)] = { cam03: { v0: Math.round((gv + 1.0) * 1000) / 1000, balWh: -30, nightA: 1,
-    nightVPerH: 0.015, vmin: 12.2, swapChecked: 2 } };
+    nightVPerH: 0.015, vmin: 12.2, swapChecked: 3 } };
   const g03 = M.computeBatteryEndurance(goodStore, null).cam03;
   r.check("s21-g 交換後の0時電圧が届いても、仮置きの容量は交換より前の日だけで測る(持ち比較から消えない)",
     g03 && typeof g03.capacityAh === "number" && g03.capStale === true && g03.fitR >= 0.9
@@ -840,14 +855,103 @@ export async function run() {
   const resum = JSON.parse(fs.readFileSync(path.join(resumSandbox, "data", "power_daily.json"), "utf8"));
   const re11 = resum.days[oldKey] && resum.days[oldKey].cam11;
   r.check("s21-j 古い版で集計した日は取り直し、誤って残った交換を消す",
-    re11 && re11.swapChecked === 2 && re11.swapAt === undefined, re11);
+    re11 && re11.swapChecked === 3 && re11.swapAt === undefined, re11);
   fs.rmSync(resumSandbox, { recursive: true, force: true });
 
   /* ---- 後片付け ---- */
   fs.rmSync(sandbox, { recursive: true, force: true });
   fs.rmSync(sandbox2, { recursive: true, force: true });
   fs.rmSync(sandbox3, { recursive: true, force: true });
-  r.check("s10-a リポジトリのdata/を汚さない", !fs.existsSync(path.join(REPO_ROOT, "data")), "repo/data");
+  /* ---- s22: 2026-10-28 再点検で入れた規則 ---- */
+  // 満充電で頭打ちの日(翌日0時電圧 >= 12.30V かつ収支が黒字)は容量の回帰に入れない
+  {
+    const ser = [];
+    let v = 12.0;
+    const balSeq = [-60, 40, -55, 80, -70, 30, -45, 90, -65, 25, -50, 70, -60, 35, -40, 55, -30, 65, -50, 45];
+    for (let i = 0; i < 40; i++) {
+      const b = balSeq[i % balSeq.length];
+      const day = dayKey(now - (45 - i) * 24 * HOUR);
+      ser.push({ day, d: { v0: Math.round(v * 1000) / 1000, balWh: b } });
+      let nv = v + b / 500;
+      if (nv > 12.35) nv = 12.35;                     // 満充電で頭打ち
+      if (nv < 11.8) nv = 11.8;
+      v = nv;
+    }
+    const capNew = M.capacityFromSeries(ser, null);
+    const exp = 500 / 12.2 * 1.34;
+    r.check("s22-a 頭打ちの日を除いて容量を測る(実際の容量に近い)",
+      capNew && Math.abs(capNew.capAh - exp) / exp < 0.25, capNew && { cap: capNew.capAh, 期待: +exp.toFixed(1) });
+  }
+  {
+    const rw = (hh, mm, bat, pv) => ({ siteId: "cam42", fetchedAt: at(hh, mm), bat, pv, loadW: 12 });
+    const chg = [rw(9, 0, 13.31, 10), rw(9, 5, 13.32, 10), rw(9, 10, 14.29, 12), rw(9, 15, 14.30, 12)];
+    const sw = [rw(15, 53, 11.35, 0.2), rw(15, 58, 11.34, 0.2), rw(16, 3, 12.30, 0.1), rw(16, 8, 12.29, 0.1)];
+    r.check("s22-b 充電の段差(13.3→14.3V)は交換とみなさず、本物の交換(11.34→12.30V)は見つける",
+      M.findIntradaySwap(chg) === null && !!M.findIntradaySwap(sw), [M.findIntradaySwap(chg), M.findIntradaySwap(sw)]);
+  }
+  r.check("s22-c 交換の再判定のための版が3", M.SWAP_CHECK_VERSION === 3, M.SWAP_CHECK_VERSION);
+  r.check("s22-d 放電速度(mV/Ah)に使う夜の上限電圧が12.25V", M.BATTERY_MV_MAX_V0 === 12.25, M.BATTERY_MV_MAX_V0);
+
+  /* ---- s23: 劣化スコア(10.0満点・高いほど良好)と交換ランキングの元データ ---- */
+  {
+    const mk = (o) => Object.assign({ mains: false, sohPct: 95, mvPerAhNow: 13, mvPerAhPrev: 10, mvSpansSwap: false,
+      capStale: false, capPlaceholder: false, lastSwapAt: null, capDaysAfterSwap: null, fitR: 0.9 }, o || {});
+    const sitesD = {
+      a: mk(), b: mk(), c: mk(), d: mk(), e: mk(),
+      bad: mk({ sohPct: 60, mvPerAhNow: 18 }),                 // 容量が小さく、放電も全拠点より余計に速くなった
+      fresh: mk({ lastSwapAt: dayKey(now - 3 * 24 * HOUR), capDaysAfterSwap: 3, capStale: true, capPlaceholder: true }),
+      unmeasured: mk({ lastSwapAt: dayKey(now - 40 * 24 * HOUR), capDaysAfterSwap: 40, capStale: true, capPlaceholder: true }),
+      nomv: mk({ mvPerAhNow: null, mvPerAhPrev: null }),
+      wild: mk({ sohPct: 160 }),
+      mains: mk({ mains: true })
+    };
+    // 朝の最低電圧: 全拠点が直近14日で0.10V下がった(季節)。bad だけ0.45V下がった。
+    const dayMapD = {}, daysD = [];
+    for (let back = 29; back >= 0; back--) {
+      const k = dayKey(now - back * 24 * HOUR);
+      daysD.push(k);
+      dayMapD[k] = {};
+      Object.keys(sitesD).forEach((id) => {
+        const drop = back < 14 ? (id === "bad" ? 0.45 : 0.10) : 0;
+        dayMapD[k][id] = { vmin: 12.0 - drop };
+      });
+    }
+    M.attachDegradation(sitesD, dayMapD, daysD);
+    const D = (id) => sitesD[id].degrade;
+    const part = (id, key) => (D(id).parts || []).find((q) => q.key === key);
+    r.check("s23-a 全拠点がそろって悪くなった分(季節)は減点しない(放電の速さも朝の回復も10.0)",
+      part("a", "discharge").score === 10 && part("a", "recovery").score === 10 && D("a").score >= 9.5, D("a"));
+    r.check("s23-b その拠点だけ余計に悪くなった分は減点する(朝の回復・放電の速さ)",
+      part("bad", "recovery").score <= 3 && part("bad", "discharge").score < 5, [part("bad", "recovery"), part("bad", "discharge")]);
+    r.check("s23-c 劣化した拠点は健全な拠点より点数が低く、順位が付く",
+      D("bad").score < D("a").score - 4 && D("bad").score < 5 && D("bad").grade !== "good", [D("bad").score, D("a").score]);
+    r.check("s23-d 交換して2週間以内は採点せず「交換直後」", D("fresh").score === null && D("fresh").fresh === true && D("fresh").reason === "交換直後", D("fresh"));
+    r.check("s23-e 交換から日が経つのに容量が測れていない拠点は採点せず「測定中」",
+      D("unmeasured").score === null && D("unmeasured").fresh === false && D("unmeasured").reason === "測定中", D("unmeasured"));
+    r.check("s23-f 取れなかった指標は除いて重みを配り直す(放電の速さが無くても点が出る)",
+      D("nomv").score !== null && !part("nomv", "discharge") && D("nomv").parts.length === 2, D("nomv"));
+    r.check("s23-g 定格比が測定のばらつき(130%超)の拠点は満点扱いにしつつ確度を「低」にする",
+      part("wild", "capacity").score === 10 && D("wild").confidence === "低", D("wild"));
+    r.check("s23-h 常時電源は採点しない", sitesD.mains.degrade === undefined, sitesD.mains.degrade);
+    r.check("s23-i 容量の点: 95%以上=10.0 / 50%以下=0 / 80%≒6.7",
+      part("a", "capacity").score === 10 && (() => {
+        const t = { x: mk({ sohPct: 80 }), y: mk({ sohPct: 40 }) };
+        M.attachDegradation(t, dayMapD, daysD);
+        return Math.abs(t.x.degrade.parts[0].score - 6.7) < 0.05 && t.y.degrade.parts[0].score === 0;
+      })(), part("a", "capacity"));
+    r.check("s23-j 区分は 8.0以上=良好 / 6.0以上=経過観察 / 4.0以上=交換を検討 / 未満=要交換",
+      M.degradeGradeOf(8.0).label === "良好" && M.degradeGradeOf(7.9).label === "経過観察" && M.degradeGradeOf(6.0).label === "経過観察"
+      && M.degradeGradeOf(5.9).label === "交換を検討" && M.degradeGradeOf(4.0).label === "交換を検討" && M.degradeGradeOf(3.9).label === "要交換",
+      [8.0, 7.9, 6.0, 5.9, 4.0, 3.9].map((v) => M.degradeGradeOf(v).label));
+    r.check("s23-k 点数は小数1桁で、0〜10に収まる",
+      ["a", "bad", "wild", "nomv"].every((id) => D(id).score >= 0 && D(id).score <= 10 && Math.round(D(id).score * 10) === D(id).score * 10 + 0
+        || Math.abs(D(id).score * 10 - Math.round(D(id).score * 10)) < 1e-9), ["a", "bad", "wild", "nomv"].map((id) => D(id).score));
+  }
+  r.check("s23-l 持ちの計算結果(battery_health.json)に劣化スコアが入る",
+    !!(health && health.sites.cam11 && health.sites.cam11.degrade && "score" in health.sites.cam11.degrade && Array.isArray(health.sites.cam11.degrade.parts)),
+    health && health.sites.cam11 && health.sites.cam11.degrade);
+
+  r.check("s10-a リポジトリのdata/を汚さない(テストの前後で中身が同じ)", dataDirStamp() === DATA_STAMP_BEFORE, "repo/data");
 
   return r.finish();
 }

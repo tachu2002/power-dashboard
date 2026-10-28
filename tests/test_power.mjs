@@ -412,6 +412,83 @@ export async function run() {
   r.check("p8-h14 ページ例外にはならない", pageHT.errMsgs().length === 0, pageHT.errMsgs());
   await pageHT.close();
 
+  /* ===== 交換ランキング(「交換ランキング」ボタン) =====
+     劣化スコアは poller が書き出す(10.0満点・高いほど良好)。画面は低い順=交換が近い順に並べ、
+     同点は同じ順位、採点できない拠点(交換直後・測定中)は順位をつけず下に分ける。 */
+  const part = (key, score, text) => ({ key, label: key, weight: 0.3, score, value: 0, text });
+  const deg = (score, grade, label, parts, conf = "高") => ({ score, grade, gradeLabel: label, confidence: conf, fresh: false, parts });
+  const pageRK = await newPage(null, {
+    nowMs: NOW, matsuhisaBody: NO_BAT_BODY, openMeteoStatus: 500,
+    batteryHealth: buildBatteryHealth({
+      nowMs: NOW, days: 109,
+      sites: {
+        cam11: { capacityAh: 50, nightA: 1.0, socPct: 80, degrade: deg(8.2, "good", "良好",
+          [part("capacity", 8.0, "定格比 88%"), part("discharge", 8.4, "全拠点比 +8%"), part("recovery", 8.2, "全拠点比 -0.04V")]) },
+        cam04: { capacityAh: 50, nightA: 1.0, socPct: 70, degrade: deg(8.2, "good", "良好",
+          [part("capacity", 8.0, "定格比 88%"), part("recovery", 8.4, "全拠点比 -0.04V")], "中") },
+        cam03: { capacityAh: 50, nightA: 0.96, socPct: 30, lastSwapAt: "2026-08-20", degrade: deg(3.8, "replace", "要交換",
+          [part("capacity", 2.0, "定格比 60%"), part("discharge", 6.0, "全拠点比 +20%"), part("recovery", 7.0, "全拠点比 -0.15V")]) },
+        cam09: { capacityAh: 15, nightA: 1.6, socPct: 50, degrade: deg(5.1, "plan", "交換を検討",
+          [part("capacity", 4.4, "定格比 70%"), part("recovery", 6.1, "全拠点比 -0.2V")], "中") },
+        cam41: { capacityAh: 14, nightA: 0.07, socPct: 86, degrade: { score: null, grade: null, gradeLabel: null, confidence: null, fresh: true, reason: "交換直後", parts: [] } },
+        cam13: { capacityAh: 40, nightA: 0.8, socPct: 60, degrade: { score: null, grade: null, gradeLabel: null, confidence: null, fresh: false, reason: "測定中", parts: [] } },
+        cam12: { mains: true, v0: 13.45 }
+      }
+    })
+  });
+  await openDashboard(pageRK, () => {
+    const st = window.__dashboardDebug.getBatteryHealthState();
+    return st && Object.keys(st.sites || {}).length > 0;
+  });
+  await pageRK.evaluate(() => window.__dashboardDebug.showView("power"));
+  await pageRK.waitForTimeout(400);
+  const rk0 = await pageRK.evaluate(() => ({
+    hidden: !document.getElementById("rankCard").classList.contains("show"),
+    btn: document.getElementById("rankBtn").textContent
+  }));
+  r.check("p9-a ランキングは既定では畳んである", rk0.hidden && rk0.btn === "交換ランキング", rk0);
+  const rk = await pageRK.evaluate(() => {
+    document.getElementById("rankBtn").click();
+    const rows = Array.from(document.querySelectorAll("#rankList .rk-row"));
+    const txt = (el, sel) => { const n = el.querySelector(sel); return n ? n.textContent.trim() : null; };
+    return {
+      shown: document.getElementById("rankCard").classList.contains("show"),
+      btn: document.getElementById("rankBtn").textContent,
+      order: rows.map((x) => x.getAttribute("data-site")),
+      ranks: rows.map((x) => txt(x, ".rk-no")),
+      scores: rows.map((x) => txt(x, ".rk-score")),
+      pills: rows.map((x) => txt(x, ".ht-pill")),
+      parts: rows.map((x) => Array.from(x.querySelectorAll(".rk-part")).map((p) => p.textContent.trim())),
+      sub: rows.map((x) => txt(x, ".rk-sub")),
+      other: document.getElementById("rankOther").textContent,
+      note: document.getElementById("rankNote").textContent,
+      howto: document.getElementById("rankHowto").textContent,
+      widths: rows.map((x) => x.querySelector(".rk-gauge > i").style.width)
+    };
+  });
+  r.check("p9-b ボタンで開き、点数の低い順(交換が近い順)に並べる",
+    rk.shown && rk.btn === "ランキングを隠す" && rk.order[0] === "cam03" && rk.order[1] === "cam09"
+    && rk.order.slice(2).sort().join() === "cam04,cam11" && rk.order.length === 4, rk);
+  r.check("p9-c 順位は同点を同じ順位にする(1,2,3,3)", rk.ranks.join() === "1,2,3,3", rk.ranks);
+  r.check("p9-d 点数は「8.2/10.0」の形で出す", rk.scores[0] === "3.8/10.0" && rk.scores[1] === "5.1/10.0" && rk.scores[2] === "8.2/10.0", rk.scores);
+  r.check("p9-e 区分は要交換/交換を検討/良好", rk.pills.join() === "要交換,交換を検討,良好,良好", rk.pills);
+  r.check("p9-f 3つの指標の点を並べ、測れなかった指標は「—」にする",
+    rk.parts[0].length === 3 && rk.parts[0][0].indexOf("2.0") > 0 && rk.parts[1].join("|").indexOf("放電の速さ —") >= 0, rk.parts);
+  r.check("p9-g 副情報(最終交換・確度)を出す", rk.sub[0].indexOf("最終交換 08/20") >= 0 && rk.sub[0].indexOf("確度 高") >= 0
+    && rk.sub[1].indexOf("確度 中") >= 0, rk.sub);
+  r.check("p9-h 交換直後と測定中は順位をつけず別に書く",
+    rk.other.indexOf("交換直後") >= 0 && rk.other.indexOf("測定中") >= 0 && rk.order.indexOf("cam41") < 0 && rk.order.indexOf("cam13") < 0, rk.other);
+  r.check("p9-i 要約に、交換を検討したい拠点数を出す", rk.note.indexOf("2拠点") >= 0 && rk.note.indexOf("10.0が良好") >= 0, rk.note);
+  r.check("p9-j 算出方法と、点数が目安であることを画面に明記する",
+    rk.howto.indexOf("全拠点は同じ地域") >= 0 && rk.howto.indexOf("目安") >= 0 && rk.howto.indexOf("±15%") >= 0, rk.howto.slice(0, 80));
+  r.check("p9-k ゲージは点数に比例する(3.8→38%)", rk.widths[0] === "38%" && rk.widths[2] === "82%", rk.widths);
+  await pageRK.setViewportSize({ width: 390, height: 800 });
+  await pageRK.waitForTimeout(300);
+  const rkMobile = await pageRK.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));
+  r.check("p9-l スマートフォン幅でも横にはみ出さない", rkMobile.sw <= rkMobile.iw + 1, rkMobile);
+  r.check("p9-m ページ例外にはならない", pageRK.errMsgs().length === 0, pageRK.errMsgs());
+  await pageRK.close();
+
   // グラフが枠に対して引き伸ばされていないこと(発電グラフを外して幅が広がった際の不具合対策)
   const aspect = await pageH.evaluate(() => {
     const box = document.getElementById("pchart-bat-cam02");

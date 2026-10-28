@@ -374,7 +374,9 @@ export function buildBatteryHealth(opts = {}) {
       ratedAh: s.ratedAh ?? (cap != null ? (cap > 32 ? 50 : 20) : null),
       sohPct: s.sohPct ?? (cap != null ? Math.round(cap / (s.ratedAh ?? (cap > 32 ? 50 : 20)) * 100) : null),
       mvPerAhNow: s.mvPerAhNow ?? null, mvPerAhPrev: s.mvPerAhPrev ?? null,
-      nightNights: s.nightNights ?? (s.mvPerAhNow != null ? 18 : null)
+      nightNights: s.nightNights ?? (s.mvPerAhNow != null ? 18 : null),
+      // 劣化スコア(scripts/poll.mjs の attachDegradation が書き出す形)。指定したときだけ持たせる
+      ...(s.degrade ? { degrade: s.degrade } : {})
     };
   });
   return {
