@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-10-29T15:20:00.483Z",
+  "generatedAt": "2026-10-29T15:30:00.181Z",
   "sites": {
     "cam01": {
       "pv": 0,
-      "bat": 11.776,
+      "bat": 11.772,
       "measureTime": "2026-10-30 00:10:06",
       "waterLevelM": null,
       "via": "サーバー(直接取得)",
@@ -25,7 +25,7 @@
     },
     "cam03": {
       "pv": 0.001,
-      "bat": 11.82,
+      "bat": 11.816,
       "measureTime": "2026-10-30 00:10:11",
       "waterLevelM": -4.29,
       "via": "サーバー(直接取得)",
@@ -35,13 +35,35 @@
       "lastError": null
     },
     "cam04": {
-      "pv": 0,
-      "bat": 12.137,
+      "pv": 0.001,
+      "bat": 12.128,
       "measureTime": "2026-10-30 00:10:07",
       "waterLevelM": 1.09,
       "via": "サーバー(直接取得)",
       "lastSuccessAt": "2026-10-29T15:20:00.542Z",
       "lastFetchAt": "2026-10-29T15:20:00.542Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "cam08": {
+      "pv": 0.001,
+      "bat": 12.185,
+      "measureTime": "2026-10-29 23:40:21",
+      "waterLevelM": 0.08,
+      "via": "サーバー(直接取得)",
+      "lastSuccessAt": "2026-10-29T15:20:00.543Z",
+      "lastFetchAt": "2026-10-29T15:20:00.543Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "cam09": {
+      "pv": 0.005,
+      "bat": 11.438,
+      "measureTime": "2026-10-30 00:10:19",
+      "waterLevelM": 0.29,
+      "via": "サーバー(直接取得)",
+      "lastSuccessAt": "2026-10-29T15:20:01.783Z",
+      "lastFetchAt": "2026-10-29T15:20:01.783Z",
       "lastFetchOk": true,
       "lastError": null
     },
@@ -56,25 +78,14 @@
       "lastFetchOk": true,
       "lastError": null
     },
-    "cam08": {
-      "pv": 0.001,
-      "bat": 12.194,
-      "measureTime": "2026-10-29 23:40:21",
-      "waterLevelM": 0.08,
+    "cam12": {
+      "pv": 0,
+      "bat": 11.82,
+      "measureTime": "2026-10-30 00:10:07",
+      "waterLevelM": -0.073,
       "via": "サーバー(直接取得)",
-      "lastSuccessAt": "2026-10-29T15:20:00.543Z",
-      "lastFetchAt": "2026-10-29T15:20:00.543Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
-    "cam09": {
-      "pv": 0.006,
-      "bat": 11.433,
-      "measureTime": "2026-10-30 00:10:19",
-      "waterLevelM": 0.29,
-      "via": "サーバー(直接取得)",
-      "lastSuccessAt": "2026-10-29T15:20:01.783Z",
-      "lastFetchAt": "2026-10-29T15:20:01.783Z",
+      "lastSuccessAt": "2026-10-29T15:20:01.886Z",
+      "lastFetchAt": "2026-10-29T15:20:01.886Z",
       "lastFetchOk": true,
       "lastError": null
     },
@@ -91,7 +102,7 @@
     },
     "cam14": {
       "pv": 0,
-      "bat": 11.979,
+      "bat": 11.965,
       "measureTime": "2026-10-30 00:10:17",
       "waterLevelM": 0.037,
       "via": "サーバー(直接取得)",
@@ -100,8 +111,19 @@
       "lastFetchOk": true,
       "lastError": null
     },
+    "cam36": {
+      "pv": 0,
+      "bat": 12.256,
+      "measureTime": "2026-10-30 00:10:07",
+      "waterLevelM": 0.029,
+      "via": "サーバー(直接取得)",
+      "lastSuccessAt": "2026-10-29T15:20:02.105Z",
+      "lastFetchAt": "2026-10-29T15:20:02.105Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
     "cam39": {
-      "pv": 16.429,
+      "pv": 15.729,
       "bat": 13.416,
       "measureTime": "2026-10-30 00:18:06",
       "waterLevelM": 0.055,
@@ -111,20 +133,9 @@
       "lastFetchOk": true,
       "lastError": null
     },
-    "cam36": {
-      "pv": 0,
-      "bat": 12.26,
-      "measureTime": "2026-10-30 00:10:07",
-      "waterLevelM": 0.029,
-      "via": "サーバー(直接取得)",
-      "lastSuccessAt": "2026-10-29T15:20:02.105Z",
-      "lastFetchAt": "2026-10-29T15:20:02.105Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
     "cam40": {
       "pv": 0,
-      "bat": 12.409,
+      "bat": 12.401,
       "measureTime": "2026-10-30 00:10:06",
       "waterLevelM": 0.363,
       "via": "サーバー(直接取得)",
@@ -133,19 +144,8 @@
       "lastFetchOk": true,
       "lastError": null
     },
-    "cam12": {
-      "pv": 0,
-      "bat": 11.82,
-      "measureTime": "2026-10-30 00:10:07",
-      "waterLevelM": -0.073,
-      "via": "サーバー(直接取得)",
-      "lastSuccessAt": "2026-10-29T15:20:01.886Z",
-      "lastFetchAt": "2026-10-29T15:20:01.886Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
     "cam41": {
-      "pv": 0.002,
+      "pv": 0.001,
       "bat": 12.519,
       "measureTime": "2026-10-30 00:10:03",
       "waterLevelM": 0.129,
@@ -157,7 +157,7 @@
     },
     "cam42": {
       "pv": 0.001,
-      "bat": 12.19,
+      "bat": 12.207,
       "measureTime": "2026-10-30 00:10:12",
       "waterLevelM": 0.42,
       "via": "サーバー(直接取得)",
@@ -168,7 +168,7 @@
     },
     "cam43": {
       "pv": 0.001,
-      "bat": 12.119,
+      "bat": 12.11,
       "measureTime": "2026-10-30 00:10:14",
       "waterLevelM": 0.48,
       "via": "サーバー(直接取得)",
@@ -179,7 +179,7 @@
     },
     "cam44": {
       "pv": 0.001,
-      "bat": 12.247,
+      "bat": 12.242,
       "measureTime": "2026-10-30 00:10:03",
       "waterLevelM": 0.05,
       "via": "サーバー(直接取得)",
@@ -212,7 +212,7 @@
     },
     "cam47": {
       "pv": 0.002,
-      "bat": 11.899,
+      "bat": 11.891,
       "measureTime": "2026-10-30 00:10:06",
       "waterLevelM": 0.396,
       "via": "サーバー(直接取得)",
@@ -221,8 +221,19 @@
       "lastFetchOk": true,
       "lastError": null
     },
+    "cam48": {
+      "pv": 3.168,
+      "bat": 13.746,
+      "measureTime": "2026-10-30 00:10:03",
+      "waterLevelM": -15.45,
+      "via": "サーバー(直接取得)",
+      "lastSuccessAt": "2026-10-29T15:20:02.675Z",
+      "lastFetchAt": "2026-10-29T15:20:02.675Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
     "cam50": {
-      "pv": 12.199,
+      "pv": 12.572,
       "bat": 13.504,
       "measureTime": "2026-10-30 00:19:00",
       "waterLevelM": 0.18,
@@ -232,19 +243,8 @@
       "lastFetchOk": true,
       "lastError": null
     },
-    "cam48": {
-      "pv": 3.169,
-      "bat": 13.741,
-      "measureTime": "2026-10-30 00:10:03",
-      "waterLevelM": -15.45,
-      "via": "サーバー(直接取得)",
-      "lastSuccessAt": "2026-10-29T15:20:02.675Z",
-      "lastFetchAt": "2026-10-29T15:20:02.675Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
     "cam51": {
-      "pv": 19.353,
+      "pv": 19.54,
       "bat": 13.627,
       "measureTime": "2026-10-30 00:18:13",
       "waterLevelM": 0.08,
@@ -256,7 +256,7 @@
     },
     "cam52": {
       "pv": 0.001,
-      "bat": 11.605,
+      "bat": 11.592,
       "measureTime": "2026-10-30 00:10:15",
       "waterLevelM": 0.22,
       "via": "サーバー(直接取得)",
@@ -267,7 +267,7 @@
     },
     "cam53": {
       "pv": 0,
-      "bat": 12.137,
+      "bat": 12.124,
       "measureTime": "2026-10-30 00:10:16",
       "waterLevelM": 0,
       "via": "サーバー(直接取得)",
@@ -276,20 +276,9 @@
       "lastFetchOk": true,
       "lastError": null
     },
-    "cam55": {
-      "pv": 0.001,
-      "bat": 12.049,
-      "measureTime": "2026-10-30 00:10:21",
-      "waterLevelM": 0.64,
-      "via": "サーバー(直接取得)",
-      "lastSuccessAt": "2026-10-29T15:20:02.913Z",
-      "lastFetchAt": "2026-10-29T15:20:02.913Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
     "cam54": {
       "pv": 0,
-      "bat": 12.176,
+      "bat": 12.163,
       "measureTime": "2026-10-30 00:10:34",
       "waterLevelM": 0.08,
       "via": "サーバー(直接取得)",
@@ -298,113 +287,36 @@
       "lastFetchOk": true,
       "lastError": null
     },
+    "cam55": {
+      "pv": 0.001,
+      "bat": 12.036,
+      "measureTime": "2026-10-30 00:10:21",
+      "waterLevelM": 0.64,
+      "via": "サーバー(直接取得)",
+      "lastSuccessAt": "2026-10-29T15:20:02.913Z",
+      "lastFetchAt": "2026-10-29T15:20:02.913Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
     "kw01": {
       "pv": null,
       "bat": null,
-      "measureTime": "2026/10/30 00:10",
+      "measureTime": "2026/10/30 00:20",
       "waterLevelM": 0.51,
       "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:02.990Z",
-      "lastFetchAt": "2026-10-29T15:20:02.990Z",
+      "lastSuccessAt": "2026-10-29T15:30:00.184Z",
+      "lastFetchAt": "2026-10-29T15:30:00.184Z",
       "lastFetchOk": true,
       "lastError": null
     },
     "kw03": {
       "pv": null,
       "bat": null,
-      "measureTime": "2026/10/30 00:10",
-      "waterLevelM": 1.19,
+      "measureTime": "2026/10/30 00:20",
+      "waterLevelM": 1.18,
       "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:03.054Z",
-      "lastFetchAt": "2026-10-29T15:20:03.054Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
-    "kw02": {
-      "pv": null,
-      "bat": null,
-      "measureTime": "2026/10/30 00:10",
-      "waterLevelM": 0.21,
-      "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:03.002Z",
-      "lastFetchAt": "2026-10-29T15:20:03.002Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
-    "kw04": {
-      "pv": null,
-      "bat": null,
-      "measureTime": "2026/10/30 00:10",
-      "waterLevelM": 0.75,
-      "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:03.125Z",
-      "lastFetchAt": "2026-10-29T15:20:03.125Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
-    "kw06": {
-      "pv": null,
-      "bat": null,
-      "measureTime": "2026/10/29 09:00",
-      "waterLevelM": -2.49,
-      "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:03.855Z",
-      "lastFetchAt": "2026-10-29T15:20:03.855Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
-    "kw07": {
-      "pv": null,
-      "bat": null,
-      "measureTime": "2026/10/29 09:00",
-      "waterLevelM": -4.2,
-      "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:03.929Z",
-      "lastFetchAt": "2026-10-29T15:20:03.929Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
-    "kw09": {
-      "pv": null,
-      "bat": null,
-      "measureTime": "2026/10/29 10:00",
-      "waterLevelM": -4.04,
-      "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:04.369Z",
-      "lastFetchAt": "2026-10-29T15:20:04.369Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
-    "kw10": {
-      "pv": null,
-      "bat": null,
-      "measureTime": "2026/10/30 00:10",
-      "waterLevelM": 0.17,
-      "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:04.462Z",
-      "lastFetchAt": "2026-10-29T15:20:04.462Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
-    "kw11": {
-      "pv": null,
-      "bat": null,
-      "measureTime": "2026/10/30 00:10",
-      "waterLevelM": -0.2,
-      "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:04.589Z",
-      "lastFetchAt": "2026-10-29T15:20:04.589Z",
-      "lastFetchOk": true,
-      "lastError": null
-    },
-    "kw08": {
-      "pv": null,
-      "bat": null,
-      "measureTime": "2026/10/30 00:10",
-      "waterLevelM": 0.57,
-      "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:04.178Z",
-      "lastFetchAt": "2026-10-29T15:20:04.178Z",
+      "lastSuccessAt": "2026-10-29T15:30:00.241Z",
+      "lastFetchAt": "2026-10-29T15:30:00.241Z",
       "lastFetchOk": true,
       "lastError": null
     },
@@ -414,13 +326,101 @@
       "measureTime": "2026/10/29 09:00",
       "waterLevelM": -1.27,
       "via": "サーバー(国交省 川の防災情報)",
-      "lastSuccessAt": "2026-10-29T15:20:03.127Z",
-      "lastFetchAt": "2026-10-29T15:20:03.127Z",
+      "lastSuccessAt": "2026-10-29T15:30:00.244Z",
+      "lastFetchAt": "2026-10-29T15:30:00.244Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "kw04": {
+      "pv": null,
+      "bat": null,
+      "measureTime": "2026/10/30 00:20",
+      "waterLevelM": 0.75,
+      "via": "サーバー(国交省 川の防災情報)",
+      "lastSuccessAt": "2026-10-29T15:30:00.242Z",
+      "lastFetchAt": "2026-10-29T15:30:00.242Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "kw02": {
+      "pv": null,
+      "bat": null,
+      "measureTime": "2026/10/30 00:20",
+      "waterLevelM": 0.21,
+      "via": "サーバー(国交省 川の防災情報)",
+      "lastSuccessAt": "2026-10-29T15:30:00.240Z",
+      "lastFetchAt": "2026-10-29T15:30:00.240Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "kw06": {
+      "pv": null,
+      "bat": null,
+      "measureTime": "2026/10/29 09:00",
+      "waterLevelM": -2.49,
+      "via": "サーバー(国交省 川の防災情報)",
+      "lastSuccessAt": "2026-10-29T15:30:01.103Z",
+      "lastFetchAt": "2026-10-29T15:30:01.103Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "kw07": {
+      "pv": null,
+      "bat": null,
+      "measureTime": "2026/10/29 09:00",
+      "waterLevelM": -4.2,
+      "via": "サーバー(国交省 川の防災情報)",
+      "lastSuccessAt": "2026-10-29T15:30:01.289Z",
+      "lastFetchAt": "2026-10-29T15:30:01.289Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "kw08": {
+      "pv": null,
+      "bat": null,
+      "measureTime": "2026/10/30 00:20",
+      "waterLevelM": 0.57,
+      "via": "サーバー(国交省 川の防災情報)",
+      "lastSuccessAt": "2026-10-29T15:30:01.303Z",
+      "lastFetchAt": "2026-10-29T15:30:01.303Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "kw09": {
+      "pv": null,
+      "bat": null,
+      "measureTime": "2026/10/29 10:00",
+      "waterLevelM": -4.04,
+      "via": "サーバー(国交省 川の防災情報)",
+      "lastSuccessAt": "2026-10-29T15:30:01.516Z",
+      "lastFetchAt": "2026-10-29T15:30:01.516Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "kw11": {
+      "pv": null,
+      "bat": null,
+      "measureTime": "2026/10/30 00:20",
+      "waterLevelM": -0.2,
+      "via": "サーバー(国交省 川の防災情報)",
+      "lastSuccessAt": "2026-10-29T15:30:01.852Z",
+      "lastFetchAt": "2026-10-29T15:30:01.852Z",
+      "lastFetchOk": true,
+      "lastError": null
+    },
+    "kw10": {
+      "pv": null,
+      "bat": null,
+      "measureTime": "2026/10/30 00:20",
+      "waterLevelM": 0.17,
+      "via": "サーバー(国交省 川の防災情報)",
+      "lastSuccessAt": "2026-10-29T15:30:01.787Z",
+      "lastFetchAt": "2026-10-29T15:30:01.787Z",
       "lastFetchOk": true,
       "lastError": null
     }
   },
   "powerRelay": {
-    "lastTs": "2026-10-29T15:18:57.000Z"
+    "lastTs": "2026-10-29T15:24:54.000Z"
   }
 }
