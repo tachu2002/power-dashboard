@@ -1298,7 +1298,8 @@ function computeBatteryEndurance(store, longTerm) {
  *   ② 下限までの放電 … 前夜(0:00〜4:00)の電圧降下の速さのまま下がり続けたとき、0時の電圧から
  *      その拠点の下限電圧(北沢9.5V／多呂・梅名2号・芝橋・中村橋10.5V／既定11.5V)まで何時間かかるか。
  *      48時間以上=10点、12時間以下=0点。
- * 点数 = ①と②の平均(片方しか測れなければその1つ)。交換直後の拠点は交換前の値が当てにならないので採点しない。 */
+ * 点数 = ①と②の平均(片方しか測れなければその1つ)。交換直後の拠点も採点する(2026-10-30 利用者の指示)。
+ * 交換前の値は使わず交換後の日・夜だけで数えるので、実測が少ないうちは確度を「低」にする。 */
 const BATTERY_FLOOR_DEFAULT_V = 11.5;
 const BATTERY_FLOOR_OVERRIDE_V = { cam03: 9.5, cam14: 10.5, cam09: 10.5, cam43: 10.5, cam52: 10.5 };   // index.html の BATTERY_EMPTY_VOLTAGE_OVERRIDE と同じ
 const DEGRADE_REACH_V = 13.0;
@@ -1309,7 +1310,7 @@ const DEGRADE_REACH_RECENT = 3;          // 直近の晴れた何日で「論外
 const DEGRADE_REACH_FAIL_DAYS = 2;       // そのうち何日届かなければ論外か
 const DEGRADE_FAIL_MAX = 3.9;            // 論外の拠点の点数の上限
 const DEGRADE_FLOOR_FULL_H = 48, DEGRADE_FLOOR_ZERO_H = 12;
-const DEGRADE_NIGHT_LOOKBACK_DAYS = 3;   // 「前夜」として探す日数(直近に夜間の実測が無い拠点のため)
+const DEGRADE_NIGHT_LOOKBACK_DAYS = 14;  // 「前夜」として探す日数(直近に夜間の実測が無い拠点でも採点するため、新しい順に最大14日)
 const DEGRADE_FRESH_DAYS = 14;           // 交換してからこの日数に満たなければ「交換直後」
 const DEGRADE_GRADES = [                 // 点数の下限 → 区分
   { min: 8.0, key: "good", label: "良好" },
@@ -1352,55 +1353,61 @@ function attachDegradation(sites, dayMap, days) {
   ids.forEach(function (id) {
     const e = sites[id];
     const fresh = !!(e.lastSwapAt && typeof e.capDaysAfterSwap === "number" && e.capDaysAfterSwap < DEGRADE_FRESH_DAYS);
-    const deg = { score: null, grade: null, gradeLabel: null, confidence: null, fresh: fresh, fail13: false,
+    const deg = { score: null, grade: null, gradeLabel: null, confidence: null, fresh: fresh, provisional: false, fail13: false,
       cappedBy: null, parts: [], reach: null, floor: null };
     e.degrade = deg;
-    if (fresh) { deg.reason = "交換直後"; return; }
-    // ① 満充電への到達(交換した拠点は交換後の日だけ)
-    const own = sunnyDays.filter(function (day) { return !(e.lastSwapAt && day < e.lastSwapAt); })
-      .map(function (day) { return { day: day, v: vmaxOf(day, id) }; }).filter(function (x) { return x.v !== null; });
-    let charge = null;
-    if (own.length >= 2) {
-      const recent = own.slice(0, DEGRADE_REACH_RECENT);                  // 新しい順
-      const missed = recent.filter(function (x) { return x.v < DEGRADE_REACH_V; }).length;
-      const hit = own.filter(function (x) { return x.v >= DEGRADE_REACH_V; }).length;
-      const rate = hit / own.length;
-      deg.reach = { recentDays: recent.length, recentMissed: missed, days: own.length, hit: hit,
-        rate: Math.round(rate * 1000) / 1000, lastDay: own[0].day, lastV: Math.round(own[0].v * 100) / 100,
-        medianV: Math.round(medianOf(own.map(function (x) { return x.v; })) * 100) / 100 };
-      deg.fail13 = recent.length >= 2 && missed >= DEGRADE_REACH_FAIL_DAYS;
-      // 割合が出せる日数があれば割合で、無ければ直近の3日で点数にする
-      const r = own.length >= DEGRADE_REACH_MIN_DAYS ? rate : (recent.length - missed) / recent.length;
-      charge = Math.round(clamp01((r - DEGRADE_REACH_ZERO) / (DEGRADE_REACH_FULL - DEGRADE_REACH_ZERO)) * 100) / 10;
-      deg.parts.push({ key: "charge", label: "満充電への到達", score: charge, value: deg.reach.rate,
-        text: "晴れた" + own.length + "日中" + hit + "日で13V到達(直近" + recent.length + "日で" + missed + "日届かず・日中最高の中央値 "
-          + deg.reach.medianV.toFixed(2) + "V)" });
-    }
-    // ② 下限までの放電: 前夜の降下の速さのまま下がると、0時の電圧から下限まで何時間か
-    let floor = null;
-    if (lastDay) {
-      for (let b = 0; b < DEGRADE_NIGHT_LOOKBACK_DAYS && floor === null; b++) {
-        const d = (dayMap[dayAt(b)] || {})[id];
-        if (!d || typeof d.v0 !== "number" || typeof d.nightVPerH !== "number" || !(d.nightVPerH > 0.0008)) continue;
-        if (e.lastSwapAt && dayAt(b) < e.lastSwapAt) continue;
-        const floorV = batteryFloorVoltage(id);
-        const hours = Math.max(0, (d.v0 - floorV) / d.nightVPerH);
-        deg.floor = { day: dayAt(b), v0: Math.round(d.v0 * 1000) / 1000, floorV: floorV,
-          vPerH: Math.round(d.nightVPerH * 10000) / 10000, hours: Math.round(hours * 10) / 10 };
-        floor = Math.round(clamp01((hours - DEGRADE_FLOOR_ZERO_H) / (DEGRADE_FLOOR_FULL_H - DEGRADE_FLOOR_ZERO_H)) * 100) / 10;
-        deg.parts.push({ key: "floor", label: "下限までの放電", score: floor, value: deg.floor.hours,
-          text: "前夜の降下 " + (d.nightVPerH * 1000).toFixed(1) + "mV/hのままなら、" + d.v0.toFixed(2) + "V → 下限" + floorV.toFixed(1)
-            + "Vまで約" + Math.round(hours) + "時間" });
+    // 交換した拠点は交換後の日・夜だけで数える。それでも測れなければ、交換前の値で仮に採点する(provisional)
+    const measure = function (ignoreSwap) {
+      // ① 満充電への到達(交換した拠点は交換後の日だけ)
+      const own = sunnyDays.filter(function (day) { return !(!ignoreSwap && e.lastSwapAt && day < e.lastSwapAt); })
+        .map(function (day) { return { day: day, v: vmaxOf(day, id) }; }).filter(function (x) { return x.v !== null; });
+      let charge = null;
+      if (own.length >= 1) {
+        const recent = own.slice(0, DEGRADE_REACH_RECENT);                  // 新しい順
+        const missed = recent.filter(function (x) { return x.v < DEGRADE_REACH_V; }).length;
+        const hit = own.filter(function (x) { return x.v >= DEGRADE_REACH_V; }).length;
+        const rate = hit / own.length;
+        deg.reach = { recentDays: recent.length, recentMissed: missed, days: own.length, hit: hit,
+          rate: Math.round(rate * 1000) / 1000, lastDay: own[0].day, lastV: Math.round(own[0].v * 100) / 100,
+          medianV: Math.round(medianOf(own.map(function (x) { return x.v; })) * 100) / 100 };
+        deg.fail13 = recent.length >= 2 && missed >= DEGRADE_REACH_FAIL_DAYS;
+        // 割合が出せる日数があれば割合で、無ければ直近の3日で点数にする
+        const r = own.length >= DEGRADE_REACH_MIN_DAYS ? rate : (recent.length - missed) / recent.length;
+        charge = Math.round(clamp01((r - DEGRADE_REACH_ZERO) / (DEGRADE_REACH_FULL - DEGRADE_REACH_ZERO)) * 100) / 10;
+        deg.parts.push({ key: "charge", label: "満充電への到達", score: charge, value: deg.reach.rate,
+          text: "晴れた" + own.length + "日中" + hit + "日で13V到達(直近" + recent.length + "日で" + missed + "日届かず・日中最高の中央値 "
+            + deg.reach.medianV.toFixed(2) + "V)" });
       }
-    }
+      // ② 下限までの放電: 前夜の降下の速さのまま下がると、0時の電圧から下限まで何時間か
+      let floor = null;
+      if (lastDay) {
+        for (let b = 0; b < DEGRADE_NIGHT_LOOKBACK_DAYS && floor === null; b++) {
+          const d = (dayMap[dayAt(b)] || {})[id];
+          if (!d || typeof d.v0 !== "number" || typeof d.nightVPerH !== "number" || !(d.nightVPerH > 0.0008)) continue;
+          if (!ignoreSwap && e.lastSwapAt && dayAt(b) < e.lastSwapAt) continue;
+          const floorV = batteryFloorVoltage(id);
+          const hours = Math.max(0, (d.v0 - floorV) / d.nightVPerH);
+          deg.floor = { day: dayAt(b), v0: Math.round(d.v0 * 1000) / 1000, floorV: floorV,
+            vPerH: Math.round(d.nightVPerH * 10000) / 10000, hours: Math.round(hours * 10) / 10 };
+          floor = Math.round(clamp01((hours - DEGRADE_FLOOR_ZERO_H) / (DEGRADE_FLOOR_FULL_H - DEGRADE_FLOOR_ZERO_H)) * 100) / 10;
+          deg.parts.push({ key: "floor", label: "下限までの放電", score: floor, value: deg.floor.hours,
+            text: (b === 0 ? "前夜" : "直近の夜(" + dayAt(b).slice(5).replace("-", "/") + ")") + "の降下 " + (d.nightVPerH * 1000).toFixed(1) + "mV/hのままなら、" + d.v0.toFixed(2) + "V → 下限" + floorV.toFixed(1)
+              + "Vまで約" + Math.round(hours) + "時間" });
+        }
+      }
+
+    };
+    measure(false);
+    if (!deg.parts.length && e.lastSwapAt) { measure(true); if (deg.parts.length) deg.provisional = true; }
     const got = deg.parts.map(function (p) { return p.score; });
-    if (!got.length) { deg.reason = "測定中"; return; }
+    if (!got.length) { deg.reason = fresh ? "交換直後" : "測定中"; return; }
     deg.score = Math.round(got.reduce(function (a, b) { return a + b; }, 0) / got.length * 10) / 10;
     if (deg.fail13 && deg.score > DEGRADE_FAIL_MAX) { deg.score = DEGRADE_FAIL_MAX; deg.cappedBy = "charge"; }
     const g = degradeGradeOf(deg.score);
     deg.grade = g.key;
     deg.gradeLabel = deg.fail13 ? "論外" : g.label;
-    deg.confidence = got.length === 2 ? "高" : "中";
+    // 交換直後は交換後の日数が短く、実測が少ないので確度は低くする
+    deg.confidence = (fresh || deg.provisional) ? "低" : got.length === 2 ? "高" : "中";
   });
 }
 async function updateBatteryHealthFile() {
