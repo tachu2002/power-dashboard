@@ -945,14 +945,14 @@
           <ol class="rk-list" id="rankList"></ol>
           <div class="rk-other" id="rankOther"></div>
           <div class="health-note" id="rankHowto">
-            <b>劣化スコアの見かた</b>（10.0が良好・低いほど交換が近い）<br>
-            評価するのは次の2つだけです。<br>
-            ・<b>満充電への到達（必須）</b>… 日中が晴れた日に、電池が満充電（端子電圧13V以上）まで届いたか。<b>届かないのは論外で、劣化がかなり進んでいる</b>ものとして扱います。全拠点は同じ地域で日射が共通なので、全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とします（曇りの日と、曇りが続いた直後の最初の晴れ間は、深く放電した電池が1日では戻りきれないので数えません）。<b>直近の晴れた3日のうち2日以上13Vに届かなかった拠点は「論外」</b>とし、点数にかかわらずランキングの先頭に置き、点数も最大3.9に抑えます。点数は、晴れた日に届いた割合（95%以上で10.0、40%以下で0）です。<br>
-            ・<b>下限までの放電</b>… 前夜（0:00〜4:00）の電圧降下の速さのまま下がり続けたとき、0時の電圧から<b>その拠点の下限電圧</b>（北沢アンダーパス9.5V／多呂樋管・梅名樋管2号・芝橋・中村橋10.5V／既定11.5V）まで何時間かかるか。48時間以上で10.0、12時間以下で0です。<br>
-            点数は2つの平均です（片方しか測れなければその1つ。確度に出します）。
-            電池を交換した拠点も採点します。交換後の日・夜だけで数えるため、実測が少ない間は確度が「低」です。交換後の実測が全く無い間は、交換前の値で仮に採点します（確度「低」）。それでも測れない拠点は、順位なしで末尾に載せます。ランキングは更新のたびに入れ替わります。
-            区分は 8.0以上＝良好／6.0〜8.0＝経過観察／4.0〜6.0＝交換を検討／4.0未満＝要交換。
-            このランキングは「電池の傷み具合」の順で、「健全性の一覧」の状態（今すぐ持つか）とは見る観点が違います（各行に一覧の状態も添えています）。満充電に届かない原因が電池ではなく、パネルの汚れ・日陰・負荷の大きさのこともあるため、<b>点数は順位をつけるための目安</b>です。
+            <b>このランキングの目的</b> … 電池が底を尽きると機器が止まります。<b>止まる前に、劣化の早い電池を見つけて交換する</b>ための順位です。評価は「いま付いている電池」だけで行い、交換前の電池の値は使いません（交換した電池が新品とは限らないため）。全拠点を必ず採点します。<br>
+            <b>並び順</b>（上ほど先に交換）… ①電池切れで停止中 → ②論外（晴れた日に満充電へ届かない） → ③まもなく底（下限まであと12時間未満） → ④点数の低い順。<br>
+            <b>点数</b>（10.0が良好・低いほど交換が近い）は、次の2つの平均です。<br>
+            ・<b>満充電への到達（必須）</b>… 日中が晴れた日に、電池が満充電（端子電圧13V以上）まで届いたか。<b>届かないのは論外で、劣化がかなり進んでいる</b>ものとして扱います。全拠点は同じ地域で日射が共通なので、全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とします（曇りの日と、曇りが続いた直後の最初の晴れ間は、深く放電した電池が1日では戻りきれないので数えません）。<b>直近の晴れた3日のうち2日以上13Vに届かなかった拠点は「論外」</b>とし、点数も最大3.9に抑えます。点数は、晴れた日に届いた割合（95%以上で10.0、40%以下で0）です。<br>
+            ・<b>下限までの放電</b>… 直近の夜（0:00〜4:00）の電圧降下の速さのまま下がり続けたとき、0時の電圧から<b>その拠点の下限電圧</b>（北沢アンダーパス9.5V／多呂樋管・梅名樋管2号・芝橋・中村橋10.5V／既定11.5V）まで何時間かかるか。48時間以上で10.0、12時間以下で0です。<br>
+            電池を交換したばかりで、交換後の夜の実測がまだ無い拠点は、消費電流と全拠点の標準的な放電の速さから見込んで採点します（確度「低」。実測の夜がそろえば自動で実測に置き換わります）。
+            このランキングは「電池の傷み具合」の順で、「健全性の一覧」の状態（今すぐ持つか）とは見る観点が違います（各行に一覧の状態も添えています）。
+            満充電に届かない原因が電池ではなく、パネルの汚れ・日陰・負荷の大きさのこともあるため、<b>点数は順位をつけるための目安</b>です。ランキングは更新のたびに入れ替わります。
           </div>
         </div>
 
@@ -2442,6 +2442,8 @@
    * 採点できないものは順位をつけず、「測定中」「交換直後」として下に分ける。
    * --------------------------------------------------------------------- */
   var RANK_PART_ORDER = [["charge", "満充電への到達"], ["floor", "下限までの放電"]];
+  var RANK_SOON_HOURS = 12;   // 下限まであと何時間未満を「まもなく底」とするか
+  var RANK_TIER_LABEL = ["停止中", "論外", "まもなく底"];
   var RANK_GRADE_CLASS = { good: "ok", watch: "watch", plan: "warn", replace: "bad" };
   function fmtDegradeScore(v) { return typeof v === "number" ? v.toFixed(1) + "/10.0" : "—"; }
   // 一覧・ランキングでは「（河川 / 地区）」を落として幅を稼ぐ。ただし同じ名前の拠点が複数あるとき
@@ -2461,21 +2463,28 @@
       rows.push({ id: site.id, name: site.name, e: e, d: e.degrade });
     });
     var hoursOf = {};
-    var stateOf = {};
+    var stateOf = {}, cutOf = {};
     healthTableRows().forEach(function (r) {
+      cutOf[r.id] = r.cut;
       hoursOf[r.id] = r.sustain ? 1e8 : (r.hours === null ? 1e9 : r.hours);
       stateOf[r.id] = healthStateOf(r)[0];
     });
     var scored = rows.filter(function (r) { return typeof r.d.score === "number"; });
-    // 晴れた日に満充電(13V)へ届かない拠点(論外)は点数にかかわらず先頭。届かなかった日が多い順。
-    var missOf = function (r) { return r.d.fail13 ? (r.d.reach ? r.d.reach.recentMissed : 0) : -1; };
+    // 機器が止まる前に交換するためのランキング。優先度の高い順に
+    //  0 停止中(電池切れ) → 1 論外(晴れた日に満充電へ届かない) → 2 まもなく底(下限まで12時間未満) → 3 点数の低い順。
+    scored.forEach(function (r) {
+      var cut = cutOf[r.id];
+      var h = hoursOf[r.id];
+      r.tier = (cut && cut.kind === "empty") ? 0 : r.d.fail13 ? 1 : (h < RANK_SOON_HOURS ? 2 : 3);
+    });
+    var missOf = function (r) { return r.d.fail13 && r.d.reach ? r.d.reach.recentMissed : 0; };
     scored.sort(function (a, b) {
-      return (missOf(b) - missOf(a)) || (a.d.score - b.d.score) || (hoursOf[a.id] - hoursOf[b.id]);
+      return (a.tier - b.tier) || (missOf(b) - missOf(a)) || (a.d.score - b.d.score) || (hoursOf[a.id] - hoursOf[b.id]);
     });
     var rank = 0;
     scored.forEach(function (r, i) {
       var prev = scored[i - 1];
-      if (i === 0 || r.d.score !== prev.d.score || !!r.d.fail13 !== !!prev.d.fail13) rank = i + 1;
+      if (i === 0 || r.d.score !== prev.d.score || r.tier !== prev.tier) rank = i + 1;
       r.rank = rank;
     });
     return {
@@ -2513,7 +2522,9 @@
       var tbl = res.stateOf[r.id];
       if (tbl) sub.push("一覧の状態: " + tbl);
       if (d.fresh) sub.push("交換直後" + (typeof e.capDaysAfterSwap === "number" ? "（交換後" + e.capDaysAfterSwap + "日）" : ""));
-      if (d.provisional) sub.push("交換前の値で仮採点");
+      if (d.estimated) sub.push("交換後の夜の実測がまだ無く、見込みで採点");
+      if (r.tier === 0) sub.push("電池切れで機器が止まっています。すぐ交換");
+      if (r.tier === 2) sub.push("下限まであと" + fmtEndurance(res.hoursOf[r.id]) + "。止まる前に交換");
       if (d.fail13 && d.reach) {
         sub.push("晴れた日に満充電(13V)へ届かない（直近" + d.reach.recentDays + "日中" + d.reach.recentMissed + "日）");
       }
@@ -2522,12 +2533,12 @@
       if (h < 1e8) sub.push("あと" + fmtEndurance(h));
       sub.push("確度 " + d.confidence);
       var shortName = shortSiteName(r.name);
-      return '<li class="rk-row rk-' + d.grade + (d.fail13 ? " rk-fail" : "") + '" data-site="' + r.id + '">'
+      return '<li class="rk-row rk-' + d.grade + (r.tier <= 1 ? " rk-fail" : "") + '" data-site="' + r.id + '">'
         + '<div class="rk-no">' + r.rank + "</div>"
         + '<div><div class="rk-name" title="' + r.name + '">' + shortName + '</div><div class="rk-sub">' + sub.join("・") + "</div></div>"
         + '<div class="rk-score"><span class="rk-num">' + d.score.toFixed(1) + '</span><span class="rk-max">/10.0</span></div>'
         + '<div class="rk-gauge"><i style="width:' + Math.max(3, d.score * 10) + "%;background:" + col + '"></i></div>'
-        + '<div class="rk-pill"><span class="ht-pill ' + cls + '">' + d.gradeLabel + "</span></div>"
+        + '<div class="rk-pill"><span class="ht-pill ' + (r.tier < 3 ? "bad" : cls) + '">' + (r.tier < 3 ? RANK_TIER_LABEL[r.tier] : d.gradeLabel) + "</span></div>"
         + '<div class="rk-parts">' + parts + "</div></li>";
     });
     // 採点できない拠点(測定中・交換直後で実測が全く無い)も、順位なしで末尾に載せて全拠点を並べる
