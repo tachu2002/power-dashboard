@@ -480,6 +480,7 @@
     gap: 4px 12px; align-items: center; padding: 8px 10px; border: 1px solid var(--gridline); border-radius: 8px;
     background: var(--surface-1); }
   .rk-row.rk-fail { border-width: 2px; }
+  .rk-row.rk-nodata { opacity: 0.75; }
   .rk-row.rk-replace { border-color: var(--critical-border); background: var(--critical-bg); }
   .rk-row.rk-plan { border-color: var(--warn-border); background: var(--warn-bg); }
   .rk-no { font-size: 15px; font-weight: 700; color: var(--text-secondary); text-align: center; font-variant-numeric: tabular-nums; }
@@ -949,7 +950,7 @@
             ・<b>満充電への到達（必須）</b>… 日中が晴れた日に、電池が満充電（端子電圧13V以上）まで届いたか。<b>届かないのは論外で、劣化がかなり進んでいる</b>ものとして扱います。全拠点は同じ地域で日射が共通なので、全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とします（曇りの日と、曇りが続いた直後の最初の晴れ間は、深く放電した電池が1日では戻りきれないので数えません）。<b>直近の晴れた3日のうち2日以上13Vに届かなかった拠点は「論外」</b>とし、点数にかかわらずランキングの先頭に置き、点数も最大3.9に抑えます。点数は、晴れた日に届いた割合（95%以上で10.0、40%以下で0）です。<br>
             ・<b>下限までの放電</b>… 前夜（0:00〜4:00）の電圧降下の速さのまま下がり続けたとき、0時の電圧から<b>その拠点の下限電圧</b>（北沢アンダーパス9.5V／多呂樋管・梅名樋管2号・芝橋・中村橋10.5V／既定11.5V）まで何時間かかるか。48時間以上で10.0、12時間以下で0です。<br>
             点数は2つの平均です（片方しか測れなければその1つ。確度に出します）。
-            電池を交換して2週間以内の拠点は交換前の値が当てにならないため、採点せず「交換直後」に分けています。
+            電池を交換した拠点も採点します。交換後の日・夜だけで数えるため、実測が少ない間は確度が「低」です。交換後の実測が全く無い間は、交換前の値で仮に採点します（確度「低」）。それでも測れない拠点は、順位なしで末尾に載せます。ランキングは更新のたびに入れ替わります。
             区分は 8.0以上＝良好／6.0〜8.0＝経過観察／4.0〜6.0＝交換を検討／4.0未満＝要交換。
             このランキングは「電池の傷み具合」の順で、「健全性の一覧」の状態（今すぐ持つか）とは見る観点が違います（各行に一覧の状態も添えています）。満充電に届かない原因が電池ではなく、パネルの汚れ・日陰・負荷の大きさのこともあるため、<b>点数は順位をつけるための目安</b>です。
           </div>
@@ -2479,7 +2480,7 @@
     });
     return {
       scored: scored,
-      fresh: rows.filter(function (r) { return r.d.fresh; }),
+      fresh: rows.filter(function (r) { return r.d.fresh && typeof r.d.score !== "number"; }),
       pending: rows.filter(function (r) { return !r.d.fresh && typeof r.d.score !== "number"; }),
       hoursOf: hoursOf,
       stateOf: stateOf
@@ -2497,7 +2498,7 @@
       note.textContent = "劣化スコアはまだありません。次の再計算（1時間ごと）で出ます。";
       return;
     }
-    list.innerHTML = res.scored.map(function (r) {
+    var rowHtml = res.scored.map(function (r) {
       var d = r.d, e = r.e;
       var cls = RANK_GRADE_CLASS[d.grade] || "ok";
       var col = d.grade === "replace" ? "var(--critical-border)" : d.grade === "plan" ? "var(--warn-border)"
@@ -2511,6 +2512,8 @@
       var sub = [];
       var tbl = res.stateOf[r.id];
       if (tbl) sub.push("一覧の状態: " + tbl);
+      if (d.fresh) sub.push("交換直後" + (typeof e.capDaysAfterSwap === "number" ? "（交換後" + e.capDaysAfterSwap + "日）" : ""));
+      if (d.provisional) sub.push("交換前の値で仮採点");
       if (d.fail13 && d.reach) {
         sub.push("晴れた日に満充電(13V)へ届かない（直近" + d.reach.recentDays + "日中" + d.reach.recentMissed + "日）");
       }
@@ -2526,19 +2529,28 @@
         + '<div class="rk-gauge"><i style="width:' + Math.max(3, d.score * 10) + "%;background:" + col + '"></i></div>'
         + '<div class="rk-pill"><span class="ht-pill ' + cls + '">' + d.gradeLabel + "</span></div>"
         + '<div class="rk-parts">' + parts + "</div></li>";
+    });
+    // 採点できない拠点(測定中・交換直後で実測が全く無い)も、順位なしで末尾に載せて全拠点を並べる
+    var unscored = res.fresh.concat(res.pending);
+    var unscoredHtml = unscored.map(function (r) {
+      var why = r.d.fresh ? "交換直後" : "測定中";
+      var sub = [];
+      var tbl = res.stateOf[r.id];
+      if (tbl) sub.push("一覧の状態: " + tbl);
+      if (r.e.lastSwapAt) sub.push("最終交換 " + r.e.lastSwapAt.slice(5).replace("-", "/"));
+      sub.push(why === "交換直後" ? "交換後の晴れた日・夜の実測がまだ無い" : "実測がまだそろっていない");
+      return '<li class="rk-row rk-nodata" data-site="' + r.id + '">'
+        + '<div class="rk-no">—</div>'
+        + '<div><div class="rk-name" title="' + r.name + '">' + shortSiteName(r.name) + '</div><div class="rk-sub">' + sub.join("・") + "</div></div>"
+        + '<div class="rk-score"><span class="rk-num">—</span><span class="rk-max">/10.0</span></div>'
+        + '<div class="rk-gauge"></div>'
+        + '<div class="rk-pill"><span class="ht-pill watch">' + why + "</span></div>"
+        + '<div class="rk-parts"><span class="rk-part rk-none">満充電への到達 —</span><span class="rk-part rk-none">下限までの放電 —</span></div></li>';
     }).join("");
-    var names = function (arr) {
-      return arr.map(function (r) { return shortSiteName(r.name); }).join("、");
-    };
-    var htm = "";
-    if (res.fresh.length) {
-      htm += "<b>交換直後（採点しません）</b> … " + names(res.fresh)
-        + "。交換して2週間以内で、交換前の値が当てにならないため。新しい電池の容量が測れ次第、採点します。<br>";
-    }
-    if (res.pending.length) {
-      htm += "<b>測定中</b> … " + names(res.pending) + "。いまの電池の容量がまだ測れていません。<br>";
-    }
-    other.innerHTML = htm;
+    list.innerHTML = rowHtml.join("") + unscoredHtml;
+    other.innerHTML = unscored.length
+      ? "<b>順位なしの拠点</b> … 末尾に「測定中」「交換直後」として載せています。実測がそろい次第、採点して順位に入ります（ランキングは更新のたびに入れ替わります）。"
+      : "";
     var urgent = res.scored.filter(function (r) { return r.d.grade === "replace" || r.d.grade === "plan"; });
     var stamp = batteryHealthState.generatedAt ? fmtOutlookWhen(batteryHealthState.generatedAt.getTime()) : "";
     var fails = res.scored.filter(function (r) { return r.d.fail13; });
@@ -2546,7 +2558,7 @@
       + (urgent.length
       ? "交換を検討したい拠点が " + urgent.length + "拠点あります。"
       : "いま交換を急ぐ拠点はありません。")
-      + "点数は10.0が良好で、低いほど交換が近い順に並べています（採点 " + res.scored.length + "拠点）"
+      + "点数は10.0が良好で、低いほど交換が近い順に並べています（全" + (res.scored.length + unscored.length) + "拠点のうち採点 " + res.scored.length + "拠点）"
       + (stamp ? "／最終計算 " + stamp : "") + "。";
   }
   function renderHealthTable() {
