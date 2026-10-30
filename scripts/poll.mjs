@@ -1298,8 +1298,10 @@ function computeBatteryEndurance(store, longTerm) {
  *   ② 下限までの放電 … 前夜(0:00〜4:00)の電圧降下の速さのまま下がり続けたとき、0時の電圧から
  *      その拠点の下限電圧(北沢9.5V／多呂・梅名2号・芝橋・中村橋10.5V／既定11.5V)まで何時間かかるか。
  *      48時間以上=10点、12時間以下=0点。
- * 点数 = ①と②の平均(片方しか測れなければその1つ)。交換直後の拠点も採点する(2026-10-30 利用者の指示)。
- * 交換前の値は使わず交換後の日・夜だけで数えるので、実測が少ないうちは確度を「低」にする。 */
+ * 点数 = ①と②の平均(片方しか測れなければその1つ)。**全拠点を必ず採点する**(2026-10-30 利用者の指示)。
+ * 評価はいまの電池だけで行い、交換前の電池の値は一切使わない。交換後の実測が少ないうちは確度を「低」にし、
+ * 交換後の夜がまだ無ければ、消費電流と全拠点の標準的な放電の速さから②を見込む。
+ * 電池が底を尽きると機器が止まるので、止まる前に劣化の早い電池を見つけて交換するためのランキング。 */
 const BATTERY_FLOOR_DEFAULT_V = 11.5;
 const BATTERY_FLOOR_OVERRIDE_V = { cam03: 9.5, cam14: 10.5, cam09: 10.5, cam43: 10.5, cam52: 10.5 };   // index.html の BATTERY_EMPTY_VOLTAGE_OVERRIDE と同じ
 const DEGRADE_REACH_V = 13.0;
@@ -1350,13 +1352,20 @@ function attachDegradation(sites, dayMap, days) {
       if (fleetReached(dayAt(b)) === true && fleetReached(dayAt(b + 1)) === true) sunnyDays.push(dayAt(b));
     }
   }
+  // 全拠点の標準値(夜の実測が無い拠点の見込みに使う)
+  const medOf = function (f, dflt) {
+    const v = ids.map(function (i) { return sites[i][f]; }).filter(function (x) { return typeof x === "number" && x > 0; });
+    const m = medianOf(v);
+    return m === null ? dflt : m;
+  };
+  const fleet = { mv: medOf("mvPerAhNow", 12), nightA: medOf("nightA", 1), v0: medOf("v0", 12.2) };
   ids.forEach(function (id) {
     const e = sites[id];
     const fresh = !!(e.lastSwapAt && typeof e.capDaysAfterSwap === "number" && e.capDaysAfterSwap < DEGRADE_FRESH_DAYS);
-    const deg = { score: null, grade: null, gradeLabel: null, confidence: null, fresh: fresh, provisional: false, fail13: false,
+    const deg = { score: null, grade: null, gradeLabel: null, confidence: null, fresh: fresh, estimated: false, fail13: false,
       cappedBy: null, parts: [], reach: null, floor: null };
     e.degrade = deg;
-    // 交換した拠点は交換後の日・夜だけで数える。それでも測れなければ、交換前の値で仮に採点する(provisional)
+    // 交換した拠点は交換後の日・夜だけで数える(交換前の電池の値は一切使わない)
     const measure = function (ignoreSwap) {
       // ① 満充電への到達(交換した拠点は交換後の日だけ)
       const own = sunnyDays.filter(function (day) { return !(!ignoreSwap && e.lastSwapAt && day < e.lastSwapAt); })
@@ -1398,16 +1407,32 @@ function attachDegradation(sites, dayMap, days) {
 
     };
     measure(false);
-    if (!deg.parts.length && e.lastSwapAt) { measure(true); if (deg.parts.length) deg.provisional = true; }
+    // 交換後の夜の実測がまだ無い拠点(交換した当日など)も、必ず採点する。
+    // 機器の夜間の消費電流と、全拠点の標準的な放電の速さ(1Ahあたりの降下)から「下限まで何時間か」を見込む。
+    // 見込みなので確度は「低」。実測の夜がそろえば、自動で実測に置き換わる。
+    if (!deg.parts.some(function (q) { return q.key === "floor"; })) {
+      const A = typeof e.nightA === "number" && e.nightA > 0 ? e.nightA : fleet.nightA;
+      const mv = fleet.mv;
+      const vRest = e.lastSwapAt ? (typeof e.lastSwapVAfter === "number" ? e.lastSwapVAfter : fleet.v0)
+        : (typeof e.v0 === "number" ? e.v0 : fleet.v0);
+      const floorV = batteryFloorVoltage(id);
+      const hours = Math.max(0, (vRest - floorV) / (A * mv / 1000));
+      deg.floor = { day: null, v0: Math.round(vRest * 1000) / 1000, floorV: floorV, vPerH: Math.round(A * mv / 1000 * 10000) / 10000,
+        hours: Math.round(hours * 10) / 10, estimated: true };
+      const sc = Math.round(clamp01((hours - DEGRADE_FLOOR_ZERO_H) / (DEGRADE_FLOOR_FULL_H - DEGRADE_FLOOR_ZERO_H)) * 100) / 10;
+      deg.parts.push({ key: "floor", label: "下限までの放電", score: sc, value: deg.floor.hours, estimated: true,
+        text: "交換後の夜の実測がまだ無いため見込み: 消費 " + A.toFixed(2) + "A × 標準の降下 " + mv.toFixed(0) + "mV/Ah で、"
+          + vRest.toFixed(2) + "V → 下限" + floorV.toFixed(1) + "Vまで約" + Math.round(hours) + "時間" });
+    }
     const got = deg.parts.map(function (p) { return p.score; });
-    if (!got.length) { deg.reason = fresh ? "交換直後" : "測定中"; return; }
     deg.score = Math.round(got.reduce(function (a, b) { return a + b; }, 0) / got.length * 10) / 10;
     if (deg.fail13 && deg.score > DEGRADE_FAIL_MAX) { deg.score = DEGRADE_FAIL_MAX; deg.cappedBy = "charge"; }
     const g = degradeGradeOf(deg.score);
     deg.grade = g.key;
     deg.gradeLabel = deg.fail13 ? "論外" : g.label;
     // 交換直後は交換後の日数が短く、実測が少ないので確度は低くする
-    deg.confidence = (fresh || deg.provisional) ? "低" : got.length === 2 ? "高" : "中";
+    deg.estimated = deg.parts.some(function (q) { return q.estimated; });
+    deg.confidence = (fresh || deg.estimated) ? "低" : got.length === 2 ? "高" : "中";
   });
 }
 async function updateBatteryHealthFile() {
