@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-30T17:30:05.348Z",
+  "generatedAt": "2026-10-30T19:15:17.427Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -8,7 +8,7 @@
   "tempRefC": 25,
   "tempCoefPerC": 0.006,
   "longTermFrom": "2026-06-13",
-  "longTermTo": "2026-10-29",
+  "longTermTo": "2026-10-30",
   "sites": {
     "cam11": {
       "days": 141,
@@ -29,16 +29,16 @@
         "from": "2026-08-29",
         "to": "2026-10-31",
         "days": 28,
-        "tempC": 22.2,
+        "tempC": 22,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 141,
-      "pvPeakNowW": 28.5,
+      "pvPeakNowW": 29.1,
       "pvPeakInitialW": 26.6,
-      "loadWhPerDay": 81.7,
-      "genWhPerDay": 127.5,
+      "loadWhPerDay": 81.8,
+      "genWhPerDay": 126.3,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.43,
@@ -100,7 +100,7 @@
         11.754,
         11.987,
         12.132,
-        12.137
+        12.102
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -139,7 +139,7 @@
             "label": "朝の回復",
             "weight": 0.3,
             "score": 10,
-            "value": 0.048,
+            "value": 0.045,
             "text": "全拠点比 +0.05V"
           }
         ],
@@ -169,7 +169,7 @@
         "from": "2026-08-30",
         "to": "2026-10-31",
         "days": 35,
-        "tempC": 22.6,
+        "tempC": 22.4,
         "whole": false,
         "placeholder": false
       },
@@ -183,7 +183,7 @@
       "pvPeakNowW": 30.6,
       "pvPeakInitialW": 28.7,
       "loadWhPerDay": 93.2,
-      "genWhPerDay": 119.5,
+      "genWhPerDay": 118,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.52,
@@ -245,7 +245,7 @@
         11.618,
         11.662,
         11.671,
-        11.666
+        11.64
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -300,12 +300,12 @@
       "mains": false,
       "v0": 12.507,
       "socPct": 81,
-      "nightA": 0.074,
+      "nightA": 0.073,
       "vmin": 12.49,
       "capacityAh": 18.3,
       "fitR": 0.883,
       "whPerV": 171,
-      "enduranceH": 151.8,
+      "enduranceH": 152.8,
       "usableAh": 11.16,
       "capacityInitialAh": null,
       "capacityNowAh": 18.7,
@@ -314,7 +314,7 @@
         "from": "2026-09-26",
         "to": "2026-10-31",
         "days": 35,
-        "tempC": 21.1,
+        "tempC": 21,
         "whole": true,
         "placeholder": false
       },
@@ -323,7 +323,7 @@
       "pvPeakNowW": 9.5,
       "pvPeakInitialW": 9.4,
       "loadWhPerDay": 16,
-      "genWhPerDay": 28.4,
+      "genWhPerDay": 28.1,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.57,
@@ -385,7 +385,7 @@
         12.242,
         12.489,
         12.467,
-        12.48
+        12.462
       ],
       "swaps": [
         "2026-09-18",
@@ -442,7 +442,7 @@
       "capacityAh": 64,
       "fitR": 0.888,
       "whPerV": 586,
-      "enduranceH": 21.6,
+      "enduranceH": 21.7,
       "usableAh": 20.49,
       "capacityInitialAh": null,
       "capacityNowAh": 65.4,
@@ -459,8 +459,8 @@
       "spanDays": 141,
       "pvPeakNowW": 29.7,
       "pvPeakInitialW": 29,
-      "loadWhPerDay": 78.7,
-      "genWhPerDay": 149.5,
+      "loadWhPerDay": 78.6,
+      "genWhPerDay": 149.2,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.32,
@@ -522,7 +522,7 @@
         11.948,
         12.115,
         12.093,
-        12.089
+        12.08
       ],
       "swaps": [
         "2026-09-22",
@@ -566,7 +566,7 @@
       "mains": false,
       "v0": 11.953,
       "socPct": 40,
-      "nightA": 1.476,
+      "nightA": 1.477,
       "vmin": 11.977,
       "capacityAh": 55.2,
       "fitR": 0.947,
@@ -589,7 +589,7 @@
       "pvPeakNowW": 29.7,
       "pvPeakInitialW": 28.6,
       "loadWhPerDay": 100.8,
-      "genWhPerDay": 161.1,
+      "genWhPerDay": 159.3,
       "vminFrom": "2026-09-02",
       "vminDays": [
         11.82,
@@ -651,7 +651,7 @@
         11.974,
         11.992,
         11.974,
-        11.935
+        11.908
       ],
       "swaps": [
         "2026-09-10",
@@ -708,16 +708,16 @@
         "from": "2026-09-19",
         "to": "2026-10-31",
         "days": 24,
-        "tempC": 21.4,
+        "tempC": 21.2,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 141,
-      "pvPeakNowW": 12.9,
+      "pvPeakNowW": 13,
       "pvPeakInitialW": 8.6,
-      "loadWhPerDay": 32.7,
-      "genWhPerDay": 60.5,
+      "loadWhPerDay": 32.6,
+      "genWhPerDay": 57.8,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.3,
@@ -779,7 +779,7 @@
         11.935,
         12.11,
         12.172,
-        12.172
+        12.154
       ],
       "swaps": [
         "2026-07-03",
@@ -796,7 +796,7 @@
       "mvSpansSwap": false,
       "ratedAh": 20,
       "sohPct": 151,
-      "mvPerAhNow": 17.6,
+      "mvPerAhNow": 18.3,
       "mvPerAhPrev": null,
       "nightNights": 14,
       "nightGenMaxWh": 45,
@@ -859,8 +859,8 @@
       "spanDays": 141,
       "pvPeakNowW": 29.3,
       "pvPeakInitialW": 28.8,
-      "loadWhPerDay": 112.8,
-      "genWhPerDay": 177.9,
+      "loadWhPerDay": 112.9,
+      "genWhPerDay": 175.4,
       "vminFrom": "2026-09-02",
       "vminDays": [
         11.82,
@@ -922,7 +922,7 @@
         11.961,
         12.089,
         12.018,
-        11.965
+        11.926
       ],
       "swaps": [
         "2026-07-04",
@@ -945,7 +945,7 @@
       "mvPerAhNow": 10.2,
       "mvPerAhPrev": 8.9,
       "nightNights": 21,
-      "nightGenMaxWh": 175,
+      "nightGenMaxWh": 174,
       "capKeptFull": false,
       "degrade": {
         "score": null,
@@ -975,22 +975,22 @@
       "enduranceH": 3.1,
       "usableAh": 4.08,
       "capacityInitialAh": null,
-      "capacityNowAh": 52.2,
+      "capacityNowAh": 52.3,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-26",
         "to": "2026-10-31",
         "days": 35,
-        "tempC": 21.1,
+        "tempC": 21,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 141,
-      "pvPeakNowW": 29.3,
+      "pvPeakNowW": 29.4,
       "pvPeakInitialW": 27.3,
       "loadWhPerDay": 107.2,
-      "genWhPerDay": 147.2,
+      "genWhPerDay": 146.9,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.37,
@@ -1052,7 +1052,7 @@
         11.535,
         11.688,
         11.79,
-        11.746
+        11.719
       ],
       "swaps": [
         "2026-09-18"
@@ -1067,8 +1067,8 @@
       "capDaysAfterSwap": 44,
       "mvSpansSwap": true,
       "ratedAh": 50,
-      "sohPct": 104,
-      "mvPerAhNow": 10.6,
+      "sohPct": 105,
+      "mvPerAhNow": 10.9,
       "mvPerAhPrev": 10.2,
       "nightNights": 20,
       "nightGenMaxWh": 149,
@@ -1085,8 +1085,8 @@
             "label": "容量",
             "weight": 0.4,
             "score": 10,
-            "value": 104,
-            "text": "定格比 104%"
+            "value": 105,
+            "text": "定格比 105%"
           },
           {
             "key": "recovery",
@@ -1123,7 +1123,7 @@
         "from": "2026-08-29",
         "to": "2026-10-31",
         "days": 24,
-        "tempC": 22.3,
+        "tempC": 22.1,
         "whole": false,
         "placeholder": false
       },
@@ -1131,8 +1131,8 @@
       "spanDays": 141,
       "pvPeakNowW": 27.1,
       "pvPeakInitialW": 25.6,
-      "loadWhPerDay": 97.3,
-      "genWhPerDay": 144.6,
+      "loadWhPerDay": 97.4,
+      "genWhPerDay": 141.6,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.52,
@@ -1194,7 +1194,7 @@
         11.93,
         12.163,
         12.326,
-        12.3
+        12.282
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1233,7 +1233,7 @@
             "label": "朝の回復",
             "weight": 0.3,
             "score": 10,
-            "value": 0.103,
+            "value": 0.1,
             "text": "全拠点比 +0.10V"
           }
         ],
@@ -1249,12 +1249,12 @@
       "mains": false,
       "v0": 12.18,
       "socPct": 56,
-      "nightA": 0.343,
+      "nightA": 0.344,
       "vmin": 12.427,
       "capacityAh": 18.1,
       "fitR": 0.959,
       "whPerV": 169,
-      "enduranceH": 19,
+      "enduranceH": 18.9,
       "usableAh": 6.51,
       "capacityInitialAh": null,
       "capacityNowAh": 18.4,
@@ -1263,7 +1263,7 @@
         "from": "2026-08-29",
         "to": "2026-10-31",
         "days": 26,
-        "tempC": 22.1,
+        "tempC": 22,
         "whole": false,
         "placeholder": false
       },
@@ -1272,7 +1272,7 @@
       "pvPeakNowW": 13.6,
       "pvPeakInitialW": 14.2,
       "loadWhPerDay": 30.6,
-      "genWhPerDay": 64.8,
+      "genWhPerDay": 62.9,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.56,
@@ -1334,7 +1334,7 @@
         11.759,
         11.979,
         12.181,
-        12.137
+        12.119
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1412,7 +1412,7 @@
       "pvPeakNowW": 31.1,
       "pvPeakInitialW": 21.8,
       "loadWhPerDay": 93.6,
-      "genWhPerDay": 154.1,
+      "genWhPerDay": 153.6,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.19,
@@ -1474,7 +1474,7 @@
         11.39,
         11.539,
         11.706,
-        11.688
+        11.658
       ],
       "swaps": [
         "2026-09-10",
@@ -1547,8 +1547,8 @@
       "spanDays": 141,
       "pvPeakNowW": 29,
       "pvPeakInitialW": 29.3,
-      "loadWhPerDay": 109.5,
-      "genWhPerDay": 130.8,
+      "loadWhPerDay": 109.6,
+      "genWhPerDay": 130.3,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.19,
@@ -1632,7 +1632,7 @@
       "mvPerAhNow": 9.2,
       "mvPerAhPrev": null,
       "nightNights": 14,
-      "nightGenMaxWh": 139,
+      "nightGenMaxWh": 138,
       "capKeptFull": false,
       "degrade": {
         "score": null,
@@ -1668,16 +1668,16 @@
         "from": "2026-08-29",
         "to": "2026-10-31",
         "days": 22,
-        "tempC": 22.1,
+        "tempC": 22,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 141,
-      "pvPeakNowW": 29.1,
+      "pvPeakNowW": 29.2,
       "pvPeakInitialW": 28.4,
-      "loadWhPerDay": 89.7,
-      "genWhPerDay": 142.4,
+      "loadWhPerDay": 89.8,
+      "genWhPerDay": 141.7,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.59,
@@ -1739,7 +1739,7 @@
         11.961,
         12.185,
         12.335,
-        12.304
+        12.282
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1802,19 +1802,19 @@
       "enduranceH": 0,
       "usableAh": 0,
       "capacityInitialAh": null,
-      "capacityNowAh": 45.6,
+      "capacityNowAh": 45.7,
       "degradePct": null,
       "capWindow": {
         "from": "2026-10-14",
         "to": "2026-10-31",
         "days": 10,
-        "tempC": 20,
+        "tempC": 19.8,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 141,
-      "pvPeakNowW": 29.3,
+      "pvPeakNowW": 29.2,
       "pvPeakInitialW": 27,
       "loadWhPerDay": 84.4,
       "genWhPerDay": 125.5,
@@ -1879,7 +1879,7 @@
         11.596,
         11.671,
         11.645,
-        11.601
+        11.574
       ],
       "swaps": [
         "2026-09-18",
@@ -1896,7 +1896,7 @@
       "mvSpansSwap": true,
       "ratedAh": 50,
       "sohPct": 91,
-      "mvPerAhNow": 13.6,
+      "mvPerAhNow": 14.3,
       "mvPerAhPrev": 16.8,
       "nightNights": 16,
       "nightGenMaxWh": 126,
@@ -2040,7 +2040,7 @@
       "mains": false,
       "v0": 12.125,
       "socPct": 52,
-      "nightA": 1.338,
+      "nightA": 1.337,
       "vmin": 12.18,
       "capacityAh": 54,
       "fitR": 0.884,
@@ -2054,7 +2054,7 @@
         "from": "2026-09-25",
         "to": "2026-10-31",
         "days": 35,
-        "tempC": 21.1,
+        "tempC": 21,
         "whole": false,
         "placeholder": false
       },
@@ -2125,7 +2125,7 @@
         11.741,
         12.018,
         12.119,
-        12.097
+        12.08
       ],
       "swaps": [
         "2026-09-25"
@@ -2166,7 +2166,7 @@
             "label": "朝の回復",
             "weight": 0.3,
             "score": 10,
-            "value": 0.129,
+            "value": 0.127,
             "text": "全拠点比 +0.13V"
           }
         ],
@@ -2204,8 +2204,8 @@
       "spanDays": 141,
       "pvPeakNowW": 32.5,
       "pvPeakInitialW": 24.5,
-      "loadWhPerDay": 124.1,
-      "genWhPerDay": 174.7,
+      "loadWhPerDay": 124.2,
+      "genWhPerDay": 166.6,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.03,
@@ -2267,7 +2267,7 @@
         10.928,
         11.104,
         11.086,
-        10.985
+        10.924
       ],
       "swaps": [
         "2026-09-10",
@@ -2329,7 +2329,7 @@
         "from": "2026-09-20",
         "to": "2026-10-31",
         "days": 15,
-        "tempC": 20.8,
+        "tempC": 20.7,
         "whole": false,
         "placeholder": false
       },
@@ -2337,8 +2337,8 @@
       "spanDays": 141,
       "pvPeakNowW": 29.5,
       "pvPeakInitialW": 28.7,
-      "loadWhPerDay": 102,
-      "genWhPerDay": 147.5,
+      "loadWhPerDay": 102.1,
+      "genWhPerDay": 144,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.5,
@@ -2400,7 +2400,7 @@
         11.851,
         12.018,
         12.15,
-        12.11
+        12.089
       ],
       "swaps": [
         "2026-09-20"
@@ -2419,7 +2419,7 @@
       "mvPerAhNow": 8.4,
       "mvPerAhPrev": null,
       "nightNights": 7,
-      "nightGenMaxWh": 138,
+      "nightGenMaxWh": 137,
       "capKeptFull": false,
       "degrade": {
         "score": 10,
@@ -2471,7 +2471,7 @@
         "from": "2026-08-29",
         "to": "2026-10-31",
         "days": 29,
-        "tempC": 22.2,
+        "tempC": 22,
         "whole": false,
         "placeholder": false
       },
@@ -2480,7 +2480,7 @@
       "pvPeakNowW": 29.4,
       "pvPeakInitialW": 24.5,
       "loadWhPerDay": 99.1,
-      "genWhPerDay": 139.1,
+      "genWhPerDay": 138.4,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.44,
@@ -2542,7 +2542,7 @@
         11.728,
         11.926,
         12.04,
-        12.014
+        11.987
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2556,7 +2556,7 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 86,
-      "mvPerAhNow": 8.4,
+      "mvPerAhNow": 8.5,
       "mvPerAhPrev": null,
       "nightNights": 13,
       "nightGenMaxWh": 141,
@@ -2620,7 +2620,7 @@
       "pvPeakNowW": 32,
       "pvPeakInitialW": 30.7,
       "loadWhPerDay": 141.2,
-      "genWhPerDay": 190.8,
+      "genWhPerDay": 187.4,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.4,
@@ -2682,7 +2682,7 @@
         12.106,
         12.181,
         12.146,
-        12.115
+        12.097
       ],
       "swaps": [
         "2026-09-13",
@@ -3048,7 +3048,7 @@
         "from": "2026-09-30",
         "to": "2026-10-31",
         "days": 31,
-        "tempC": 21,
+        "tempC": 20.9,
         "whole": false,
         "placeholder": false
       },
@@ -3119,7 +3119,7 @@
         11.069,
         11.244,
         11.412,
-        11.526
+        11.464
       ],
       "swaps": [
         "2026-09-10",
@@ -3197,10 +3197,10 @@
       },
       "initialWindow": null,
       "spanDays": 141,
-      "pvPeakNowW": 19.8,
+      "pvPeakNowW": 19.9,
       "pvPeakInitialW": 20.2,
-      "loadWhPerDay": 53.1,
-      "genWhPerDay": 104.8,
+      "loadWhPerDay": 53.4,
+      "genWhPerDay": 103.4,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.55,
@@ -3320,13 +3320,13 @@
       "enduranceH": 11.5,
       "usableAh": 11.11,
       "capacityInitialAh": null,
-      "capacityNowAh": 47.5,
+      "capacityNowAh": 47.6,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-23",
         "to": "2026-10-31",
         "days": 15,
-        "tempC": 20.7,
+        "tempC": 20.6,
         "whole": false,
         "placeholder": false
       },
@@ -3335,7 +3335,7 @@
       "pvPeakNowW": 30.4,
       "pvPeakInitialW": 30.1,
       "loadWhPerDay": 105.5,
-      "genWhPerDay": 147.2,
+      "genWhPerDay": 144.9,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.26,
@@ -3397,7 +3397,7 @@
         11.618,
         11.763,
         11.899,
-        11.957
+        11.935
       ],
       "swaps": [
         "2026-09-11",
@@ -3475,10 +3475,10 @@
       },
       "initialWindow": null,
       "spanDays": 141,
-      "pvPeakNowW": 30.5,
+      "pvPeakNowW": 30.6,
       "pvPeakInitialW": 30.2,
-      "loadWhPerDay": 107.6,
-      "genWhPerDay": 131.5,
+      "loadWhPerDay": 107.7,
+      "genWhPerDay": 130.9,
       "vminFrom": "2026-09-02",
       "vminDays": [
         12.26,
@@ -3540,7 +3540,7 @@
         12.159,
         12.119,
         12.08,
-        12.075
+        12.071
       ],
       "swaps": [
         "2026-09-11",
