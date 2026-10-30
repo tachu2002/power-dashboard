@@ -903,6 +903,7 @@ export async function run() {
       cam03: mk(),                                                    // 下限9.5V
       swapped: mk({ lastSwapAt: dayKey(now - 20 * 24 * HOUR), capDaysAfterSwap: 20 }),
       fresh: mk({ lastSwapAt: dayKey(now - 3 * 24 * HOUR), capDaysAfterSwap: 3 }),
+      pre: mk({ lastSwapAt: dayKey(now), capDaysAfterSwap: 0 }),     // 今日交換: 交換後の実測が無い
       mains: mk({ mains: true })
     };
     const dayMapD = {}, daysD = [];
@@ -918,6 +919,7 @@ export async function run() {
         if (id === "swapped" && !cloudy && k < dayKey(now - 20 * 24 * HOUR)) vmax = 12.8;    // 交換前は届かなかった
         const night = id === "fast" ? 0.06 : 0.012;                                          // V/h
         dayMapD[k][id] = { v0: id === "cam03" ? 10.0 : 12.0, vmax, nightVPerH: night };
+        if (id === "pre" && back === 0) delete dayMapD[k][id].nightVPerH;
       });
     }
     M.attachDegradation(sitesD, dayMapD, daysD);
@@ -938,8 +940,11 @@ export async function run() {
       Math.abs(D("a").score - (part("a", "charge").score + part("a", "floor").score) / 2) < 0.06, D("a"));
     r.check("s23-h 交換した拠点は交換後の日だけで数える(交換前に届かなかった分は引きずらない)",
       D("swapped").fail13 === false && D("swapped").reach.rate === 1, D("swapped").reach);
-    r.check("s23-i 交換直後は採点しない／常時電源は対象外",
-      D("fresh").score === null && D("fresh").reason === "交換直後" && sitesD.mains.degrade === undefined, D("fresh"));
+    r.check("s23-i 交換直後の拠点も採点する(交換後の日・夜だけで数え、確度は「低」)／常時電源は対象外",
+      typeof D("fresh").score === "number" && D("fresh").fresh === true && D("fresh").confidence === "低"
+      && D("fresh").reach.days <= 4 && sitesD.mains.degrade === undefined, D("fresh"));
+    r.check("s23-o 交換後の実測が全く無い拠点は、交換前の値で仮に採点する(確度「低」・provisional)",
+      typeof D("pre").score === "number" && D("pre").provisional === true && D("pre").confidence === "低", D("pre"));
     r.check("s23-j 区分は 8.0以上=良好 / 6.0以上=経過観察 / 4.0以上=交換を検討 / 未満=要交換",
       M.degradeGradeOf(8.0).label === "良好" && M.degradeGradeOf(7.9).label === "経過観察" && M.degradeGradeOf(5.9).label === "交換を検討"
       && M.degradeGradeOf(3.9).label === "要交換", [8.0, 7.9, 5.9, 3.9].map((v) => M.degradeGradeOf(v).label));

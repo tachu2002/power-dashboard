@@ -427,8 +427,8 @@ export async function run() {
       sites: {
         cam11: { capacityAh: 50, nightA: 1.0, socPct: 80, degrade: deg(8.2, "good", "良好",
           [part("charge", 9.0, "晴れた20日中19日で13V到達"), part("floor", 7.4, "下限まで約38時間")]) },
-        cam04: { capacityAh: 50, nightA: 1.0, socPct: 70, degrade: deg(8.2, "good", "良好",
-          [part("charge", 9.0, "晴れた20日中19日で13V到達"), part("floor", 7.4, "下限まで約38時間")]) },
+        cam04: { capacityAh: 50, nightA: 1.0, socPct: 70, lastSwapAt: "2026-10-26", capDaysAfterSwap: 4, degrade: deg(8.2, "good", "良好",
+          [part("charge", 9.0, "晴れた20日中19日で13V到達"), part("floor", 7.4, "下限まで約38時間")], { fresh: true, confidence: "低" }) },
         cam03: { capacityAh: 50, nightA: 0.96, socPct: 30, lastSwapAt: "2026-08-20", degrade: deg(2.1, "replace", "要交換",
           [part("charge", 4.0, "x"), part("floor", 0.2, "下限まで約12時間")]) },
         cam09: { capacityAh: 15, nightA: 1.6, socPct: 50, degrade: deg(3.9, "replace", "論外",
@@ -470,16 +470,16 @@ export async function run() {
       other: document.getElementById("rankOther").textContent,
       note: document.getElementById("rankNote").textContent,
       howto: document.getElementById("rankHowto").textContent,
-      widths: rows.map((x) => x.querySelector(".rk-gauge > i").style.width)
+      widths: rows.map((x) => { const i = x.querySelector(".rk-gauge > i"); return i ? i.style.width : null; })
     };
   });
   r.check("p9-b ボタンで開き、論外(晴れた日に13Vへ届かない拠点)が点数にかかわらず先頭、続いて点数の低い順",
     rk.shown && rk.btn === "ランキングを隠す" && rk.order[0] === "cam13" && rk.order[1] === "cam09" && rk.order[2] === "cam03"
-    && rk.order.slice(3).sort().join() === "cam04,cam11" && rk.order.length === 5, rk.order);
-  r.check("p9-c 順位は同点を同じ順位にする(1,2,3,4,4)", rk.ranks.join() === "1,2,3,4,4", rk.ranks);
+    && rk.order.slice(3, 5).sort().join() === "cam04,cam11" && rk.order.length === 7 && rk.order[5] === "cam41" && rk.order[6] === "cam42", rk.order);
+  r.check("p9-c 順位は同点を同じ順位にする(1,2,3,4,4,順位なし2拠点)", rk.ranks.join() === "1,2,3,4,4,—,—", rk.ranks);
   r.check("p9-d 点数は「8.2/10.0」の形で出す", rk.scores[0] === "3.0/10.0" && rk.scores[2] === "2.1/10.0" && rk.scores[3] === "8.2/10.0", rk.scores);
   r.check("p9-e 区分は論外/論外/要交換/良好。論外の行は強調する",
-    rk.pills.join() === "論外,論外,要交換,良好,良好" && rk.fail.join() === "true,true,false,false,false", [rk.pills, rk.fail]);
+    rk.pills.join() === "論外,論外,要交換,良好,良好,交換直後,測定中" && rk.fail.join() === "true,true,false,false,false,false,false", [rk.pills, rk.fail]);
   r.check("p9-f 評価は「満充電への到達」と「下限までの放電」の2つだけ(容量・朝の回復は出さない)",
     rk.parts[1].length === 2 && rk.parts[1][0].indexOf("満充電への到達") === 0 && rk.parts[1][1].indexOf("下限までの放電") === 0
     && rk.parts[0].join("|").indexOf("下限までの放電 —") >= 0 && rk.parts.flat().every((t) => t.indexOf("容量") < 0 && t.indexOf("朝の回復") < 0), rk.parts);
@@ -488,10 +488,13 @@ export async function run() {
     && rk.sub[0].indexOf("確度 中") >= 0 && rk.sub[3].indexOf("満充電(13V)へ届かない") < 0, rk.sub);
   r.check("p9-g2 各行に「健全性の一覧」の状態を添え、観点の違いを解説に書く(ランキング=電池の傷み具合／一覧=今すぐ持つか)",
     rk.sub.every((t) => /一覧の状態: (要対応|注意|良好)/.test(t)) && rk.howto.indexOf("観点が違います") >= 0, [rk.sub, rk.howto.slice(0, 40)]);
-  r.check("p9-h 交換直後と測定中は順位をつけず別に書く",
-    rk.other.indexOf("交換直後") >= 0 && rk.other.indexOf("測定中") >= 0 && rk.order.indexOf("cam41") < 0 && rk.order.indexOf("cam42") < 0, rk.other);
+  r.check("p9-g3 交換直後の拠点も採点して順位に載せ、「交換直後（交換後4日）」と確度「低」を添える",
+    rk.order.indexOf("cam04") >= 0 && rk.sub[rk.order.indexOf("cam04")].indexOf("交換直後（交換後4日）") >= 0
+    && rk.sub[rk.order.indexOf("cam04")].indexOf("確度 低") >= 0 && rk.howto.indexOf("交換した拠点も採点します") >= 0, rk.sub);
+  r.check("p9-h 採点できない拠点(交換直後・測定中)も順位なしで末尾に載せ、全拠点を並べる",
+    rk.other.indexOf("順位なし") >= 0 && rk.other.indexOf("入れ替わ") >= 0 && rk.scores[5] === "—/10.0" && rk.sub[5].indexOf("実測がまだ無い") >= 0, [rk.other, rk.scores, rk.sub]);
   r.check("p9-i 要約に、論外の拠点数と交換を検討したい拠点数を出す",
-    rk.note.indexOf("「論外」の拠点が 2拠点") >= 0 && rk.note.indexOf("交換を検討したい拠点が 3拠点") >= 0 && rk.note.indexOf("10.0が良好") >= 0, rk.note);
+    rk.note.indexOf("「論外」の拠点が 2拠点") >= 0 && rk.note.indexOf("交換を検討したい拠点が 3拠点") >= 0 && rk.note.indexOf("10.0が良好") >= 0 && rk.note.indexOf("全7拠点のうち採点 5拠点") >= 0, rk.note);
   r.check("p9-j 算出方法を明記する(満充電は必須・論外は先頭・下限は拠点ごと・目安)",
     rk.howto.indexOf("満充電への到達（必須）") >= 0 && rk.howto.indexOf("論外") >= 0 && rk.howto.indexOf("先頭") >= 0
     && rk.howto.indexOf("下限電圧") >= 0 && rk.howto.indexOf("目安") >= 0 && rk.howto.indexOf("容量") < 0, rk.howto.slice(0, 80));
