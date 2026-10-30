@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-30T21:30:05.254Z",
+  "generatedAt": "2026-10-30T22:30:05.560Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -120,33 +120,46 @@
       "nightGenMaxWh": 125,
       "capKeptFull": false,
       "degrade": {
-        "score": 8.6,
+        "score": 8.7,
         "grade": "good",
         "gradeLabel": "良好",
-        "confidence": "中",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
-            "score": 7.6,
-            "value": 84,
-            "text": "定格比 84%"
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 1,
+            "text": "晴れた23日中23日で13V到達(直近3日で0日届かず・日中最高の中央値 13.64V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
-            "score": 10,
-            "value": 0.045,
-            "text": "全拠点比 +0.05V"
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 7.4,
+            "value": 38.7,
+            "text": "前夜の降下 17.5mV/hのままなら、12.18V → 下限11.5Vまで約39時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 0,
+          "days": 23,
+          "hit": 23,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.31,
+          "medianV": 13.64
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.177,
+          "floorV": 11.5,
+          "vPerH": 0.0175,
+          "hours": 38.7
         }
       }
     },
@@ -265,33 +278,46 @@
       "nightGenMaxWh": 130,
       "capKeptFull": false,
       "degrade": {
-        "score": 8.8,
-        "grade": "good",
-        "gradeLabel": "良好",
-        "confidence": "中",
+        "score": 5,
+        "grade": "plan",
+        "gradeLabel": "交換を検討",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
-            "score": 8.9,
-            "value": 90,
-            "text": "定格比 90%"
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 0.957,
+            "text": "晴れた23日中22日で13V到達(直近3日で1日届かず・日中最高の中央値 13.60V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
-            "score": 8.6,
-            "value": -0.069,
-            "text": "全拠点比 -0.07V"
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 0,
+            "value": 11.6,
+            "text": "前夜の降下 17.8mV/hのままなら、11.71V → 下限11.5Vまで約12時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 1,
+          "days": 23,
+          "hit": 22,
+          "rate": 0.957,
+          "lastDay": "2026-10-30",
+          "lastV": 12.63,
+          "medianV": 13.6
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 11.707,
+          "floorV": 11.5,
+          "vPerH": 0.0178,
+          "hours": 11.6
         }
       }
     },
@@ -409,27 +435,47 @@
       "nightGenMaxWh": 29,
       "capKeptFull": true,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
+            "key": "charge",
+            "label": "満充電への到達",
             "score": 10,
-            "value": 0.134,
-            "text": "全拠点比 +0.13V"
+            "value": 1,
+            "text": "晴れた23日中23日で13V到達(直近3日で0日届かず・日中最高の中央値 13.86V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 10,
+            "value": 91.8,
+            "text": "前夜の降下 11.0mV/hのままなら、12.51V → 下限11.5Vまで約92時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 0,
+          "days": 23,
+          "hit": 23,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.84,
+          "medianV": 13.86
         },
-        "reason": "測定中"
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.507,
+          "floorV": 11.5,
+          "vPerH": 0.011,
+          "hours": 91.8
+        }
       }
     },
     "cam42": {
@@ -547,18 +593,47 @@
       "nightGenMaxWh": 160,
       "capKeptFull": false,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "低",
         "fresh": true,
-        "parts": [],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
+        "parts": [
+          {
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 1,
+            "text": "晴れた1日中1日で13V到達(直近1日で0日届かず・日中最高の中央値 13.46V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 10,
+            "value": 58.9,
+            "text": "前夜の降下 10.5mV/hのままなら、12.12V → 下限11.5Vまで約59時間"
+          }
+        ],
+        "reach": {
+          "recentDays": 1,
+          "recentMissed": 0,
+          "days": 1,
+          "hit": 1,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.46,
+          "medianV": 13.46
         },
-        "reason": "交換直後"
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.121,
+          "floorV": 11.5,
+          "vPerH": 0.0105,
+          "hours": 58.9
+        }
       }
     },
     "cam43": {
@@ -675,18 +750,47 @@
       "nightGenMaxWh": 164,
       "capKeptFull": false,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "低",
         "fresh": true,
-        "parts": [],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
+        "parts": [
+          {
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 1,
+            "text": "晴れた1日中1日で13V到達(直近1日で0日届かず・日中最高の中央値 13.14V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 10,
+            "value": 117.6,
+            "text": "前夜の降下 12.4mV/hのままなら、11.95V → 下限10.5Vまで約118時間"
+          }
+        ],
+        "reach": {
+          "recentDays": 1,
+          "recentMissed": 0,
+          "days": 1,
+          "hit": 1,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.14,
+          "medianV": 13.14
         },
-        "reason": "交換直後"
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 11.953,
+          "floorV": 10.5,
+          "vPerH": 0.0124,
+          "hours": 117.6
+        }
       }
     },
     "cam44": {
@@ -779,7 +883,7 @@
         11.935,
         12.11,
         12.172,
-        12.141
+        12.137
       ],
       "swaps": [
         "2026-07-03",
@@ -802,33 +906,46 @@
       "nightGenMaxWh": 45,
       "capKeptFull": false,
       "degrade": {
-        "score": 10,
+        "score": 9.7,
         "grade": "good",
         "gradeLabel": "良好",
-        "confidence": "低",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
-            "score": 10,
-            "value": 151,
-            "text": "定格比 151%(測定ばらつき)"
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 9.3,
+            "value": 0.913,
+            "text": "晴れた23日中21日で13V到達(直近3日で0日届かず・日中最高の中央値 13.40V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
+            "key": "floor",
+            "label": "下限までの放電",
             "score": 10,
-            "value": 0.074,
-            "text": "全拠点比 +0.07V"
+            "value": 119.2,
+            "text": "前夜の降下 5.7mV/hのままなら、12.18V → 下限11.5Vまで約119時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 0,
+          "days": 23,
+          "hit": 21,
+          "rate": 0.913,
+          "lastDay": "2026-10-30",
+          "lastV": 13.21,
+          "medianV": 13.4
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.183,
+          "floorV": 11.5,
+          "vPerH": 0.0057,
+          "hours": 119.2
         }
       }
     },
@@ -948,18 +1065,47 @@
       "nightGenMaxWh": 174,
       "capKeptFull": false,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 7.3,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
+        "confidence": "低",
         "fresh": true,
-        "parts": [],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
+        "parts": [
+          {
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 1,
+            "text": "晴れた1日中1日で13V到達(直近1日で0日届かず・日中最高の中央値 13.14V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 4.5,
+            "value": 28.2,
+            "text": "前夜の降下 18.4mV/hのままなら、12.02V → 下限11.5Vまで約28時間"
+          }
+        ],
+        "reach": {
+          "recentDays": 1,
+          "recentMissed": 0,
+          "days": 1,
+          "hit": 1,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.14,
+          "medianV": 13.14
         },
-        "reason": "交換直後"
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.018,
+          "floorV": 11.5,
+          "vPerH": 0.0184,
+          "hours": 28.2
+        }
       }
     },
     "cam47": {
@@ -1074,33 +1220,46 @@
       "nightGenMaxWh": 149,
       "capKeptFull": false,
       "degrade": {
-        "score": 10,
-        "grade": "good",
-        "gradeLabel": "良好",
-        "confidence": "中",
+        "score": 5.6,
+        "grade": "plan",
+        "gradeLabel": "交換を検討",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
-            "score": 10,
-            "value": 105,
-            "text": "定格比 105%"
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 9.3,
+            "value": 0.913,
+            "text": "晴れた23日中21日で13V到達(直近3日で1日届かず・日中最高の中央値 13.55V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
-            "score": 9.9,
-            "value": -0.006,
-            "text": "全拠点比 -0.01V"
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 1.8,
+            "value": 18.6,
+            "text": "前夜の降下 14.8mV/hのままなら、11.78V → 下限11.5Vまで約19時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 1,
+          "days": 23,
+          "hit": 21,
+          "rate": 0.913,
+          "lastDay": "2026-10-30",
+          "lastV": 12.77,
+          "medianV": 13.55
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 11.776,
+          "floorV": 11.5,
+          "vPerH": 0.0148,
+          "hours": 18.6
         }
       }
     },
@@ -1217,30 +1376,43 @@
         "score": 10,
         "grade": "good",
         "gradeLabel": "良好",
-        "confidence": "中",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
+            "key": "charge",
+            "label": "満充電への到達",
             "score": 10,
-            "value": 104,
-            "text": "定格比 104%"
+            "value": 1,
+            "text": "晴れた23日中23日で13V到達(直近3日で0日届かず・日中最高の中央値 13.62V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
+            "key": "floor",
+            "label": "下限までの放電",
             "score": 10,
-            "value": 0.1,
-            "text": "全拠点比 +0.10V"
+            "value": 70.9,
+            "text": "前夜の降下 11.7mV/hのままなら、12.33V → 下限11.5Vまで約71時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 0,
+          "days": 23,
+          "hit": 23,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.59,
+          "medianV": 13.62
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.326,
+          "floorV": 11.5,
+          "vPerH": 0.0117,
+          "hours": 70.9
         }
       }
     },
@@ -1354,33 +1526,46 @@
       "nightGenMaxWh": 62,
       "capKeptFull": false,
       "degrade": {
-        "score": 9.6,
+        "score": 9.4,
         "grade": "good",
         "gradeLabel": "良好",
-        "confidence": "中",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
-            "score": 9.3,
-            "value": 92,
-            "text": "定格比 92%"
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 1,
+            "text": "晴れた23日中23日で13V到達(直近3日で0日届かず・日中最高の中央値 13.62V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
-            "score": 9.9,
-            "value": -0.006,
-            "text": "全拠点比 -0.01V"
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 8.7,
+            "value": 43.2,
+            "text": "前夜の降下 15.8mV/hのままなら、12.18V → 下限11.5Vまで約43時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 0,
+          "days": 23,
+          "hit": 23,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.23,
+          "medianV": 13.62
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.18,
+          "floorV": 11.5,
+          "vPerH": 0.0158,
+          "hours": 43.2
         }
       }
     },
@@ -1497,27 +1682,47 @@
       "nightGenMaxWh": 138,
       "capKeptFull": false,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
-            "score": 8.3,
-            "value": -0.087,
-            "text": "全拠点比 -0.09V"
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 0.957,
+            "text": "晴れた23日中22日で13V到達(直近3日で1日届かず・日中最高の中央値 13.47V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 10,
+            "value": 133.4,
+            "text": "前夜の降下 16.7mV/hのままなら、11.73V → 下限9.5Vまで約133時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 1,
+          "days": 23,
+          "hit": 22,
+          "rate": 0.957,
+          "lastDay": "2026-10-30",
+          "lastV": 12.62,
+          "medianV": 13.47
         },
-        "reason": "測定中"
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 11.727,
+          "floorV": 9.5,
+          "vPerH": 0.0167,
+          "hours": 133.4
+        }
       }
     },
     "cam14": {
@@ -1635,18 +1840,47 @@
       "nightGenMaxWh": 138,
       "capKeptFull": false,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 5,
+        "grade": "plan",
+        "gradeLabel": "交換を検討",
+        "confidence": "低",
         "fresh": true,
-        "parts": [],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
+        "parts": [
+          {
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 0,
+            "value": 0,
+            "text": "晴れた1日中0日で13V到達(直近1日で1日届かず・日中最高の中央値 12.80V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 10,
+            "value": 75.7,
+            "text": "直近の夜(10/30)の降下 19.5mV/hのままなら、11.97V → 下限10.5Vまで約76時間"
+          }
+        ],
+        "reach": {
+          "recentDays": 1,
+          "recentMissed": 1,
+          "days": 1,
+          "hit": 0,
+          "rate": 0,
+          "lastDay": "2026-10-30",
+          "lastV": 12.8,
+          "medianV": 12.8
         },
-        "reason": "交換直後"
+        "floor": {
+          "day": "2026-10-30",
+          "v0": 11.974,
+          "floorV": 10.5,
+          "vPerH": 0.0195,
+          "hours": 75.7
+        }
       }
     },
     "cam13": {
@@ -1762,30 +1996,43 @@
         "score": 10,
         "grade": "good",
         "gradeLabel": "良好",
-        "confidence": "中",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
+            "key": "charge",
+            "label": "満充電への到達",
             "score": 10,
-            "value": 95,
-            "text": "定格比 95%"
+            "value": 1,
+            "text": "晴れた23日中23日で13V到達(直近3日で0日届かず・日中最高の中央値 13.64V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
+            "key": "floor",
+            "label": "下限までの放電",
             "score": 10,
-            "value": 0.065,
-            "text": "全拠点比 +0.07V"
+            "value": 72.6,
+            "text": "前夜の降下 11.4mV/hのままなら、12.32V → 下限11.5Vまで約73時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 0,
+          "days": 23,
+          "hit": 23,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.35,
+          "medianV": 13.64
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.325,
+          "floorV": 11.5,
+          "vPerH": 0.0114,
+          "hours": 72.6
         }
       }
     },
@@ -1902,33 +2149,46 @@
       "nightGenMaxWh": 126,
       "capKeptFull": false,
       "degrade": {
-        "score": 9.2,
-        "grade": "good",
-        "gradeLabel": "良好",
-        "confidence": "中",
+        "score": 5,
+        "grade": "plan",
+        "gradeLabel": "交換を検討",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
-            "score": 9.1,
-            "value": 91,
-            "text": "定格比 91%"
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 0.957,
+            "text": "晴れた23日中22日で13V到達(直近3日で1日届かず・日中最高の中央値 13.56V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
-            "score": 9.4,
-            "value": -0.028,
-            "text": "全拠点比 -0.03V"
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 0,
+            "value": 10.5,
+            "text": "前夜の降下 12.2mV/hのままなら、11.63V → 下限11.5Vまで約11時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 1,
+          "days": 23,
+          "hit": 22,
+          "rate": 0.957,
+          "lastDay": "2026-10-30",
+          "lastV": 12.23,
+          "medianV": 13.56
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 11.629,
+          "floorV": 11.5,
+          "vPerH": 0.0122,
+          "hours": 10.5
         }
       }
     },
@@ -2150,30 +2410,43 @@
         "score": 10,
         "grade": "good",
         "gradeLabel": "良好",
-        "confidence": "中",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
+            "key": "charge",
+            "label": "満充電への到達",
             "score": 10,
-            "value": 111,
-            "text": "定格比 111%"
+            "value": 1,
+            "text": "晴れた23日中23日で13V到達(直近3日で0日届かず・日中最高の中央値 13.59V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
+            "key": "floor",
+            "label": "下限までの放電",
             "score": 10,
-            "value": 0.12,
-            "text": "全拠点比 +0.12V"
+            "value": 63.9,
+            "text": "前夜の降下 9.8mV/hのままなら、12.13V → 下限11.5Vまで約64時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 0,
+          "days": 23,
+          "hit": 23,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 14.37,
+          "medianV": 13.59
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.125,
+          "floorV": 11.5,
+          "vPerH": 0.0098,
+          "hours": 63.9
         }
       }
     },
@@ -2296,18 +2569,47 @@
       "nightGenMaxWh": 145,
       "capKeptFull": false,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 0.4,
+        "grade": "replace",
+        "gradeLabel": "要交換",
+        "confidence": "低",
         "fresh": true,
-        "parts": [],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
+        "parts": [
+          {
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 0,
+            "value": 0,
+            "text": "晴れた1日中0日で13V到達(直近1日で1日届かず・日中最高の中央値 12.42V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 0.8,
+            "value": 15,
+            "text": "前夜の降下 37.8mV/hのままなら、11.07V → 下限10.5Vまで約15時間"
+          }
+        ],
+        "reach": {
+          "recentDays": 1,
+          "recentMissed": 1,
+          "days": 1,
+          "hit": 0,
+          "rate": 0,
+          "lastDay": "2026-10-30",
+          "lastV": 12.42,
+          "medianV": 12.42
         },
-        "reason": "交換直後"
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 11.068,
+          "floorV": 10.5,
+          "vPerH": 0.0378,
+          "hours": 15
+        }
       }
     },
     "cam36": {
@@ -2425,30 +2727,43 @@
         "score": 10,
         "grade": "good",
         "gradeLabel": "良好",
-        "confidence": "中",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
+            "key": "charge",
+            "label": "満充電への到達",
             "score": 10,
-            "value": 97,
-            "text": "定格比 97%"
+            "value": 1,
+            "text": "晴れた23日中23日で13V到達(直近3日で0日届かず・日中最高の中央値 13.62V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
+            "key": "floor",
+            "label": "下限までの放電",
             "score": 10,
-            "value": 0.016,
-            "text": "全拠点比 +0.02V"
+            "value": 50.6,
+            "text": "前夜の降下 12.7mV/hのままなら、12.14V → 下限11.5Vまで約51時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 0,
+          "days": 23,
+          "hit": 23,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.18,
+          "medianV": 13.62
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.14,
+          "floorV": 11.5,
+          "vPerH": 0.0127,
+          "hours": 50.6
         }
       }
     },
@@ -2562,33 +2877,46 @@
       "nightGenMaxWh": 141,
       "capKeptFull": false,
       "degrade": {
-        "score": 8.9,
+        "score": 10,
         "grade": "good",
         "gradeLabel": "良好",
-        "confidence": "中",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
-            "score": 8,
-            "value": 86,
-            "text": "定格比 86%"
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 1,
+            "text": "晴れた23日中23日で13V到達(直近3日で0日届かず・日中最高の中央値 13.60V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
+            "key": "floor",
+            "label": "下限までの放電",
             "score": 10,
-            "value": 0.006,
-            "text": "全拠点比 +0.01V"
+            "value": 48.6,
+            "text": "前夜の降下 11.0mV/hのままなら、12.04V → 下限11.5Vまで約49時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 0,
+          "days": 23,
+          "hit": 23,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.15,
+          "medianV": 13.6
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.035,
+          "floorV": 11.5,
+          "vPerH": 0.011,
+          "hours": 48.6
         }
       }
     },
@@ -2706,18 +3034,47 @@
       "nightGenMaxWh": 191,
       "capKeptFull": false,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "低",
         "fresh": true,
-        "parts": [],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
+        "parts": [
+          {
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 1,
+            "text": "晴れた1日中1日で13V到達(直近1日で0日届かず・日中最高の中央値 13.33V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 10,
+            "value": 63.4,
+            "text": "前夜の降下 10.1mV/hのままなら、12.14V → 下限11.5Vまで約63時間"
+          }
+        ],
+        "reach": {
+          "recentDays": 1,
+          "recentMissed": 0,
+          "days": 1,
+          "hit": 1,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.33,
+          "medianV": 13.33
         },
-        "reason": "交換直後"
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.139,
+          "floorV": 11.5,
+          "vPerH": 0.0101,
+          "hours": 63.4
+        }
       }
     },
     "cam48": {
@@ -3142,33 +3499,46 @@
       "nightGenMaxWh": 138,
       "capKeptFull": false,
       "degrade": {
-        "score": 9.2,
-        "grade": "good",
-        "gradeLabel": "良好",
-        "confidence": "中",
+        "score": 7.8,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
+            "key": "charge",
+            "label": "満充電への到達",
             "score": 10,
-            "value": 104,
-            "text": "定格比 104%"
+            "value": 0.957,
+            "text": "晴れた23日中22日で13V到達(直近3日で1日届かず・日中最高の中央値 13.58V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
-            "score": 8.2,
-            "value": -0.091,
-            "text": "全拠点比 -0.09V"
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 5.5,
+            "value": 31.9,
+            "text": "前夜の降下 34.6mV/hのままなら、11.60V → 下限10.5Vまで約32時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 1,
+          "days": 23,
+          "hit": 22,
+          "rate": 0.957,
+          "lastDay": "2026-10-30",
+          "lastV": 12.61,
+          "medianV": 13.58
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 11.602,
+          "floorV": 10.5,
+          "vPerH": 0.0346,
+          "hours": 31.9
         }
       }
     },
@@ -3284,27 +3654,47 @@
       "nightGenMaxWh": 103,
       "capKeptFull": false,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 6.7,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
-            "score": 8.1,
-            "value": -0.095,
-            "text": "全拠点比 -0.10V"
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 0.957,
+            "text": "晴れた23日中22日で13V到達(直近3日で1日届かず・日中最高の中央値 13.93V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 3.3,
+            "value": 23.9,
+            "text": "前夜の降下 19.4mV/hのままなら、11.96V → 下限11.5Vまで約24時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 1,
+          "days": 23,
+          "hit": 22,
+          "rate": 0.957,
+          "lastDay": "2026-10-30",
+          "lastV": 12.83,
+          "medianV": 13.93
         },
-        "reason": "測定中"
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 11.963,
+          "floorV": 11.5,
+          "vPerH": 0.0194,
+          "hours": 23.9
+        }
       }
     },
     "cam55": {
@@ -3420,33 +3810,46 @@
       "nightGenMaxWh": 147,
       "capKeptFull": false,
       "degrade": {
-        "score": 9.7,
-        "grade": "good",
-        "gradeLabel": "良好",
-        "confidence": "中",
+        "score": 6.6,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
+        "confidence": "高",
         "fresh": false,
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
-            "key": "capacity",
-            "label": "容量",
-            "weight": 0.4,
+            "key": "charge",
+            "label": "満充電への到達",
             "score": 10,
-            "value": 95,
-            "text": "定格比 95%"
+            "value": 0.957,
+            "text": "晴れた23日中22日で13V到達(直近3日で1日届かず・日中最高の中央値 13.57V)"
           },
           {
-            "key": "recovery",
-            "label": "朝の回復",
-            "weight": 0.3,
-            "score": 9.3,
-            "value": -0.034,
-            "text": "全拠点比 -0.03V"
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 3.2,
+            "value": 23.7,
+            "text": "前夜の降下 21.6mV/hのままなら、12.01V → 下限11.5Vまで約24時間"
           }
         ],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "reach": {
+          "recentDays": 3,
+          "recentMissed": 1,
+          "days": 23,
+          "hit": 22,
+          "rate": 0.957,
+          "lastDay": "2026-10-30",
+          "lastV": 12.88,
+          "medianV": 13.57
+        },
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.011,
+          "floorV": 11.5,
+          "vPerH": 0.0216,
+          "hours": 23.7
         }
       }
     },
@@ -3565,18 +3968,47 @@
       "nightGenMaxWh": 142,
       "capKeptFull": false,
       "degrade": {
-        "score": null,
-        "grade": null,
-        "gradeLabel": null,
-        "confidence": null,
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "低",
         "fresh": true,
-        "parts": [],
-        "baseline": {
-          "mvRatio": null,
-          "vminDeltaV": -0.151,
-          "fleet": 23
+        "provisional": false,
+        "fail13": false,
+        "cappedBy": null,
+        "parts": [
+          {
+            "key": "charge",
+            "label": "満充電への到達",
+            "score": 10,
+            "value": 1,
+            "text": "晴れた1日中1日で13V到達(直近1日で0日届かず・日中最高の中央値 13.24V)"
+          },
+          {
+            "key": "floor",
+            "label": "下限までの放電",
+            "score": 10,
+            "value": 72.4,
+            "text": "前夜の降下 8.4mV/hのままなら、12.11V → 下限11.5Vまで約72時間"
+          }
+        ],
+        "reach": {
+          "recentDays": 1,
+          "recentMissed": 0,
+          "days": 1,
+          "hit": 1,
+          "rate": 1,
+          "lastDay": "2026-10-30",
+          "lastV": 13.24,
+          "medianV": 13.24
         },
-        "reason": "交換直後"
+        "floor": {
+          "day": "2026-10-31",
+          "v0": 12.105,
+          "floorV": 11.5,
+          "vPerH": 0.0084,
+          "hours": 72.4
+        }
       }
     }
   }
