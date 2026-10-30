@@ -943,8 +943,8 @@ export async function run() {
     r.check("s23-i 交換直後の拠点も採点する(交換後の日・夜だけで数え、確度は「低」)／常時電源は対象外",
       typeof D("fresh").score === "number" && D("fresh").fresh === true && D("fresh").confidence === "低"
       && D("fresh").reach.days <= 4 && sitesD.mains.degrade === undefined, D("fresh"));
-    r.check("s23-o 交換後の実測が全く無い拠点は、交換前の値で仮に採点する(確度「低」・provisional)",
-      typeof D("pre").score === "number" && D("pre").provisional === true && D("pre").confidence === "低", D("pre"));
+    r.check("s23-o 交換後の夜の実測が無い拠点も必ず採点する(消費電流と全拠点の標準の降下から見込み・確度「低」・交換前の値は使わない)",
+      typeof D("pre").score === "number" && D("pre").estimated === true && D("pre").confidence === "低" && D("pre").floor.estimated === true && D("pre").floor.day === null, D("pre"));
     r.check("s23-j 区分は 8.0以上=良好 / 6.0以上=経過観察 / 4.0以上=交換を検討 / 未満=要交換",
       M.degradeGradeOf(8.0).label === "良好" && M.degradeGradeOf(7.9).label === "経過観察" && M.degradeGradeOf(5.9).label === "交換を検討"
       && M.degradeGradeOf(3.9).label === "要交換", [8.0, 7.9, 5.9, 3.9].map((v) => M.degradeGradeOf(v).label));
