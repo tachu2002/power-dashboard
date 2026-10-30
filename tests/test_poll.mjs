@@ -892,60 +892,82 @@ export async function run() {
   r.check("s22-c 交換の再判定のための版が3", M.SWAP_CHECK_VERSION === 3, M.SWAP_CHECK_VERSION);
   r.check("s22-d 放電速度(mV/Ah)に使う夜の上限電圧が12.25V", M.BATTERY_MV_MAX_V0 === 12.25, M.BATTERY_MV_MAX_V0);
 
-  /* ---- s23: 劣化スコア(10.0満点・高いほど良好)と交換ランキングの元データ ---- */
+  /* ---- s23: 劣化スコア(10.0満点・高いほど良好)。評価は「満充電への到達(必須)」と「前夜の降下で下限まで何時間か」だけ ---- */
   {
-    const mk = (o) => Object.assign({ mains: false, sohPct: 95, mvPerAhNow: 13, mvPerAhPrev: 10, mvSpansSwap: false,
-      capStale: false, capPlaceholder: false, lastSwapAt: null, capDaysAfterSwap: null, fitR: 0.9 }, o || {});
+    const mk = (o) => Object.assign({ mains: false, lastSwapAt: null, capDaysAfterSwap: null }, o || {});
     const sitesD = {
       a: mk(), b: mk(), c: mk(), d: mk(), e: mk(),
-      bad: mk({ sohPct: 60, mvPerAhNow: 18 }),                 // 容量が小さく、放電も全拠点より余計に速くなった
-      fresh: mk({ lastSwapAt: dayKey(now - 3 * 24 * HOUR), capDaysAfterSwap: 3, capStale: true, capPlaceholder: true }),
-      unmeasured: mk({ lastSwapAt: dayKey(now - 40 * 24 * HOUR), capDaysAfterSwap: 40, capStale: true, capPlaceholder: true }),
-      nomv: mk({ mvPerAhNow: null, mvPerAhPrev: null }),
-      wild: mk({ sohPct: 160 }),
+      miss: mk(),                                                     // 晴れた日の多くで13Vに届かない
+      once: mk(),                                                     // 届かなかったのは直近3日のうち1日だけ
+      fast: mk(),                                                     // 前夜の降下が速く、下限まで短い
+      cam03: mk(),                                                    // 下限9.5V
+      swapped: mk({ lastSwapAt: dayKey(now - 20 * 24 * HOUR), capDaysAfterSwap: 20 }),
+      fresh: mk({ lastSwapAt: dayKey(now - 3 * 24 * HOUR), capDaysAfterSwap: 3 }),
       mains: mk({ mains: true })
     };
-    // 朝の最低電圧: 全拠点が直近14日で0.10V下がった(季節)。bad だけ0.45V下がった。
     const dayMapD = {}, daysD = [];
-    for (let back = 29; back >= 0; back--) {
+    for (let back = 30; back >= 0; back--) {
       const k = dayKey(now - back * 24 * HOUR);
       daysD.push(k);
       dayMapD[k] = {};
+      const cloudy = back % 5 === 0 && back > 0;       // 5日に1日は全拠点が届かない曇りの日
       Object.keys(sitesD).forEach((id) => {
-        const drop = back < 14 ? (id === "bad" ? 0.45 : 0.10) : 0;
-        dayMapD[k][id] = { vmin: 12.0 - drop };
+        let vmax = cloudy ? 12.7 : 13.6;
+        if (!cloudy && id === "miss") vmax = back % 4 === 0 || back <= 2 ? 12.8 : 13.6;     // 直近の晴れた日も多くが届かない
+        if (!cloudy && id === "once" && back === 1) vmax = 12.8;
+        if (id === "swapped" && !cloudy && k < dayKey(now - 20 * 24 * HOUR)) vmax = 12.8;    // 交換前は届かなかった
+        const night = id === "fast" ? 0.06 : 0.012;                                          // V/h
+        dayMapD[k][id] = { v0: id === "cam03" ? 10.0 : 12.0, vmax, nightVPerH: night };
       });
     }
     M.attachDegradation(sitesD, dayMapD, daysD);
     const D = (id) => sitesD[id].degrade;
     const part = (id, key) => (D(id).parts || []).find((q) => q.key === key);
-    r.check("s23-a 全拠点がそろって悪くなった分(季節)は減点しない(放電の速さも朝の回復も10.0)",
-      part("a", "discharge").score === 10 && part("a", "recovery").score === 10 && D("a").score >= 9.5, D("a"));
-    r.check("s23-b その拠点だけ余計に悪くなった分は減点する(朝の回復・放電の速さ)",
-      part("bad", "recovery").score <= 3 && part("bad", "discharge").score < 5, [part("bad", "recovery"), part("bad", "discharge")]);
-    r.check("s23-c 劣化した拠点は健全な拠点より点数が低く、順位が付く",
-      D("bad").score < D("a").score - 4 && D("bad").score < 5 && D("bad").grade !== "good", [D("bad").score, D("a").score]);
-    r.check("s23-d 交換して2週間以内は採点せず「交換直後」", D("fresh").score === null && D("fresh").fresh === true && D("fresh").reason === "交換直後", D("fresh"));
-    r.check("s23-e 交換から日が経つのに容量が測れていない拠点は採点せず「測定中」",
-      D("unmeasured").score === null && D("unmeasured").fresh === false && D("unmeasured").reason === "測定中", D("unmeasured"));
-    r.check("s23-f 取れなかった指標は除いて重みを配り直す(放電の速さが無くても点が出る)",
-      D("nomv").score !== null && !part("nomv", "discharge") && D("nomv").parts.length === 2, D("nomv"));
-    r.check("s23-g 定格比が測定のばらつき(130%超)の拠点は満点扱いにしつつ確度を「低」にする",
-      part("wild", "capacity").score === 10 && D("wild").confidence === "低", D("wild"));
-    r.check("s23-h 常時電源は採点しない", sitesD.mains.degrade === undefined, sitesD.mains.degrade);
-    r.check("s23-i 容量の点: 95%以上=10.0 / 50%以下=0 / 80%≒6.7",
-      part("a", "capacity").score === 10 && (() => {
-        const t = { x: mk({ sohPct: 80 }), y: mk({ sohPct: 40 }) };
-        M.attachDegradation(t, dayMapD, daysD);
-        return Math.abs(t.x.degrade.parts[0].score - 6.7) < 0.05 && t.y.degrade.parts[0].score === 0;
-      })(), part("a", "capacity"));
+    r.check("s23-a 曇りの日は数えず、毎回届く拠点は満充電の点が10.0で「論外」にならない",
+      part("a", "charge").score === 10 && D("a").fail13 === false && D("a").reach.days >= 15, D("a"));
+    r.check("s23-b 直近の晴れた3日のうち2日以上13Vに届かない拠点は「論外」(区分も論外・点数は3.9以下)",
+      D("miss").fail13 === true && D("miss").gradeLabel === "論外" && D("miss").grade === "replace" && D("miss").score <= 3.9
+      && D("miss").cappedBy === "charge", D("miss"));
+    r.check("s23-c 届かなかったのが直近の晴れた3日のうち1日だけなら論外にしない", D("once").fail13 === false && D("once").reach.recentMissed === 1, D("once"));
+    r.check("s23-d 前夜の降下の速さで下限まで何時間かを出す(0時12.0V・0.012V/h・下限11.5V → 約42時間)",
+      D("a").floor && Math.abs(D("a").floor.hours - 41.7) < 0.2 && Math.abs(part("a", "floor").score - 8.3) < 0.2, D("a").floor);
+    r.check("s23-e 降下が速いと点数が下がる(0.06V/h → 約8時間 → 0点)", D("fast").floor.hours < 12 && part("fast", "floor").score === 0, D("fast").floor);
+    r.check("s23-f 下限は拠点ごと(北沢cam03は9.5V: 10.0V − 9.5V = 0.5V → 約42時間)",
+      D("cam03").floor.floorV === 9.5 && Math.abs(D("cam03").floor.hours - 41.7) < 0.2, D("cam03").floor);
+    r.check("s23-g 点数は満充電と下限までの2つの平均",
+      Math.abs(D("a").score - (part("a", "charge").score + part("a", "floor").score) / 2) < 0.06, D("a"));
+    r.check("s23-h 交換した拠点は交換後の日だけで数える(交換前に届かなかった分は引きずらない)",
+      D("swapped").fail13 === false && D("swapped").reach.rate === 1, D("swapped").reach);
+    r.check("s23-i 交換直後は採点しない／常時電源は対象外",
+      D("fresh").score === null && D("fresh").reason === "交換直後" && sitesD.mains.degrade === undefined, D("fresh"));
     r.check("s23-j 区分は 8.0以上=良好 / 6.0以上=経過観察 / 4.0以上=交換を検討 / 未満=要交換",
-      M.degradeGradeOf(8.0).label === "良好" && M.degradeGradeOf(7.9).label === "経過観察" && M.degradeGradeOf(6.0).label === "経過観察"
-      && M.degradeGradeOf(5.9).label === "交換を検討" && M.degradeGradeOf(4.0).label === "交換を検討" && M.degradeGradeOf(3.9).label === "要交換",
-      [8.0, 7.9, 6.0, 5.9, 4.0, 3.9].map((v) => M.degradeGradeOf(v).label));
-    r.check("s23-k 点数は小数1桁で、0〜10に収まる",
-      ["a", "bad", "wild", "nomv"].every((id) => D(id).score >= 0 && D(id).score <= 10 && Math.round(D(id).score * 10) === D(id).score * 10 + 0
-        || Math.abs(D(id).score * 10 - Math.round(D(id).score * 10)) < 1e-9), ["a", "bad", "wild", "nomv"].map((id) => D(id).score));
+      M.degradeGradeOf(8.0).label === "良好" && M.degradeGradeOf(7.9).label === "経過観察" && M.degradeGradeOf(5.9).label === "交換を検討"
+      && M.degradeGradeOf(3.9).label === "要交換", [8.0, 7.9, 5.9, 3.9].map((v) => M.degradeGradeOf(v).label));
+    r.check("s23-k 点数は小数1桁で0〜10に収まり、容量・朝の回復は使わない",
+      ["a", "miss", "fast", "once"].every((id) => D(id).score >= 0 && D(id).score <= 10 && Math.abs(D(id).score * 10 - Math.round(D(id).score * 10)) < 1e-9)
+      && D("a").parts.every((q) => q.key === "charge" || q.key === "floor"), D("a").parts.map((q) => q.key));
+    r.check("s23-m 下限の表がindex.htmlと同じ(既定11.5V・北沢9.5V・多呂/梅名2号/芝橋/中村橋10.5V)",
+      M.batteryFloorVoltage("cam11") === 11.5 && M.batteryFloorVoltage("cam03") === 9.5
+      && ["cam14", "cam09", "cam43", "cam52"].every((id) => M.batteryFloorVoltage(id) === 10.5), M.BATTERY_FLOOR_OVERRIDE_V);
+  }
+  // 曇りが続いた直後の最初の晴れ間は、深く放電した電池が戻りきれないので「届かなかった」と数えない
+  {
+    const sitesC = { a: {}, b: {}, c: {}, d: {}, x: {} };
+    Object.values(sitesC).forEach((o) => Object.assign(o, { mains: false, lastSwapAt: null, capDaysAfterSwap: null }));
+    const dm = {}, dd = [];
+    for (let back = 12; back >= 0; back--) {
+      const k = dayKey(now - back * 24 * HOUR);
+      dd.push(k); dm[k] = {};
+      const cloudy = back === 4 || back === 5;      // 2日続いた曇りのあとで晴れ
+      Object.keys(sitesC).forEach((id) => {
+        let vmax = cloudy ? 12.5 : 13.6;
+        if (id === "x" && (back === 3 || back === 2)) vmax = 12.8;   // 晴れ間の最初の日と2日目に届かず、3日目に届いた
+        dm[k][id] = { v0: 12.0, vmax, nightVPerH: 0.012 };
+      });
+    }
+    M.attachDegradation(sitesC, dm, dd);
+    r.check("s23-n 曇り明けの最初の晴れ間は数えない(その日と翌日に届かなくても、直近の晴れた3日で届かなかったのは1日)",
+      sitesC.x.degrade.fail13 === false && sitesC.x.degrade.reach.recentMissed === 1, sitesC.x.degrade.reach);
   }
   r.check("s23-l 持ちの計算結果(battery_health.json)に劣化スコアが入る",
     !!(health && health.sites.cam11 && health.sites.cam11.degrade && "score" in health.sites.cam11.degrade && Array.isArray(health.sites.cam11.degrade.parts)),
