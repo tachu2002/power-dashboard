@@ -479,6 +479,7 @@
   .rk-row { display: grid; grid-template-columns: 30px minmax(120px, 1.1fr) 92px minmax(90px, 0.9fr) 84px minmax(0, 2fr);
     gap: 4px 12px; align-items: center; padding: 8px 10px; border: 1px solid var(--gridline); border-radius: 8px;
     background: var(--surface-1); }
+  .rk-row.rk-fail { border-width: 2px; }
   .rk-row.rk-replace { border-color: var(--critical-border); background: var(--critical-bg); }
   .rk-row.rk-plan { border-color: var(--warn-border); background: var(--warn-bg); }
   .rk-no { font-size: 15px; font-weight: 700; color: var(--text-secondary); text-align: center; font-variant-numeric: tabular-nums; }
@@ -944,15 +945,13 @@
           <div class="rk-other" id="rankOther"></div>
           <div class="health-note" id="rankHowto">
             <b>劣化スコアの見かた</b>（10.0が良好・低いほど交換が近い）<br>
-            全拠点は同じ地域で日射が共通なので、「同じ時期に全拠点が同じように動いた分」は天気や季節のせい、
-            <b>その拠点だけ余計に悪くなった分が電池のへたり</b>と考えて点数にしています。<br>
-            ・<b>容量</b>（重み40%）… 実効容量 ÷ 定格。95%以上で10.0、80%で約6.7、70%で約4.4、50%以下で0。<br>
-            ・<b>放電の速さ</b>（重み30%）… 夜間に1Ah取り出したときの電圧降下が前15夜からどれだけ増えたかを、全拠点の増え方と比べます。全拠点並みなら10.0、5割多く悪化すれば0。<br>
-            ・<b>朝の回復</b>（重み30%）… 朝の最低電圧（直近14日 ← その前14日）の動きを全拠点の中央値と比べます。全拠点並みなら10.0、0.5V余計に下がれば0。<br>
-            測れなかった指標は除き、残りで重みを配り直します（確からしさが下がるので「確度」に出します）。
+            評価するのは次の2つだけです。<br>
+            ・<b>満充電への到達（必須）</b>… 日中が晴れた日に、電池が満充電（端子電圧13V以上）まで届いたか。<b>届かないのは論外で、劣化がかなり進んでいる</b>ものとして扱います。全拠点は同じ地域で日射が共通なので、全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とします（曇りの日と、曇りが続いた直後の最初の晴れ間は、深く放電した電池が1日では戻りきれないので数えません）。<b>直近の晴れた3日のうち2日以上13Vに届かなかった拠点は「論外」</b>とし、点数にかかわらずランキングの先頭に置き、点数も最大3.9に抑えます。点数は、晴れた日に届いた割合（95%以上で10.0、40%以下で0）です。<br>
+            ・<b>下限までの放電</b>… 前夜（0:00〜4:00）の電圧降下の速さのまま下がり続けたとき、0時の電圧から<b>その拠点の下限電圧</b>（北沢アンダーパス9.5V／多呂樋管・梅名樋管2号・芝橋・中村橋10.5V／既定11.5V）まで何時間かかるか。48時間以上で10.0、12時間以下で0です。<br>
+            点数は2つの平均です（片方しか測れなければその1つ。確度に出します）。
             電池を交換して2週間以内の拠点は交換前の値が当てにならないため、採点せず「交換直後」に分けています。
             区分は 8.0以上＝良好／6.0〜8.0＝経過観察／4.0〜6.0＝交換を検討／4.0未満＝要交換。
-            定格比の誤差は±15%程度あり、観測も夏〜秋の短い期間なので、<b>点数は順位をつけるための目安</b>です。
+            このランキングは「電池の傷み具合」の順で、「健全性の一覧」の状態（今すぐ持つか）とは見る観点が違います（各行に一覧の状態も添えています）。満充電に届かない原因が電池ではなく、パネルの汚れ・日陰・負荷の大きさのこともあるため、<b>点数は順位をつけるための目安</b>です。
           </div>
         </div>
 
@@ -2441,9 +2440,18 @@
    * ここでは点数の低い順(=交換が近い順)に並べ直して見せるだけ。同点は同じ順位にする。
    * 採点できないものは順位をつけず、「測定中」「交換直後」として下に分ける。
    * --------------------------------------------------------------------- */
-  var RANK_PART_ORDER = [["capacity", "容量"], ["discharge", "放電の速さ"], ["recovery", "朝の回復"]];
+  var RANK_PART_ORDER = [["charge", "満充電への到達"], ["floor", "下限までの放電"]];
   var RANK_GRADE_CLASS = { good: "ok", watch: "watch", plan: "warn", replace: "bad" };
   function fmtDegradeScore(v) { return typeof v === "number" ? v.toFixed(1) + "/10.0" : "—"; }
+  // 一覧・ランキングでは「（河川 / 地区）」を落として幅を稼ぐ。ただし同じ名前の拠点が複数あるとき
+  // (中村橋: 佐野 と 三島市中)は区別できなくなるので、地区だけ残す。
+  function shortSiteName(name) {
+    var base = String(name).replace(/\s*[（(][^）)]*[）)]\s*$/, "");
+    var same = POWER_SITES.filter(function (x) { return String(x.name).replace(/\s*[（(][^）)]*[）)]\s*$/, "") === base; });
+    if (same.length < 2) return base;
+    var m = String(name).match(/[（(][^）)]*?\/\s*([^）)]*)[）)]\s*$/);
+    return base + (m ? "（" + m[1].trim() + "）" : "");
+  }
   function degradeRows() {
     var rows = [];
     POWER_SITES.forEach(function (site) {
@@ -2452,19 +2460,29 @@
       rows.push({ id: site.id, name: site.name, e: e, d: e.degrade });
     });
     var hoursOf = {};
-    healthTableRows().forEach(function (r) { hoursOf[r.id] = r.sustain ? 1e8 : (r.hours === null ? 1e9 : r.hours); });
+    var stateOf = {};
+    healthTableRows().forEach(function (r) {
+      hoursOf[r.id] = r.sustain ? 1e8 : (r.hours === null ? 1e9 : r.hours);
+      stateOf[r.id] = healthStateOf(r)[0];
+    });
     var scored = rows.filter(function (r) { return typeof r.d.score === "number"; });
-    scored.sort(function (a, b) { return (a.d.score - b.d.score) || (hoursOf[a.id] - hoursOf[b.id]); });
+    // 晴れた日に満充電(13V)へ届かない拠点(論外)は点数にかかわらず先頭。届かなかった日が多い順。
+    var missOf = function (r) { return r.d.fail13 ? (r.d.reach ? r.d.reach.recentMissed : 0) : -1; };
+    scored.sort(function (a, b) {
+      return (missOf(b) - missOf(a)) || (a.d.score - b.d.score) || (hoursOf[a.id] - hoursOf[b.id]);
+    });
     var rank = 0;
     scored.forEach(function (r, i) {
-      if (i === 0 || r.d.score !== scored[i - 1].d.score) rank = i + 1;
+      var prev = scored[i - 1];
+      if (i === 0 || r.d.score !== prev.d.score || !!r.d.fail13 !== !!prev.d.fail13) rank = i + 1;
       r.rank = rank;
     });
     return {
       scored: scored,
       fresh: rows.filter(function (r) { return r.d.fresh; }),
       pending: rows.filter(function (r) { return !r.d.fresh && typeof r.d.score !== "number"; }),
-      hoursOf: hoursOf
+      hoursOf: hoursOf,
+      stateOf: stateOf
     };
   }
   function renderRankCard() {
@@ -2491,15 +2509,17 @@
           + " <b>" + p.score.toFixed(1) + "</b></span>";
       }).join("");
       var sub = [];
-      if (typeof e.sohPct === "number" && !e.capStale && !e.capPlaceholder) {
-        sub.push("定格比 " + (e.sohPct > SOH_PLAUSIBLE_MAX ? "測定ばらつき" : e.sohPct + "%"));
+      var tbl = res.stateOf[r.id];
+      if (tbl) sub.push("一覧の状態: " + tbl);
+      if (d.fail13 && d.reach) {
+        sub.push("晴れた日に満充電(13V)へ届かない（直近" + d.reach.recentDays + "日中" + d.reach.recentMissed + "日）");
       }
       if (e.lastSwapAt) sub.push("最終交換 " + e.lastSwapAt.slice(5).replace("-", "/"));
       var h = res.hoursOf[r.id];
       if (h < 1e8) sub.push("あと" + fmtEndurance(h));
       sub.push("確度 " + d.confidence);
-      var shortName = r.name.replace(/\s*[（(][^）)]*[）)]\s*$/, "");
-      return '<li class="rk-row rk-' + d.grade + '" data-site="' + r.id + '">'
+      var shortName = shortSiteName(r.name);
+      return '<li class="rk-row rk-' + d.grade + (d.fail13 ? " rk-fail" : "") + '" data-site="' + r.id + '">'
         + '<div class="rk-no">' + r.rank + "</div>"
         + '<div><div class="rk-name" title="' + r.name + '">' + shortName + '</div><div class="rk-sub">' + sub.join("・") + "</div></div>"
         + '<div class="rk-score"><span class="rk-num">' + d.score.toFixed(1) + '</span><span class="rk-max">/10.0</span></div>'
@@ -2508,7 +2528,7 @@
         + '<div class="rk-parts">' + parts + "</div></li>";
     }).join("");
     var names = function (arr) {
-      return arr.map(function (r) { return r.name.replace(/\s*[（(][^）)]*[）)]\s*$/, ""); }).join("、");
+      return arr.map(function (r) { return shortSiteName(r.name); }).join("、");
     };
     var htm = "";
     if (res.fresh.length) {
@@ -2521,7 +2541,9 @@
     other.innerHTML = htm;
     var urgent = res.scored.filter(function (r) { return r.d.grade === "replace" || r.d.grade === "plan"; });
     var stamp = batteryHealthState.generatedAt ? fmtOutlookWhen(batteryHealthState.generatedAt.getTime()) : "";
-    note.textContent = (urgent.length
+    var fails = res.scored.filter(function (r) { return r.d.fail13; });
+    note.textContent = (fails.length ? "晴れた日に満充電(13V)へ届かない「論外」の拠点が " + fails.length + "拠点あります。" : "")
+      + (urgent.length
       ? "交換を検討したい拠点が " + urgent.length + "拠点あります。"
       : "いま交換を急ぐ拠点はありません。")
       + "点数は10.0が良好で、低いほど交換が近い順に並べています（採点 " + res.scored.length + "拠点）"
@@ -2610,7 +2632,7 @@
             : e.capDaysAfterSwap ? '<span class="ht-small">　以降' + e.capDaysAfterSwap + "日で測定</span>" : "");
       }
       // 列数が多いので、拠点名の「（河川 / 地区）」は落として幅を稼ぐ(全体はtitleに残す)
-      var shortName = r.name.replace(/\s*[（(][^）)]*[）)]\s*$/, "");
+      var shortName = shortSiteName(r.name);
       return '<tr data-site="' + r.id + '">'
         + '<td class="ht-name" title="' + r.name + '">' + shortName + "</td>"
         + '<td><span class="ht-pill ' + st[1] + '">' + st[0] + "</span></td>"
