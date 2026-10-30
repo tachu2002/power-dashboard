@@ -1286,27 +1286,32 @@ function computeBatteryEndurance(store, longTerm) {
   return sites;
 }
 
-/* 劣化スコア(10.0満点・高いほど良好)と交換の優先度
+/* 劣化スコア(10.0満点・高いほど良好)と交換ランキング(2026-10-30 利用者の指示で作り直し)
  * -----------------------------------------------------------------------
- * 全拠点は同じ地域にあり日射は共通。だから「同じ時期に全拠点が同じように動いた分」は天気や季節
- * のせいで、その拠点だけが余計に悪化した分が電池のへたりだと考えられる。そこで3つの指標を、
- * 全拠点の中央値を基準にして点数にする。
- *   ① 容量(40%)   … 実効容量 ÷ 定格(定格比)。95%以上=10点、50%以下=0点(80%≒6.7点、70%≒4.4点)。
- *   ② 放電の速さ(30%) … 1Ahあたりの降下(mV/Ah)が前15夜からどれだけ増えたかを、
- *                       全拠点の増え方(季節による共通の変化)と比べる。同じなら10点、+50%で0点。
- *   ③ 朝の回復(30%) … 朝の最低電圧(直近14日 ← その前14日)の動きを、全拠点の中央値と比べる。
- *                       日射が共通なので、その差が「同じ日照条件で戻りきれなくなった分」。
- *                       全拠点並みなら10点、0.5V余計に下がれば0点。
- * 取れなかった指標は除いて重みを配り直す。交換直後の拠点は交換前の値が当てにならないので採点しない。 */
-const DEGRADE_WEIGHTS = { capacity: 0.4, discharge: 0.3, recovery: 0.3 };
-const DEGRADE_VMIN_HALF_DAYS = 14;      // 朝の電圧を比べる半分の期間
-const DEGRADE_VMIN_MIN_POINTS = 8;      // その半分に必要な日数
-const DEGRADE_MIN_FLEET = 4;            // 全拠点の基準を作るのに必要な拠点数
-const DEGRADE_FRESH_DAYS = 14;          // 交換してからこの日数に満たなければ「交換直後」
-const DEGRADE_SOH_FLOOR = 50, DEGRADE_SOH_FULL = 95;   // 定格比の誤差が±15%程度あるので、満点は95%以上
-const DEGRADE_MV_BAD_REL = 0.5;         // 全拠点より放電が5割多く悪化したら0点
-const DEGRADE_VMIN_BAD_V = 0.5;         // 全拠点より朝の電圧が0.5V余計に下がったら0点
-const DEGRADE_GRADES = [                // 点数の下限 → 区分
+ * 評価するのは次の2つだけ(容量・朝の回復は使わない)。
+ *   ① 満充電への到達(必須) … 日中が晴れた日に、電池が満充電(端子電圧13V以上)まで届いたか。
+ *      届かないのは論外で、劣化がかなり進んでいる。全拠点は同じ地域で日射が共通なので、
+ *      全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とする(曇りの日と、曇りが続いた直後の
+ *      最初の晴れ間は、深く放電した電池が1日では戻りきれないので数えない)。
+ *      直近の晴れた3日のうち2日以上で届かなければ「論外」(fail13)。
+ *      論外の拠点は点数にかかわらずランキングの先頭に置き、点数も最大3.9(要交換)に抑える。
+ *   ② 下限までの放電 … 前夜(0:00〜4:00)の電圧降下の速さのまま下がり続けたとき、0時の電圧から
+ *      その拠点の下限電圧(北沢9.5V／多呂・梅名2号・芝橋・中村橋10.5V／既定11.5V)まで何時間かかるか。
+ *      48時間以上=10点、12時間以下=0点。
+ * 点数 = ①と②の平均(片方しか測れなければその1つ)。交換直後の拠点は交換前の値が当てにならないので採点しない。 */
+const BATTERY_FLOOR_DEFAULT_V = 11.5;
+const BATTERY_FLOOR_OVERRIDE_V = { cam03: 9.5, cam14: 10.5, cam09: 10.5, cam43: 10.5, cam52: 10.5 };   // index.html の BATTERY_EMPTY_VOLTAGE_OVERRIDE と同じ
+const DEGRADE_REACH_V = 13.0;
+const DEGRADE_REACH_WINDOW_DAYS = 30;    // 数える日数(当日は途中なので入れない)
+const DEGRADE_REACH_MIN_DAYS = 8;        // 晴れた日が何日あれば割合で採点するか
+const DEGRADE_REACH_FULL = 0.95, DEGRADE_REACH_ZERO = 0.40;   // 届いた割合: 95%以上=10点、40%以下=0点
+const DEGRADE_REACH_RECENT = 3;          // 直近の晴れた何日で「論外」を判定するか
+const DEGRADE_REACH_FAIL_DAYS = 2;       // そのうち何日届かなければ論外か
+const DEGRADE_FAIL_MAX = 3.9;            // 論外の拠点の点数の上限
+const DEGRADE_FLOOR_FULL_H = 48, DEGRADE_FLOOR_ZERO_H = 12;
+const DEGRADE_NIGHT_LOOKBACK_DAYS = 3;   // 「前夜」として探す日数(直近に夜間の実測が無い拠点のため)
+const DEGRADE_FRESH_DAYS = 14;           // 交換してからこの日数に満たなければ「交換直後」
+const DEGRADE_GRADES = [                 // 点数の下限 → 区分
   { min: 8.0, key: "good", label: "良好" },
   { min: 6.0, key: "watch", label: "経過観察" },
   { min: 4.0, key: "plan", label: "交換を検討" },
@@ -1317,93 +1322,85 @@ function degradeGradeOf(score) {
   return DEGRADE_GRADES[DEGRADE_GRADES.length - 1];
 }
 function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+function batteryFloorVoltage(id) {
+  const v = BATTERY_FLOOR_OVERRIDE_V[id];
+  return typeof v === "number" ? v : BATTERY_FLOOR_DEFAULT_V;
+}
 function attachDegradation(sites, dayMap, days) {
   const ids = Object.keys(sites).filter(function (id) { return !sites[id].mains; });
   const lastDay = days.length ? days[days.length - 1] : null;
-  // 朝の最低電圧の変化(直近の半分 − その前の半分)。暦の日付で全拠点そろえる。
-  const half = DEGRADE_VMIN_HALF_DAYS;
-  const vminDelta = {};
+  const minFleet = 4;
+  const dayAt = function (back) { return new Date(Date.parse(lastDay) - back * 86400000).toISOString().slice(0, 10); };
+  const vmaxOf = function (day, id) {
+    const d = (dayMap[day] || {})[id];
+    return d && typeof d.vmax === "number" && d.vmax > 0 ? d.vmax : null;
+  };
+  // 晴れた日 = 全拠点の半分以上が13Vに届いた日で、しかも前日も同じ(新しい順)。
+  // 曇りが続いた直後の最初の晴れ間は、どの電池も深く放電していて1日では13Vまで戻りきれない。
+  // これを「届かなかった」と数えると、劣化していない拠点まで論外になるので、前日も晴れた日だけを数える。
+  const fleetReached = function (day) {
+    const vs = ids.map(function (id) { return vmaxOf(day, id); }).filter(function (v) { return v !== null; });
+    if (vs.length < minFleet) return null;
+    return vs.filter(function (v) { return v >= DEGRADE_REACH_V; }).length / vs.length >= 0.5;
+  };
+  const sunnyDays = [];
   if (lastDay) {
-    const dayAt = function (back) { return new Date(Date.parse(lastDay) - back * 86400000).toISOString().slice(0, 10); };
-    const winVals = function (id, from, to) {   // 暦の back=from..to-1 日前
-      const v = [];
-      for (let b = from; b < to; b++) {
-        const d = (dayMap[dayAt(b)] || {})[id];
-        if (d && typeof d.vmin === "number" && d.vmin > 0) v.push(d.vmin);
-      }
-      return v;
-    };
-    ids.forEach(function (id) {
-      const e = sites[id];
-      // 交換が窓の中に入っていたら比べない(電池が別物になる)
-      if (e.lastSwapAt && e.lastSwapAt > dayAt(half * 2 - 1)) { vminDelta[id] = null; return; }
-      const nowV = winVals(id, 0, half), prevV = winVals(id, half, half * 2);
-      if (nowV.length < DEGRADE_VMIN_MIN_POINTS || prevV.length < DEGRADE_VMIN_MIN_POINTS) { vminDelta[id] = null; return; }
-      vminDelta[id] = medianOf(nowV) - medianOf(prevV);
-    });
+    for (let b = 1; b <= DEGRADE_REACH_WINDOW_DAYS; b++) {
+      if (fleetReached(dayAt(b)) === true && fleetReached(dayAt(b + 1)) === true) sunnyDays.push(dayAt(b));
+    }
   }
-  const mvRatio = {};
-  ids.forEach(function (id) {
-    const e = sites[id];
-    mvRatio[id] = (!e.mvSpansSwap && typeof e.mvPerAhNow === "number" && typeof e.mvPerAhPrev === "number" && e.mvPerAhPrev > 0)
-      ? e.mvPerAhNow / e.mvPerAhPrev : null;
-  });
-  const valid = function (m) { return ids.map(function (id) { return m[id]; }).filter(function (x) { return typeof x === "number"; }); };
-  const mvVals = valid(mvRatio), dvVals = valid(vminDelta);
-  const mvBase = mvVals.length >= DEGRADE_MIN_FLEET ? medianOf(mvVals) : null;
-  const dvBase = dvVals.length >= DEGRADE_MIN_FLEET ? medianOf(dvVals) : null;
   ids.forEach(function (id) {
     const e = sites[id];
     const fresh = !!(e.lastSwapAt && typeof e.capDaysAfterSwap === "number" && e.capDaysAfterSwap < DEGRADE_FRESH_DAYS);
-    // 交換から日が経っているのに、いまの電池の容量がまだ測れていない(当てはまりが悪い)拠点は容量を採点しない
-    const capKnown = !(e.capStale || e.capPlaceholder);
-    const deg = { score: null, grade: null, gradeLabel: null, confidence: null, fresh: fresh, parts: [],
-      baseline: { mvRatio: mvBase === null ? null : Math.round(mvBase * 1000) / 1000,
-        vminDeltaV: dvBase === null ? null : Math.round(dvBase * 1000) / 1000, fleet: ids.length } };
-    if (fresh) {
-      deg.reason = "交換直後";
-      e.degrade = deg;
-      return;
+    const deg = { score: null, grade: null, gradeLabel: null, confidence: null, fresh: fresh, fail13: false,
+      cappedBy: null, parts: [], reach: null, floor: null };
+    e.degrade = deg;
+    if (fresh) { deg.reason = "交換直後"; return; }
+    // ① 満充電への到達(交換した拠点は交換後の日だけ)
+    const own = sunnyDays.filter(function (day) { return !(e.lastSwapAt && day < e.lastSwapAt); })
+      .map(function (day) { return { day: day, v: vmaxOf(day, id) }; }).filter(function (x) { return x.v !== null; });
+    let charge = null;
+    if (own.length >= 2) {
+      const recent = own.slice(0, DEGRADE_REACH_RECENT);                  // 新しい順
+      const missed = recent.filter(function (x) { return x.v < DEGRADE_REACH_V; }).length;
+      const hit = own.filter(function (x) { return x.v >= DEGRADE_REACH_V; }).length;
+      const rate = hit / own.length;
+      deg.reach = { recentDays: recent.length, recentMissed: missed, days: own.length, hit: hit,
+        rate: Math.round(rate * 1000) / 1000, lastDay: own[0].day, lastV: Math.round(own[0].v * 100) / 100,
+        medianV: Math.round(medianOf(own.map(function (x) { return x.v; })) * 100) / 100 };
+      deg.fail13 = recent.length >= 2 && missed >= DEGRADE_REACH_FAIL_DAYS;
+      // 割合が出せる日数があれば割合で、無ければ直近の3日で点数にする
+      const r = own.length >= DEGRADE_REACH_MIN_DAYS ? rate : (recent.length - missed) / recent.length;
+      charge = Math.round(clamp01((r - DEGRADE_REACH_ZERO) / (DEGRADE_REACH_FULL - DEGRADE_REACH_ZERO)) * 100) / 10;
+      deg.parts.push({ key: "charge", label: "満充電への到達", score: charge, value: deg.reach.rate,
+        text: "晴れた" + own.length + "日中" + hit + "日で13V到達(直近" + recent.length + "日で" + missed + "日届かず・日中最高の中央値 "
+          + deg.reach.medianV.toFixed(2) + "V)" });
     }
-    // ① 容量
-    let uncertain = false;
-    if (capKnown && typeof e.sohPct === "number") {
-      if (e.sohPct > 130) uncertain = true;     // 測定のばらつき。満点扱いにするが確からしさは下げる
-      const soh = Math.min(e.sohPct, DEGRADE_SOH_FULL);
-      deg.parts.push({ key: "capacity", label: "容量", weight: DEGRADE_WEIGHTS.capacity,
-        score: Math.round(clamp01((soh - DEGRADE_SOH_FLOOR) / (DEGRADE_SOH_FULL - DEGRADE_SOH_FLOOR)) * 100) / 10,
-        value: e.sohPct, text: "定格比 " + e.sohPct + "%" + (uncertain ? "(測定ばらつき)" : "") });
+    // ② 下限までの放電: 前夜の降下の速さのまま下がると、0時の電圧から下限まで何時間か
+    let floor = null;
+    if (lastDay) {
+      for (let b = 0; b < DEGRADE_NIGHT_LOOKBACK_DAYS && floor === null; b++) {
+        const d = (dayMap[dayAt(b)] || {})[id];
+        if (!d || typeof d.v0 !== "number" || typeof d.nightVPerH !== "number" || !(d.nightVPerH > 0.0008)) continue;
+        if (e.lastSwapAt && dayAt(b) < e.lastSwapAt) continue;
+        const floorV = batteryFloorVoltage(id);
+        const hours = Math.max(0, (d.v0 - floorV) / d.nightVPerH);
+        deg.floor = { day: dayAt(b), v0: Math.round(d.v0 * 1000) / 1000, floorV: floorV,
+          vPerH: Math.round(d.nightVPerH * 10000) / 10000, hours: Math.round(hours * 10) / 10 };
+        floor = Math.round(clamp01((hours - DEGRADE_FLOOR_ZERO_H) / (DEGRADE_FLOOR_FULL_H - DEGRADE_FLOOR_ZERO_H)) * 100) / 10;
+        deg.parts.push({ key: "floor", label: "下限までの放電", score: floor, value: deg.floor.hours,
+          text: "前夜の降下 " + (d.nightVPerH * 1000).toFixed(1) + "mV/hのままなら、" + d.v0.toFixed(2) + "V → 下限" + floorV.toFixed(1)
+            + "Vまで約" + Math.round(hours) + "時間" });
+      }
     }
-    // ② 放電の速さ(全拠点の変化に対する余分な悪化)
-    if (mvBase !== null && typeof mvRatio[id] === "number") {
-      const rel = mvRatio[id] / mvBase - 1;
-      deg.parts.push({ key: "discharge", label: "放電の速さ", weight: DEGRADE_WEIGHTS.discharge,
-        score: Math.round((1 - clamp01(rel / DEGRADE_MV_BAD_REL)) * 100) / 10,
-        value: Math.round(rel * 1000) / 1000,
-        text: "全拠点比 " + (rel >= 0 ? "+" : "") + Math.round(rel * 100) + "%" });
-    }
-    // ③ 朝の回復(全拠点の変化に対する余分な低下)
-    if (dvBase !== null && typeof vminDelta[id] === "number") {
-      const rel = vminDelta[id] - dvBase;
-      deg.parts.push({ key: "recovery", label: "朝の回復", weight: DEGRADE_WEIGHTS.recovery,
-        score: Math.round((1 - clamp01(-rel / DEGRADE_VMIN_BAD_V)) * 100) / 10,
-        value: Math.round(rel * 1000) / 1000,
-        text: "全拠点比 " + (rel >= 0 ? "+" : "") + rel.toFixed(2) + "V" });
-    }
-    const wsum = deg.parts.reduce(function (a, p) { return a + p.weight; }, 0);
-    const hasCap = deg.parts.some(function (p) { return p.key === "capacity"; });
-    if (deg.parts.length < 2 || !hasCap) {
-      deg.reason = "測定中";
-      e.degrade = deg;
-      return;
-    }
-    deg.score = Math.round(deg.parts.reduce(function (a, p) { return a + p.score * p.weight; }, 0) / wsum * 10) / 10;
+    const got = deg.parts.map(function (p) { return p.score; });
+    if (!got.length) { deg.reason = "測定中"; return; }
+    deg.score = Math.round(got.reduce(function (a, b) { return a + b; }, 0) / got.length * 10) / 10;
+    if (deg.fail13 && deg.score > DEGRADE_FAIL_MAX) { deg.score = DEGRADE_FAIL_MAX; deg.cappedBy = "charge"; }
     const g = degradeGradeOf(deg.score);
     deg.grade = g.key;
-    deg.gradeLabel = g.label;
-    deg.confidence = (deg.parts.length === 3 && !uncertain && (e.fitR || 0) >= 0.85) ? "高"
-      : (deg.parts.length >= 2 && !uncertain) ? "中" : "低";
-    e.degrade = deg;
+    deg.gradeLabel = deg.fail13 ? "論外" : g.label;
+    deg.confidence = got.length === 2 ? "高" : "中";
   });
 }
 async function updateBatteryHealthFile() {
@@ -1919,5 +1916,5 @@ export {
   BATTERY_RATED_CANDIDATES, BATTERY_NIGHT_WINDOW,
   BATTERY_FULL_REST_V, BATTERY_WINDOW_SEARCH_DAYS, BATTERY_MV_MAX_V0, SWAP_MAX_BEFORE_V, SWAP_MAX_AFTER_V,
   SWAP_CHECK_VERSION, capacityPairs,
-  DEGRADE_WEIGHTS, DEGRADE_GRADES, degradeGradeOf, attachDegradation
+  DEGRADE_REACH_V, DEGRADE_GRADES, degradeGradeOf, attachDegradation, batteryFloorVoltage, BATTERY_FLOOR_OVERRIDE_V
 };
