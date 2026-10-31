@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-31T00:40:07.031Z",
+  "generatedAt": "2026-10-31T01:50:13.104Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -2275,7 +2275,7 @@
         13.372,
         13.381,
         13.381,
-        13.381
+        13.377
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2550,17 +2550,18 @@
         "2026-09-25",
         "2026-09-26",
         "2026-09-30",
-        "2026-10-28"
+        "2026-10-28",
+        "2026-11-01"
       ],
-      "lastSwapAt": "2026-10-28",
-      "lastSwapTime": "2026-10-27T02:32:25.000Z",
-      "lastSwapVBefore": 12.11,
-      "lastSwapVAfter": 12.493,
+      "lastSwapAt": "2026-11-01",
+      "lastSwapTime": "2026-10-31T00:50:38.000Z",
+      "lastSwapVBefore": 12.163,
+      "lastSwapVAfter": 12.515,
       "capAfterSwap": false,
       "capStale": true,
       "capPlaceholder": true,
-      "capDaysAfterSwap": 4,
-      "mvSpansSwap": true,
+      "capDaysAfterSwap": 0,
+      "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 120,
       "mvPerAhNow": 11.4,
@@ -2569,46 +2570,32 @@
       "nightGenMaxWh": 145,
       "capKeptFull": false,
       "degrade": {
-        "score": 0.4,
-        "grade": "replace",
-        "gradeLabel": "要交換",
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
         "confidence": "低",
         "fresh": true,
-        "estimated": false,
+        "estimated": true,
         "fail13": false,
         "cappedBy": null,
         "parts": [
           {
-            "key": "charge",
-            "label": "満充電への到達",
-            "score": 0,
-            "value": 0,
-            "text": "晴れた1日中0日で13V到達(直近1日で1日届かず・日中最高の中央値 12.42V)"
-          },
-          {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 0.8,
-            "value": 15,
-            "text": "前夜の降下 37.8mV/hのままなら、11.07V → 下限10.5Vまで約15時間"
+            "score": 10,
+            "value": 109,
+            "estimated": true,
+            "text": "交換後の夜の実測がまだ無いため見込み: 消費 1.58A × 標準の降下 12mV/Ah で、12.52V → 下限10.5Vまで約109時間"
           }
         ],
-        "reach": {
-          "recentDays": 1,
-          "recentMissed": 1,
-          "days": 1,
-          "hit": 0,
-          "rate": 0,
-          "lastDay": "2026-10-30",
-          "lastV": 12.42,
-          "medianV": 12.42
-        },
+        "reach": null,
         "floor": {
-          "day": "2026-10-31",
-          "v0": 11.068,
+          "day": null,
+          "v0": 12.515,
           "floorV": 10.5,
-          "vPerH": 0.0378,
-          "hours": 15
+          "vPerH": 0.0185,
+          "hours": 109,
+          "estimated": true
         }
       }
     },
