@@ -1224,6 +1224,58 @@ export async function run() {
   });
   r.check("f13-e 曇り(日射15%)の日でも、夜間降下の実測がある拠点は日が昇ると予測の電圧が右上がりになる",
     cloudy2.ratio > 1.5 && cloudy2.noon > cloudy2.pre + 0.05, cloudy2);
+  const stopRec = await page4.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const realNow = Date.now, HOUR = 3600000, MIN = 60000;
+    const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
+      return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
+    const D0 = jstMid(realNow());
+    const t3 = D0 + 3 * HOUR > realNow() + 5 * MIN ? D0 + 3 * HOUR : D0 + 27 * HOUR;
+    const s = d.siteStates.cam11, keep = s.points.slice();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const fc = d.getForecastState();
+    const radAt = (t) => { const w = fc.hours.reduce((b, h) => (Math.abs(h.t - t) < Math.abs(b.t - t) ? h : b), fc.hours[0]);
+      return Math.abs(w.t - t) <= 90 * MIN ? w.rad : 0; };
+    const pts = [];
+    for (let m = 14 * 60; m > 4 * 60; m -= 10) { const t = t3 - m * MIN;
+      pts.push({ fetchedAt: new Date(t), pv: 0.06 * radAt(t), bat: 12.4, loadW: 12, via: VIA }); }
+    for (let i = 0; i < 25; i++) pts.push({ fetchedAt: new Date(t3 - (24 - i) * 10 * MIN), pv: 0,
+      bat: 11.56 - 0.04 * i / 24, loadW: 12, via: VIA });
+    s.points = pts;
+    Date.now = () => t3;
+    try {
+      const o = d.computeBatteryOutlook(d.SITE_CATALOG.cam11);
+      const vs = o.series.map((p) => p.v);
+      const min = Math.min.apply(null, vs);
+      return { n: vs.length, min: +min.toFixed(2), last: +vs[vs.length - 1].toFixed(2), reach: o.hoursToReserve };
+    } finally { Date.now = realNow; s.points = keep; }
+  });
+  r.check("f14-a 下限(11.5V)に達しても予測は下限より下へ伸びず、朝の日射で回復する",
+    stopRec.reach !== null && stopRec.min >= 11.5 - 0.1 && stopRec.last > stopRec.min + 0.05, stopRec);
+  const fb = await page4.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const realNow = Date.now, HOUR = 3600000, MIN = 60000;
+    const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
+      return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
+    const D0 = jstMid(realNow());
+    const t3 = D0 + 3 * HOUR > realNow() + 5 * MIN ? D0 + 3 * HOUR : D0 + 27 * HOUR;
+    const out = {};
+    for (const id of ["cam09", "cam03", "cam11"]) {
+      const s = d.siteStates[id]; if (!s) { out[id] = null; continue; }
+      const keep = s.points.slice();
+      const fl = d.batteryEmptyVoltageFor(id);
+      const pts = [];
+      for (let i = 0; i < 300; i++) { const t = t3 - (299 - i) * 10 * MIN;
+        pts.push({ fetchedAt: new Date(t), pv: 0, bat: fl + 0.12 + 0.0008 * (299 - i) * 1, loadW: 12, via: "x" }); }
+      s.points = pts; d.clearPredictionCache(); Date.now = () => t3;
+      try { const ser = d.predictBatterySeries(d.SITE_CATALOG[id]);
+        out[id] = { floor: fl, min: Math.min.apply(null, ser.map((p) => p.value)), n: ser.length };
+      } finally { Date.now = realNow; s.points = keep; d.clearPredictionCache(); }
+    }
+    return out;
+  });
+  r.check("f14-b 予想電圧はどの拠点でも、その拠点の下限電圧より下へ伸びない",
+    Object.values(fb).every((o) => o === null || (o.n > 0 && o.min >= o.floor - 0.011)), fb);
   await page4.close();
 
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
