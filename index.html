@@ -6373,7 +6373,7 @@
     // --- 先の見通し ---
     var cloud = cloudFactorFromForecast(lat, lon, nowMs);
     var series = [];
-    var hoursToReserve = null, minSoc = socNow, minSocAt = nowMs;
+    var hoursToReserve = null, minSoc = socNow, minSocAt = nowMs, stopped = false;
     // 並び順に使う「24時間以内の最低残量」。7日間の最低は、途中の晴れの日で満充電に戻ると
     // 今の残量に関係なく同じ値になり、交換で残量が増えても順位が動かなかったため。
     var minSoc24 = socNow;
@@ -6383,7 +6383,11 @@
       var t = nowMs + j * OUTLOOK_STEP_MS;
       var pvW = k * radiationAt(lat, lon, t - OUTLOOK_STEP_MS / 2, cloud);
       var netW = pvW - loadEffW;
+      /* 下限電圧に達したら機器の制御が停止して負荷が切れる(実機の保護動作)。
+         停止後は発電だけが入り、翌朝の日射で電圧は回復する。下限より下へは下がらない。 */
+      if (stopped) netW = pvW;
       soc = Math.max(DEEP_DISCHARGE_PCT, Math.min(100, soc + netW * stepH / capWh * 100));
+      if (!stopped && soc <= reserve) { stopped = true; soc = Math.max(soc, reserve); }
       lift = liftStep(lift, liftTargetV(pvW, e.capacityAh), stepH);
       if (soc < minSoc) { minSoc = soc; minSocAt = t; }
       if (t - nowMs <= 24 * HOUR_MS && soc < minSoc24) minSoc24 = soc;
@@ -6573,6 +6577,9 @@
     var lo = Math.max(BAT_PREDICT_ABS_MIN, Math.min.apply(null, recentVals) - BAT_PREDICT_MARGIN_V);
     var hi = Math.min(BAT_PREDICT_ABS_MAX, Math.max.apply(null, recentVals) + BAT_PREDICT_MARGIN_V);
     if (!(hi > lo)) { lo = BAT_PREDICT_ABS_MIN; hi = BAT_PREDICT_ABS_MAX; }
+    // 機器は拠点ごとの下限電圧で停止して負荷が切れる(実機の保護動作)ので、予測もそれより下へは下げない。
+    var floorV = batteryEmptyVoltageFor(site.id);
+    if (last.bat > floorV && lo < floorV) lo = floorV;
     // 最新の実測値を起点に、各コマまでの「実際の経過時間」ぶんだけ変化させる。
     // (最初のコマまでの間隔は1時間とは限らないため、常に1時間分を足すと最新実測値から
     //  不自然に飛んだ値になってしまう。)
