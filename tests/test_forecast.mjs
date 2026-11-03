@@ -88,7 +88,7 @@ export async function run() {
   r.check("f2-a バッテリーの予測が生成される", pred.batLen > 0, pred.batLen);
   r.check("f2-b 水位の予測が生成される", pred.waterLen > 0, pred.waterLen);
   r.check("f2-c 発電(PV)の予測が生成される", pred.pvLen > 0, pred.pvLen);
-  r.check("f2-d 予測は12時間先までに収まる", pred.batLen <= 13, pred.batLen);
+  r.check("f2-d 電圧の予測は7日先(1時間刻み)までに収まる", pred.batLen <= 7 * 24 + 1, pred.batLen);
   r.check("f2-e 予測点にpredictedフラグが立つ", pred.allPredicted, pred.batFirst);
   r.check("f2-f 予測は時刻昇順", pred.ascendingBat, pred.batFirst);
   r.check("f2-g 予測は最新実測より未来の時刻から始まる",
@@ -166,9 +166,9 @@ export async function run() {
     const el = document.querySelector("#pchart-bat-cam02 svg");
     return Array.from(el.querySelectorAll("text")).map((t) => t.textContent);
   });
-  const timeLabels = labels.filter((t) => /^\d{2}:\d{2}/.test(t));
+  const timeLabels = labels.filter((t) => /^(\d{1,2}\/\d{1,2} )?\d{2}:\d{2}/.test(t));
   r.check("f4-e 時刻ラベルが存在する", timeLabels.length > 0, labels);
-  r.check("f4-f 時刻ラベルに秒が含まれない", timeLabels.every((t) => !/^\d{2}:\d{2}:\d{2}/.test(t)), timeLabels);
+  r.check("f4-f 時刻ラベルに秒が含まれない", timeLabels.every((t) => !/\d{2}:\d{2}:\d{2}/.test(t)), timeLabels);
 
   /* ---- 5. 水位変化グラフ一覧(直近12時間 + 6時間先の予測) ---- */
   await page.evaluate(() => window.__dashboardDebug.showView("graphlist"));
@@ -530,8 +530,8 @@ export async function run() {
       stepMin: o11 && o11.series.length > 1 ? (o11.series[1].t - o11.series[0].t) / 60000 : null,
       horizonH: o11 ? (o11.series[o11.series.length - 1].t - o11.computedAt) / 3600000 : null };
   });
-  r.check("f7-h 10分刻みで12時間先まで見通す",
-    look.stepMin === 10 && look.horizonH >= 11.9 && look.horizonH <= 12.1, { step: look.stepMin, h: look.horizonH });
+  r.check("f7-h 先頭は10分刻みで、7日先まで見通す",
+    look.stepMin === 10 && look.horizonH >= 167 && look.horizonH <= 169, { step: look.stepMin, h: look.horizonH });
   r.check("f7-i 日の出・日の入りと発電係数・曇り具合を持つ",
     look.o11 && look.o11.sunrise && look.o11.pvCoef > 0 && look.o11.cloud > 0 && look.o11.loadW > 0, look.o11);
   r.check("f7-j 昼は夜より残量の減りが小さい（日射を織り込んでいる）",
@@ -1154,7 +1154,7 @@ export async function run() {
       // (a) 夜明け前 3:00 から見る。日の出の前後を底に、そのあとは電圧が上がる
       const t3 = nextAt(3);
       const a = run("cam11", t3, mk(t3, true).concat(night(t3)));
-      const av = a.series.map((p) => p.v);
+      const av = a.series.slice(0, 72).map((p) => p.v);
       const minI = av.indexOf(Math.min.apply(null, av));
       out.dawn = { v0: +av[0].toFixed(2), min: +av[minI].toFixed(2), minAt: hm(a.series[minI].t), sunrise: hm(a.sunrise),
         vNoon: +at(a, 8).toFixed(2), pvCoef: a.pvCoef, minMs: a.series[minI].t, sunriseMs: a.sunrise };
@@ -1165,7 +1165,7 @@ export async function run() {
       // (c) 昼 11:00 から見る。日の入りのあと(23:00 まで)は電圧が下がる
       const t11 = nextAt(11);
       const b = run("cam11", t11, mk(t11, true).concat(dayNow(t11)));
-      const vs = b.series.map((p) => p.v);
+      const vs = b.series.slice(0, 72).map((p) => p.v);
       out.dusk = { start: +vs[0].toFixed(2), max: +Math.max.apply(null, vs).toFixed(2), end: +vs[vs.length - 1].toFixed(2),
         sunset: hm(b.sunset), lift: b.liftNowV };
       // 夜(充電が止まって3時間以上)は持ち上がり0
@@ -1276,6 +1276,44 @@ export async function run() {
   });
   r.check("f14-b 予想電圧はどの拠点でも、その拠点の下限電圧より下へ伸びない",
     Object.values(fb).every((o) => o === null || (o.n > 0 && o.min >= o.floor - 0.011)), fb);
+  const weekly = await page4.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const realNow = Date.now, HOUR = 3600000, MIN = 60000;
+    const jstMid = (ms) => { const j = new Date(ms + 9 * HOUR);
+      return Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR; };
+    const D0 = jstMid(realNow());
+    const t3 = D0 + 3 * HOUR > realNow() + 5 * MIN ? D0 + 3 * HOUR : D0 + 27 * HOUR;
+    const s = d.siteStates.cam11, keep = s.points.slice();
+    const fc = d.getForecastState(), savedHours = fc.hours.slice();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const radAt = (t) => { const w = fc.hours.reduce((b, h) => (Math.abs(h.t - t) < Math.abs(b.t - t) ? h : b), fc.hours[0]);
+      return Math.abs(w.t - t) <= 90 * MIN ? w.rad : 0; };
+    const pts = [];
+    for (let m = 14 * 60; m > 4 * 60; m -= 10) { const t = t3 - m * MIN;
+      pts.push({ fetchedAt: new Date(t), pv: 0.06 * radAt(t), bat: 12.4, loadW: 12, via: VIA }); }
+    for (let i = 0; i < 25; i++) pts.push({ fetchedAt: new Date(t3 - (24 - i) * 10 * MIN), pv: 0,
+      bat: 12.0 - 0.02 * i / 24, loadW: 12, via: VIA });
+    s.points = pts;
+    const run = (factor) => {
+      // 3日目〜5日目だけ予報の日射を差し替える(週間天気が効くかを見る)
+      const base = savedHours.filter((h) => h.t <= t3 + 48 * HOUR);
+      const extra = [];
+      for (let t = t3 + 49 * HOUR; t <= t3 + 120 * HOUR; t += HOUR) {
+        const jh = new Date(t + 9 * HOUR).getUTCHours();
+        extra.push({ t, rain: 0, temp: 15, rad: (jh >= 8 && jh <= 15) ? 800 * factor : 0 });
+      }
+      fc.hours = base.concat(extra);
+      d.clearPredictionCache();
+      Date.now = () => t3;
+      const o = d.computeBatteryOutlook(d.SITE_CATALOG.cam11);
+      const at = o.series.reduce((b, p) => (Math.abs(p.t - (t3 + 108 * HOUR)) < Math.abs(b.t - (t3 + 108 * HOUR)) ? p : b), o.series[0]);
+      return { v: +at.v.toFixed(2), n: o.series.length, last: (o.series[o.series.length - 1].t - t3) / HOUR };
+    };
+    try { return { sunny: run(1), cloudy: run(0.05) }; }
+    finally { Date.now = realNow; s.points = keep; fc.hours = savedHours; d.clearPredictionCache(); }
+  });
+  r.check("f14-c 週間天気が電圧の予測に効く(数日先が晴れか曇りかで予測の電圧が変わる)",
+    weekly.sunny.v > weekly.cloudy.v + 0.1 && weekly.sunny.last >= 167, weekly);
   await page4.close();
 
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());
