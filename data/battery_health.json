@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-03T05:00:05.796Z",
+  "generatedAt": "2026-11-03T06:37:53.895Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -1118,23 +1118,18 @@
       "whPerV": 451,
       "enduranceH": 0,
       "usableAh": 0,
-      "capacityInitialAh": 42.9,
+      "capacityInitialAh": null,
       "capacityNowAh": 50.7,
-      "degradePct": 118,
+      "degradePct": null,
       "capWindow": {
         "from": "2026-09-29",
         "to": "2026-11-03",
         "days": 35,
         "tempC": 20.6,
         "whole": false,
-        "placeholder": false
+        "placeholder": true
       },
-      "initialWindow": {
-        "from": "2026-06-20",
-        "to": "2026-07-17",
-        "days": 13,
-        "tempC": 23.1
-      },
+      "initialWindow": null,
       "spanDays": 144,
       "pvPeakNowW": 29.5,
       "pvPeakInitialW": 27.3,
@@ -1203,15 +1198,17 @@
         11.702,
         11.57
       ],
-      "swaps": [],
-      "lastSwapAt": null,
-      "lastSwapTime": null,
-      "lastSwapVBefore": null,
-      "lastSwapVAfter": null,
+      "swaps": [
+        "2026-11-04"
+      ],
+      "lastSwapAt": "2026-11-04",
+      "lastSwapTime": "2026-11-03T06:03:56.000Z",
+      "lastSwapVBefore": 12.321,
+      "lastSwapVAfter": 12.827,
       "capAfterSwap": false,
-      "capStale": false,
-      "capPlaceholder": false,
-      "capDaysAfterSwap": null,
+      "capStale": true,
+      "capPlaceholder": true,
+      "capDaysAfterSwap": 0,
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 101,
@@ -1221,46 +1218,32 @@
       "nightGenMaxWh": 148,
       "capKeptFull": false,
       "degrade": {
-        "score": 3.9,
-        "grade": "replace",
-        "gradeLabel": "論外",
-        "confidence": "高",
-        "fresh": false,
-        "estimated": false,
-        "fail13": true,
-        "cappedBy": "charge",
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "低",
+        "fresh": true,
+        "estimated": true,
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
-          {
-            "key": "charge",
-            "label": "満充電への到達",
-            "score": 8.5,
-            "value": 0.87,
-            "text": "晴れた23日中20日で13V到達(直近3日で3日届かず・日中最高の中央値 13.55V)"
-          },
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 0,
-            "value": 11.2,
-            "text": "前夜の降下 13.3mV/hのままなら、11.65V → 下限11.5Vまで約11時間"
+            "score": 10,
+            "value": 85.8,
+            "estimated": true,
+            "text": "交換後の夜の実測がまだ無いため見込み: 消費 1.30A × 標準の降下 12mV/Ah で、12.83V → 下限11.5Vまで約86時間"
           }
         ],
-        "reach": {
-          "recentDays": 3,
-          "recentMissed": 3,
-          "days": 23,
-          "hit": 20,
-          "rate": 0.87,
-          "lastDay": "2026-11-01",
-          "lastV": 12.98,
-          "medianV": 13.55
-        },
+        "reach": null,
         "floor": {
-          "day": "2026-11-03",
-          "v0": 11.648,
+          "day": null,
+          "v0": 12.827,
           "floorV": 11.5,
-          "vPerH": 0.0133,
-          "hours": 11.2
+          "vPerH": 0.0155,
+          "hours": 85.8,
+          "estimated": true
         }
       }
     },
