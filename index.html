@@ -1703,6 +1703,9 @@
     var p = function (n) { return String(n).padStart(2, "0"); };
     return p(d.getHours()) + ":" + p(d.getMinutes());
   }
+  function fmtMdHm(d) {
+    return (d.getMonth() + 1) + "/" + d.getDate() + " " + fmtClockHm(d);
+  }
   function fmtTime(d) {
     var p = function (n) { return String(n).padStart(2, "0"); };
     return p(d.getMonth() + 1) + "/" + p(d.getDate()) + " " + p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
@@ -1980,7 +1983,7 @@
         (typeof e.fitR === "number" ? "\n現在の当てはまり具合 r=" + e.fitR + "（0.6以上で確定します）" : "") +
         (e.days ? "\n集計できた日数: " + e.days + "日" : "");
     } else {
-      // 日射予報(2日先まで)＋日の出日の入りからの快晴モデルで、下限に達するまでを見通す。
+      // 日射予報(7日先まで)＋日の出日の入りからの快晴モデルで、下限に達するまでを見通す。
       // 10分ごとに計算し直すため、天気が変われば数字もその都度変わる。
       var o = batteryOutlook(site);
       var base = "実効容量 " + e.capacityAh + "Ah（" + e.days + "日分の実測・当てはまり r=" + e.fitR + "）\n" +
@@ -3720,13 +3723,14 @@
     return null;
   }
   // 実測の系列に未来予測(点線用)を継ぎ足したチャート用データを作る。
-  function buildSeriesWithForecast(points, key, forecastSeries) {
+  function buildSeriesWithForecast(points, key, forecastSeries, labelFn) {
+    var lab = labelFn || fmtClockHm;
     var data = points.map(function (p) {
-      return { label: fmtClockHm(p.fetchedAt), value: p[key], t: p.fetchedAt.getTime() };
+      return { label: lab(p.fetchedAt), value: p[key], t: p.fetchedAt.getTime() };
     });
     (forecastSeries || []).forEach(function (f) {
       // soc(残量の予測%)はバッテリーの見通しから来る。グラフ右端のラベルに添えるため持ち越す。
-      data.push({ label: fmtClockHm(new Date(f.t)), value: f.value, t: f.t, predicted: true,
+      data.push({ label: lab(new Date(f.t)), value: f.value, t: f.t, predicted: true,
         soc: typeof f.soc === "number" ? f.soc : undefined,
         remainH: f.remainH, sustain: f.sustain });
     });
@@ -3783,10 +3787,10 @@
     }
     updateBatteryGauge(site, lastBat ? lastBat.bat : null);
     var batForecast = cachedPrediction(site, "bat");
-    // 予測を表示する場合は、現在時刻がグラフ中央に来るよう過去側も12時間に揃える。
-    var batWindow = batForecast.length ? CHART_PAST_WINDOW_WITH_FORECAST_MS : undefined;
+    // 予測を表示する場合は、過去2日＋先7日の範囲で描く(日付つきの時刻ラベル)。
+    var batWindow = batForecast.length ? BAT_CHART_PAST_WINDOW_MS : undefined;
     var batSel = selectRecentForChart(s.points, function (p) { return typeof p.bat === "number"; }, batWindow);
-    s.batChart.setData(buildSeriesWithForecast(batSel.points, "bat", batForecast));
+    s.batChart.setData(buildSeriesWithForecast(batSel.points, "bat", batForecast, fmtMdHm));
     // 残量の見通しは実測(発電W)を使うため、新しい実測が入ったら「持ち」の表示も出し直す。
     // (これが無いと、起動直後にまだ実測が無くて見通しを出せなかった表示のままになる。)
     updateBatteryHealth(site);
@@ -5636,8 +5640,12 @@
   var FORECAST_API_URL = "https://api.open-meteo.com/v1/forecast?latitude=" + WEATHER_LAT +
     "&longitude=" + WEATHER_LON +
     "&hourly=temperature_2m,precipitation,shortwave_radiation,cloud_cover" +
-    "&timezone=Asia%2FTokyo&past_days=2&forecast_days=2";
+    "&timezone=Asia%2FTokyo&past_days=2&forecast_days=7";
   var FORECAST_REFRESH_MS = 60 * 60 * 1000;
+  // 電圧(バッテリー)の予測だけは、三島市の週間天気(日射予報)を使って7日先まで描く。
+  // グラフは過去2日＋先7日。先の12時間までは10分刻み、それ以降は1時間刻みに間引く。
+  var BAT_PREDICTION_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
+  var BAT_CHART_PAST_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
   var PREDICTION_CACHE_MS = 5 * 60 * 1000;
   var HOUR_MS = 60 * 60 * 1000;
   // 実測から係数を推定できない場合の既定値(控えめな値だが、降雨時に水位が全く動かない
@@ -5717,7 +5725,7 @@
   /* =====================================================================
    * 太陽の位置と快晴時の日射量
    * ---------------------------------------------------------------------
-   * 予報(Open-Meteo)は2日先までしか無いため、それより先は
+   * 予報(Open-Meteo)は7日先までなので、それより先は
    * 「日の出・日の入りから決まる快晴時の日射量 × 直近の曇り具合」で補う。
    * 10分ごとに計算し直すので、日の出・日の入りも都度その時刻のものを使う。
    * ===================================================================== */
@@ -5779,7 +5787,7 @@
    * ---------------------------------------------------------------------
    *   1. 前夜0:00の残量(SOC)を起点にする(充電の下駄が抜けた素の電圧から換算した値)。
    *   2. そこから「今」までは、実測の発電W − 平均消費W を積み上げて現在の残量を出す。
-   *   3. 「今」から先は、日射予報(2日先まで)＋日の出日の入りからの快晴モデル(それ以降)で
+   *   3. 「今」から先は、日射予報(7日先まで)＋日の出日の入りからの快晴モデル(それ以降)で
    *      発電Wを見積もり、同じように積み上げる。
    *   4. 下限(既定20%)に達するまでの時間を「持ち」として表示する。
    *      7日先まで下限に達しなければ「継続可」とし、期間中の最低残量を添える。
@@ -6392,8 +6400,8 @@
       if (soc < minSoc) { minSoc = soc; minSocAt = t; }
       if (t - nowMs <= 24 * HOUR_MS && soc < minSoc24) minSoc24 = soc;
       if (hoursToReserve === null && soc <= reserve) hoursToReserve = j * stepH;
-      // グラフ用は12時間先まで(それ以降は描かないので持たない)
-      if (t - nowMs <= PREDICTION_HORIZON_MS) {
+      // グラフ用は7日先まで(12時間より先は1時間刻みに間引く)
+      if (t - nowMs <= BAT_PREDICTION_HORIZON_MS && (t - nowMs <= PREDICTION_HORIZON_MS || j % 6 === 0)) {
         var decay = Math.exp(-(t - nowMs) / OUTLOOK_SURFACE_TAU_MS);
         series.push({ t: t, soc: soc, v: voltageFromSoc(soc) + lift + offsetV * decay });
       }
@@ -6569,7 +6577,7 @@
     var profile = batteryDiurnalProfile(s.points);
     var normals = radiationNormalsByHour();
     var nowMs = last.fetchedAt.getTime();
-    var hours = futureWeatherHours(nowMs, PREDICTION_HORIZON_MS);
+    var hours = futureWeatherHours(nowMs, BAT_PREDICTION_HORIZON_MS);
     if (!hours.length) return [];
     // 予測の上下限は拠点ごとの実測レンジから決める。固定値(旧: 10.5〜14.2V)だと、
     // 充電中に14.2Vを超える拠点で予測だけが頭打ちになり、実測の続きに見えなくなっていた。
@@ -7275,6 +7283,12 @@
   // 未来予測に使う1時間ごとの気象データ(実績+予報)を読み込む。
   loadForecastHourly();
   setInterval(loadForecastHourly, FORECAST_REFRESH_MS);
+  // 日付(JST)が変わったら、1時間の更新を待たずに予報を取り直して予測を作り直す。
+  var forecastJstDay = toJstParts(new Date()).day;
+  setInterval(function () {
+    var dnow = toJstParts(new Date()).day;
+    if (dnow !== forecastJstDay) { forecastJstDay = dnow; loadForecastHourly(); }
+  }, 60 * 1000);
   // サーバー保存の最新値(ブラウザから取得できない拠点の退避先)を先に読み込んでから取得を始める。
   // 失敗してもそのまま取得へ進む(loadServerLatestは失敗時も解決する)。
   loadServerLatest().then(function () { pollAll(); pollFastSites(); });
@@ -7353,7 +7367,7 @@
     mergePowerHistory: mergePowerHistory, pollPowerSource: pollPowerSource,
     extractCsvFromJinaProxyText: extractCsvFromJinaProxyText,
     getPowerSourceState: function () { return powerSourceState; },
-    PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS,
+    PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS, BAT_PREDICTION_HORIZON_MS: BAT_PREDICTION_HORIZON_MS, BAT_CHART_PAST_WINDOW_MS: BAT_CHART_PAST_WINDOW_MS,
     CHART_PAST_WINDOW_WITH_FORECAST_MS: CHART_PAST_WINDOW_WITH_FORECAST_MS,
     GRAPHLIST_PAST_WINDOW_MS: GRAPHLIST_PAST_WINDOW_MS,
     GRAPHLIST_FORECAST_HORIZON_MS: GRAPHLIST_FORECAST_HORIZON_MS,
