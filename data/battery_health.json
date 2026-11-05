@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-05T07:50:06.383Z",
+  "generatedAt": "2026-11-05T08:50:06.792Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -1024,17 +1024,18 @@
         "2026-09-13",
         "2026-09-22",
         "2026-09-29",
-        "2026-10-27"
+        "2026-10-27",
+        "2026-11-06"
       ],
-      "lastSwapAt": "2026-10-27",
-      "lastSwapTime": "2026-10-26T04:38:25.000Z",
-      "lastSwapVBefore": 11.666,
-      "lastSwapVAfter": 12.423,
+      "lastSwapAt": "2026-11-06",
+      "lastSwapTime": "2026-11-05T07:54:32.000Z",
+      "lastSwapVBefore": 11.895,
+      "lastSwapVAfter": 12.387,
       "capAfterSwap": false,
       "capStale": true,
       "capPlaceholder": true,
-      "capDaysAfterSwap": 10,
-      "mvSpansSwap": true,
+      "capDaysAfterSwap": 0,
+      "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 118,
       "mvPerAhNow": 10.7,
@@ -1043,46 +1044,32 @@
       "nightGenMaxWh": 174,
       "capKeptFull": false,
       "degrade": {
-        "score": 5.5,
-        "grade": "plan",
-        "gradeLabel": "交換を検討",
+        "score": 9.3,
+        "grade": "good",
+        "gradeLabel": "良好",
         "confidence": "低",
         "fresh": true,
-        "estimated": false,
+        "estimated": true,
         "fail13": false,
         "cappedBy": null,
         "parts": [
           {
-            "key": "charge",
-            "label": "満充電への到達",
-            "score": 10,
-            "value": 1,
-            "text": "晴れた3日中3日で13V到達(直近3日で0日届かず・日中最高の中央値 13.20V)"
-          },
-          {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 0.9,
-            "value": 15.2,
-            "text": "直近の夜(11/04)の降下 26.8mV/hのままなら、11.91V → 下限11.5Vまで約15時間"
+            "score": 9.3,
+            "value": 45.4,
+            "estimated": true,
+            "text": "交換後の夜の実測がまだ無いため見込み: 消費 1.68A × 標準の降下 12mV/Ah で、12.39V → 下限11.5Vまで約45時間"
           }
         ],
-        "reach": {
-          "recentDays": 3,
-          "recentMissed": 0,
-          "days": 3,
-          "hit": 3,
-          "rate": 1,
-          "lastDay": "2026-11-01",
-          "lastV": 13.4,
-          "medianV": 13.2
-        },
+        "reach": null,
         "floor": {
-          "day": "2026-11-04",
-          "v0": 11.907,
+          "day": null,
+          "v0": 12.387,
           "floorV": 11.5,
-          "vPerH": 0.0268,
-          "hours": 15.2
+          "vPerH": 0.0195,
+          "hours": 45.4,
+          "estimated": true
         }
       }
     },
