@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-09T00:20:08.170Z",
+  "generatedAt": "2026-11-09T01:20:21.866Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -8,7 +8,7 @@
   "tempRefC": 25,
   "tempCoefPerC": 0.006,
   "longTermFrom": "2026-06-13",
-  "longTermTo": "2026-11-07",
+  "longTermTo": "2026-11-08",
   "sites": {
     "cam11": {
       "days": 150,
@@ -35,10 +35,10 @@
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 30,
+      "pvPeakNowW": 29.8,
       "pvPeakInitialW": 26.6,
       "loadWhPerDay": 82.1,
-      "genWhPerDay": 128.6,
+      "genWhPerDay": 126.9,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.97,
@@ -134,7 +134,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた18日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.65V)"
+            "text": "晴れた19日中19日で13V到達(直近3日で0日届かず・日中最高の中央値 13.64V)"
           },
           {
             "key": "floor",
@@ -147,12 +147,12 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 18,
+          "days": 19,
+          "hit": 19,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.63,
-          "medianV": 13.65
+          "lastDay": "2026-11-08",
+          "lastV": 13.62,
+          "medianV": 13.64
         },
         "floor": {
           "day": "2026-11-09",
@@ -188,10 +188,10 @@
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 30.5,
+      "pvPeakNowW": 30.6,
       "pvPeakInitialW": 28.7,
       "loadWhPerDay": 93.3,
-      "genWhPerDay": 116.5,
+      "genWhPerDay": 116.4,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.88,
@@ -289,7 +289,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた1日中1日で13V到達(直近1日で0日届かず・日中最高の中央値 13.59V)"
+            "text": "晴れた2日中2日で13V到達(直近2日で0日届かず・日中最高の中央値 13.60V)"
           },
           {
             "key": "floor",
@@ -300,14 +300,14 @@
           }
         ],
         "reach": {
-          "recentDays": 1,
+          "recentDays": 2,
           "recentMissed": 0,
-          "days": 1,
-          "hit": 1,
+          "days": 2,
+          "hit": 2,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.59,
-          "medianV": 13.59
+          "lastDay": "2026-11-08",
+          "lastV": 13.61,
+          "medianV": 13.6
         },
         "floor": {
           "day": "2026-11-09",
@@ -337,7 +337,7 @@
         "from": "2026-10-05",
         "to": "2026-11-09",
         "days": 35,
-        "tempC": 19.9,
+        "tempC": 19.7,
         "whole": true,
         "placeholder": false
       },
@@ -346,7 +346,7 @@
       "pvPeakNowW": 9.6,
       "pvPeakInitialW": 9.4,
       "loadWhPerDay": 15.9,
-      "genWhPerDay": 27.8,
+      "genWhPerDay": 28.1,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.43,
@@ -444,7 +444,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた18日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.86V)"
+            "text": "晴れた19日中19日で13V到達(直近3日で0日届かず・日中最高の中央値 13.86V)"
           },
           {
             "key": "floor",
@@ -457,11 +457,11 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 18,
+          "days": 19,
+          "hit": 19,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.88,
+          "lastDay": "2026-11-08",
+          "lastV": 13.86,
           "medianV": 13.86
         },
         "floor": {
@@ -492,7 +492,7 @@
         "from": "2026-10-27",
         "to": "2026-11-09",
         "days": 13,
-        "tempC": 17.3,
+        "tempC": 17.1,
         "whole": false,
         "placeholder": false
       },
@@ -500,8 +500,8 @@
       "spanDays": 150,
       "pvPeakNowW": 29.7,
       "pvPeakInitialW": 29,
-      "loadWhPerDay": 78.2,
-      "genWhPerDay": 148.9,
+      "loadWhPerDay": 78.1,
+      "genWhPerDay": 149.2,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.55,
@@ -582,8 +582,8 @@
       "ratedAh": 50,
       "sohPct": 105,
       "mvPerAhNow": 15.3,
-      "mvPerAhPrev": 19.7,
-      "nightNights": 29,
+      "mvPerAhPrev": 19.5,
+      "nightNights": 28,
       "nightGenMaxWh": 160,
       "capKeptFull": false,
       "degrade": {
@@ -601,7 +601,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた4日中4日で13V到達(直近3日で0日届かず・日中最高の中央値 13.49V)"
+            "text": "晴れた5日中5日で13V到達(直近3日で0日届かず・日中最高の中央値 13.49V)"
           },
           {
             "key": "floor",
@@ -614,11 +614,11 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 4,
-          "hit": 4,
+          "days": 5,
+          "hit": 5,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.48,
+          "lastDay": "2026-11-08",
+          "lastV": 13.49,
           "medianV": 13.49
         },
         "floor": {
@@ -649,7 +649,7 @@
         "from": "2026-10-27",
         "to": "2026-11-09",
         "days": 13,
-        "tempC": 17.3,
+        "tempC": 17.1,
         "whole": false,
         "placeholder": false
       },
@@ -657,8 +657,8 @@
       "spanDays": 150,
       "pvPeakNowW": 29.7,
       "pvPeakInitialW": 28.6,
-      "loadWhPerDay": 100,
-      "genWhPerDay": 161.1,
+      "loadWhPerDay": 99.9,
+      "genWhPerDay": 161.4,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.92,
@@ -739,26 +739,26 @@
       "ratedAh": 50,
       "sohPct": 85,
       "mvPerAhNow": 12.6,
-      "mvPerAhPrev": 16.6,
-      "nightNights": 26,
-      "nightGenMaxWh": 163,
+      "mvPerAhPrev": 15.2,
+      "nightNights": 25,
+      "nightGenMaxWh": 164,
       "capKeptFull": false,
       "degrade": {
-        "score": 7.4,
-        "grade": "watch",
-        "gradeLabel": "経過観察",
+        "score": 3.9,
+        "grade": "replace",
+        "gradeLabel": "論外",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
-        "fail13": false,
-        "cappedBy": null,
+        "fail13": true,
+        "cappedBy": "charge",
         "parts": [
           {
             "key": "charge",
             "label": "満充電への到達",
-            "score": 4.8,
-            "value": 0.75,
-            "text": "晴れた4日中3日で13V到達(直近3日で1日届かず・日中最高の中央値 13.24V)"
+            "score": 0,
+            "value": 0.6,
+            "text": "晴れた5日中3日で13V到達(直近3日で2日届かず・日中最高の中央値 13.14V)"
           },
           {
             "key": "floor",
@@ -770,13 +770,13 @@
         ],
         "reach": {
           "recentDays": 3,
-          "recentMissed": 1,
-          "days": 4,
+          "recentMissed": 2,
+          "days": 5,
           "hit": 3,
-          "rate": 0.75,
-          "lastDay": "2026-11-07",
-          "lastV": 12.7,
-          "medianV": 13.24
+          "rate": 0.6,
+          "lastDay": "2026-11-08",
+          "lastV": 12.88,
+          "medianV": 13.14
         },
         "floor": {
           "day": "2026-11-09",
@@ -812,10 +812,10 @@
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 13.1,
+      "pvPeakNowW": 13,
       "pvPeakInitialW": 8.6,
       "loadWhPerDay": 32.5,
-      "genWhPerDay": 60.5,
+      "genWhPerDay": 60.9,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.05,
@@ -913,7 +913,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた18日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.40V)"
+            "text": "晴れた19日中19日で13V到達(直近3日で0日届かず・日中最高の中央値 13.40V)"
           },
           {
             "key": "floor",
@@ -926,11 +926,11 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 18,
+          "days": 19,
+          "hit": 19,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.39,
+          "lastDay": "2026-11-08",
+          "lastV": 13.4,
           "medianV": 13.4
         },
         "floor": {
@@ -969,8 +969,8 @@
       "spanDays": 150,
       "pvPeakNowW": 29.3,
       "pvPeakInitialW": 28.8,
-      "loadWhPerDay": 113.2,
-      "genWhPerDay": 162.2,
+      "loadWhPerDay": 113.3,
+      "genWhPerDay": 166,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.67,
@@ -1053,8 +1053,8 @@
       "ratedAh": 50,
       "sohPct": 118,
       "mvPerAhNow": 10.7,
-      "mvPerAhPrev": 11.1,
-      "nightNights": 22,
+      "mvPerAhPrev": 9.9,
+      "nightNights": 21,
       "nightGenMaxWh": 172,
       "capKeptFull": false,
       "degrade": {
@@ -1072,7 +1072,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた1日中1日で13V到達(直近1日で0日届かず・日中最高の中央値 13.57V)"
+            "text": "晴れた2日中2日で13V到達(直近2日で0日届かず・日中最高の中央値 13.57V)"
           },
           {
             "key": "floor",
@@ -1083,12 +1083,12 @@
           }
         ],
         "reach": {
-          "recentDays": 1,
+          "recentDays": 2,
           "recentMissed": 0,
-          "days": 1,
-          "hit": 1,
+          "days": 2,
+          "hit": 2,
           "rate": 1,
-          "lastDay": "2026-11-07",
+          "lastDay": "2026-11-08",
           "lastV": 13.57,
           "medianV": 13.57
         },
@@ -1126,10 +1126,10 @@
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 29.9,
+      "pvPeakNowW": 29.7,
       "pvPeakInitialW": 27.3,
       "loadWhPerDay": 107.2,
-      "genWhPerDay": 146.6,
+      "genWhPerDay": 146.9,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.67,
@@ -1208,8 +1208,8 @@
       "ratedAh": 50,
       "sohPct": 101,
       "mvPerAhNow": 10.9,
-      "mvPerAhPrev": 11.6,
-      "nightNights": 21,
+      "mvPerAhPrev": 8.8,
+      "nightNights": 20,
       "nightGenMaxWh": 148,
       "capKeptFull": false,
       "degrade": {
@@ -1227,7 +1227,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた1日中1日で13V到達(直近1日で0日届かず・日中最高の中央値 13.54V)"
+            "text": "晴れた2日中2日で13V到達(直近2日で0日届かず・日中最高の中央値 13.55V)"
           },
           {
             "key": "floor",
@@ -1238,14 +1238,14 @@
           }
         ],
         "reach": {
-          "recentDays": 1,
+          "recentDays": 2,
           "recentMissed": 0,
-          "days": 1,
-          "hit": 1,
+          "days": 2,
+          "hit": 2,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.54,
-          "medianV": 13.54
+          "lastDay": "2026-11-08",
+          "lastV": 13.55,
+          "medianV": 13.55
         },
         "floor": {
           "day": "2026-11-09",
@@ -1281,10 +1281,10 @@
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 28.7,
+      "pvPeakNowW": 27.9,
       "pvPeakInitialW": 25.6,
-      "loadWhPerDay": 97.7,
-      "genWhPerDay": 144.6,
+      "loadWhPerDay": 97.8,
+      "genWhPerDay": 144,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.19,
@@ -1380,7 +1380,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた18日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.63V)"
+            "text": "晴れた19日中19日で13V到達(直近3日で0日届かず・日中最高の中央値 13.63V)"
           },
           {
             "key": "floor",
@@ -1393,11 +1393,11 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 18,
+          "days": 19,
+          "hit": 19,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.63,
+          "lastDay": "2026-11-08",
+          "lastV": 13.68,
           "medianV": 13.63
         },
         "floor": {
@@ -1434,10 +1434,10 @@
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 13.5,
+      "pvPeakNowW": 13.3,
       "pvPeakInitialW": 14.2,
       "loadWhPerDay": 30.7,
-      "genWhPerDay": 64.8,
+      "genWhPerDay": 64.4,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.89,
@@ -1516,7 +1516,7 @@
       "mvPerAhNow": 38.3,
       "mvPerAhPrev": null,
       "nightNights": 10,
-      "nightGenMaxWh": 63,
+      "nightGenMaxWh": 62,
       "capKeptFull": false,
       "degrade": {
         "score": 10,
@@ -1533,7 +1533,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた18日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.62V)"
+            "text": "晴れた19日中19日で13V到達(直近3日で0日届かず・日中最高の中央値 13.62V)"
           },
           {
             "key": "floor",
@@ -1546,10 +1546,10 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 18,
+          "days": 19,
+          "hit": 19,
           "rate": 1,
-          "lastDay": "2026-11-07",
+          "lastDay": "2026-11-08",
           "lastV": 13.61,
           "medianV": 13.62
         },
@@ -1581,7 +1581,7 @@
         "from": "2026-09-30",
         "to": "2026-11-09",
         "days": 17,
-        "tempC": 18,
+        "tempC": 17.8,
         "whole": false,
         "placeholder": false
       },
@@ -1590,7 +1590,7 @@
       "pvPeakNowW": 31.1,
       "pvPeakInitialW": 21.8,
       "loadWhPerDay": 93.9,
-      "genWhPerDay": 161.3,
+      "genWhPerDay": 161.9,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.21,
@@ -1669,27 +1669,27 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 91,
-      "mvPerAhNow": 13.9,
+      "mvPerAhNow": 13.4,
       "mvPerAhPrev": null,
-      "nightNights": 13,
+      "nightNights": 12,
       "nightGenMaxWh": 138,
       "capKeptFull": false,
       "degrade": {
-        "score": 3.9,
-        "grade": "replace",
-        "gradeLabel": "論外",
+        "score": 9,
+        "grade": "good",
+        "gradeLabel": "良好",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
-        "fail13": true,
-        "cappedBy": "charge",
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
             "key": "charge",
             "label": "満充電への到達",
-            "score": 7.9,
-            "value": 0.833,
-            "text": "晴れた18日中15日で13V到達(直近3日で2日届かず・日中最高の中央値 13.46V)"
+            "score": 8,
+            "value": 0.842,
+            "text": "晴れた19日中16日で13V到達(直近3日で1日届かず・日中最高の中央値 13.46V)"
           },
           {
             "key": "floor",
@@ -1701,12 +1701,12 @@
         ],
         "reach": {
           "recentDays": 3,
-          "recentMissed": 2,
-          "days": 18,
-          "hit": 15,
-          "rate": 0.833,
-          "lastDay": "2026-11-07",
-          "lastV": 12.93,
+          "recentMissed": 1,
+          "days": 19,
+          "hit": 16,
+          "rate": 0.842,
+          "lastDay": "2026-11-08",
+          "lastV": 13.21,
           "medianV": 13.46
         },
         "floor": {
@@ -1746,7 +1746,7 @@
       "pvPeakNowW": 29.2,
       "pvPeakInitialW": 29.3,
       "loadWhPerDay": 110.4,
-      "genWhPerDay": 143.6,
+      "genWhPerDay": 146.5,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.26,
@@ -1828,9 +1828,9 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 75,
-      "mvPerAhNow": 9.1,
+      "mvPerAhNow": 9,
       "mvPerAhPrev": null,
-      "nightNights": 12,
+      "nightNights": 11,
       "nightGenMaxWh": 139,
       "capKeptFull": false,
       "degrade": {
@@ -1848,7 +1848,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた1日中1日で13V到達(直近1日で0日届かず・日中最高の中央値 13.46V)"
+            "text": "晴れた2日中2日で13V到達(直近2日で0日届かず・日中最高の中央値 13.50V)"
           },
           {
             "key": "floor",
@@ -1859,14 +1859,14 @@
           }
         ],
         "reach": {
-          "recentDays": 1,
+          "recentDays": 2,
           "recentMissed": 0,
-          "days": 1,
-          "hit": 1,
+          "days": 2,
+          "hit": 2,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.46,
-          "medianV": 13.46
+          "lastDay": "2026-11-08",
+          "lastV": 13.54,
+          "medianV": 13.5
         },
         "floor": {
           "day": "2026-11-09",
@@ -1902,10 +1902,10 @@
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 29.9,
+      "pvPeakNowW": 30,
       "pvPeakInitialW": 28.4,
       "loadWhPerDay": 89.7,
-      "genWhPerDay": 142.4,
+      "genWhPerDay": 141.7,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.3,
@@ -2001,7 +2001,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた18日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.62V)"
+            "text": "晴れた19日中19日で13V到達(直近3日で0日届かず・日中最高の中央値 13.63V)"
           },
           {
             "key": "floor",
@@ -2014,12 +2014,12 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 18,
+          "days": 19,
+          "hit": 19,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.59,
-          "medianV": 13.62
+          "lastDay": "2026-11-08",
+          "lastV": 13.65,
+          "medianV": 13.63
         },
         "floor": {
           "day": "2026-11-09",
@@ -2043,22 +2043,22 @@
       "enduranceH": 18,
       "usableAh": 14.47,
       "capacityInitialAh": null,
-      "capacityNowAh": 42.9,
+      "capacityNowAh": 43,
       "degradePct": null,
       "capWindow": {
         "from": "2026-10-14",
         "to": "2026-11-09",
         "days": 18,
-        "tempC": 18.7,
+        "tempC": 18.5,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 29.2,
+      "pvPeakNowW": 29.3,
       "pvPeakInitialW": 27,
-      "loadWhPerDay": 83.9,
-      "genWhPerDay": 121.3,
+      "loadWhPerDay": 84,
+      "genWhPerDay": 123.2,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.77,
@@ -2137,26 +2137,26 @@
       "ratedAh": 50,
       "sohPct": 86,
       "mvPerAhNow": 14.4,
-      "mvPerAhPrev": 16.3,
-      "nightNights": 17,
+      "mvPerAhPrev": 14.9,
+      "nightNights": 16,
       "nightGenMaxWh": 125,
       "capKeptFull": false,
       "degrade": {
-        "score": 3.9,
-        "grade": "replace",
-        "gradeLabel": "論外",
+        "score": 7.7,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
-        "fail13": true,
-        "cappedBy": "charge",
+        "fail13": false,
+        "cappedBy": null,
         "parts": [
           {
             "key": "charge",
             "label": "満充電への到達",
-            "score": 7.9,
-            "value": 0.833,
-            "text": "晴れた18日中15日で13V到達(直近3日で2日届かず・日中最高の中央値 13.55V)"
+            "score": 8,
+            "value": 0.842,
+            "text": "晴れた19日中16日で13V到達(直近3日で1日届かず・日中最高の中央値 13.55V)"
           },
           {
             "key": "floor",
@@ -2168,12 +2168,12 @@
         ],
         "reach": {
           "recentDays": 3,
-          "recentMissed": 2,
-          "days": 18,
-          "hit": 15,
-          "rate": 0.833,
-          "lastDay": "2026-11-07",
-          "lastV": 13.13,
+          "recentMissed": 1,
+          "days": 19,
+          "hit": 16,
+          "rate": 0.842,
+          "lastDay": "2026-11-08",
+          "lastV": 13.31,
           "medianV": 13.55
         },
         "floor": {
@@ -2301,22 +2301,22 @@
       "enduranceH": 14.2,
       "usableAh": 18.9,
       "capacityInitialAh": null,
-      "capacityNowAh": 51.3,
+      "capacityNowAh": 51.4,
       "degradePct": null,
       "capWindow": {
         "from": "2026-10-04",
         "to": "2026-11-09",
         "days": 35,
-        "tempC": 19.8,
+        "tempC": 19.6,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 30.7,
+      "pvPeakNowW": 30.9,
       "pvPeakInitialW": 24.6,
-      "loadWhPerDay": 99.4,
-      "genWhPerDay": 118.6,
+      "loadWhPerDay": 99.6,
+      "genWhPerDay": 119,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.06,
@@ -2393,9 +2393,9 @@
       "ratedAh": 50,
       "sohPct": 103,
       "mvPerAhNow": 12.9,
-      "mvPerAhPrev": 11.4,
-      "nightNights": 23,
-      "nightGenMaxWh": 115,
+      "mvPerAhPrev": 10.9,
+      "nightNights": 22,
+      "nightGenMaxWh": 116,
       "capKeptFull": false,
       "degrade": {
         "score": 5.9,
@@ -2412,7 +2412,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた18日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.59V)"
+            "text": "晴れた19日中19日で13V到達(直近3日で0日届かず・日中最高の中央値 13.59V)"
           },
           {
             "key": "floor",
@@ -2425,11 +2425,11 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 18,
+          "days": 19,
+          "hit": 19,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.59,
+          "lastDay": "2026-11-08",
+          "lastV": 13.67,
           "medianV": 13.59
         },
         "floor": {
@@ -2468,8 +2468,8 @@
       "spanDays": 150,
       "pvPeakNowW": 32.6,
       "pvPeakInitialW": 24.5,
-      "loadWhPerDay": 124.9,
-      "genWhPerDay": 174.7,
+      "loadWhPerDay": 125.1,
+      "genWhPerDay": 174.8,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.85,
@@ -2557,9 +2557,9 @@
       "nightGenMaxWh": 145,
       "capKeptFull": false,
       "degrade": {
-        "score": 5.9,
-        "grade": "plan",
-        "gradeLabel": "交換を検討",
+        "score": 7.4,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
         "confidence": "低",
         "fresh": true,
         "estimated": false,
@@ -2569,9 +2569,9 @@
           {
             "key": "charge",
             "label": "満充電への到達",
-            "score": 1.8,
-            "value": 0.5,
-            "text": "晴れた2日中1日で13V到達(直近2日で1日届かず・日中最高の中央値 13.36V)"
+            "score": 4.8,
+            "value": 0.667,
+            "text": "晴れた3日中2日で13V到達(直近3日で1日届かず・日中最高の中央値 13.76V)"
           },
           {
             "key": "floor",
@@ -2582,14 +2582,14 @@
           }
         ],
         "reach": {
-          "recentDays": 2,
+          "recentDays": 3,
           "recentMissed": 1,
-          "days": 2,
-          "hit": 1,
-          "rate": 0.5,
-          "lastDay": "2026-11-07",
-          "lastV": 13.76,
-          "medianV": 13.36
+          "days": 3,
+          "hit": 2,
+          "rate": 0.667,
+          "lastDay": "2026-11-08",
+          "lastV": 13.81,
+          "medianV": 13.76
         },
         "floor": {
           "day": "2026-11-09",
@@ -2627,8 +2627,8 @@
       "spanDays": 150,
       "pvPeakNowW": 29.6,
       "pvPeakInitialW": 28.7,
-      "loadWhPerDay": 101.9,
-      "genWhPerDay": 147.5,
+      "loadWhPerDay": 102,
+      "genWhPerDay": 145.9,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.14,
@@ -2724,7 +2724,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた18日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.59V)"
+            "text": "晴れた19日中19日で13V到達(直近3日で0日届かず・日中最高の中央値 13.59V)"
           },
           {
             "key": "floor",
@@ -2737,11 +2737,11 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 18,
+          "days": 19,
+          "hit": 19,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.57,
+          "lastDay": "2026-11-08",
+          "lastV": 13.72,
           "medianV": 13.59
         },
         "floor": {
@@ -2766,13 +2766,13 @@
       "enduranceH": 14,
       "usableAh": 17.29,
       "capacityInitialAh": null,
-      "capacityNowAh": 45.5,
+      "capacityNowAh": 45.6,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-06",
         "to": "2026-11-09",
         "days": 35,
-        "tempC": 20.6,
+        "tempC": 20.5,
         "whole": false,
         "placeholder": false
       },
@@ -2781,7 +2781,7 @@
       "pvPeakNowW": 30.1,
       "pvPeakInitialW": 24.5,
       "loadWhPerDay": 99.7,
-      "genWhPerDay": 139.1,
+      "genWhPerDay": 138.4,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.07,
@@ -2877,7 +2877,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた18日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.56V)"
+            "text": "晴れた19日中19日で13V到達(直近3日で0日届かず・日中最高の中央値 13.55V)"
           },
           {
             "key": "floor",
@@ -2890,12 +2890,12 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 18,
+          "days": 19,
+          "hit": 19,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.52,
-          "medianV": 13.56
+          "lastDay": "2026-11-08",
+          "lastV": 13.55,
+          "medianV": 13.55
         },
         "floor": {
           "day": "2026-11-09",
@@ -2919,13 +2919,13 @@
       "enduranceH": 11.6,
       "usableAh": 20.38,
       "capacityInitialAh": null,
-      "capacityNowAh": 54.8,
+      "capacityNowAh": 54.9,
       "degradePct": null,
       "capWindow": {
         "from": "2026-10-27",
         "to": "2026-11-09",
         "days": 13,
-        "tempC": 17.3,
+        "tempC": 17.1,
         "whole": false,
         "placeholder": false
       },
@@ -2933,8 +2933,8 @@
       "spanDays": 150,
       "pvPeakNowW": 32,
       "pvPeakInitialW": 30.7,
-      "loadWhPerDay": 141.4,
-      "genWhPerDay": 190.8,
+      "loadWhPerDay": 141.5,
+      "genWhPerDay": 191,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.52,
@@ -3015,8 +3015,8 @@
       "ratedAh": 50,
       "sohPct": 110,
       "mvPerAhNow": 9.2,
-      "mvPerAhPrev": 9.4,
-      "nightNights": 17,
+      "mvPerAhPrev": 7.3,
+      "nightNights": 16,
       "nightGenMaxWh": 191,
       "capKeptFull": false,
       "degrade": {
@@ -3034,7 +3034,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた4日中4日で13V到達(直近3日で0日届かず・日中最高の中央値 13.49V)"
+            "text": "晴れた5日中5日で13V到達(直近3日で0日届かず・日中最高の中央値 13.57V)"
           },
           {
             "key": "floor",
@@ -3047,12 +3047,12 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 4,
-          "hit": 4,
+          "days": 5,
+          "hit": 5,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13.4,
-          "medianV": 13.49
+          "lastDay": "2026-11-08",
+          "lastV": 13.58,
+          "medianV": 13.57
         },
         "floor": {
           "day": "2026-11-09",
@@ -3391,16 +3391,16 @@
         "from": "2026-10-05",
         "to": "2026-11-09",
         "days": 35,
-        "tempC": 19.9,
+        "tempC": 19.7,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 30.7,
+      "pvPeakNowW": 30.8,
       "pvPeakInitialW": 30.3,
-      "loadWhPerDay": 104,
-      "genWhPerDay": 138.3,
+      "loadWhPerDay": 104.1,
+      "genWhPerDay": 139.1,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.11,
@@ -3481,7 +3481,7 @@
       "sohPct": 86,
       "mvPerAhNow": 12.9,
       "mvPerAhPrev": 12.2,
-      "nightNights": 25,
+      "nightNights": 24,
       "nightGenMaxWh": 138,
       "capKeptFull": false,
       "degrade": {
@@ -3497,9 +3497,9 @@
           {
             "key": "charge",
             "label": "満充電への到達",
-            "score": 8.9,
-            "value": 0.889,
-            "text": "晴れた18日中16日で13V到達(直近3日で1日届かず・日中最高の中央値 13.58V)"
+            "score": 9,
+            "value": 0.895,
+            "text": "晴れた19日中17日で13V到達(直近3日で0日届かず・日中最高の中央値 13.58V)"
           },
           {
             "key": "floor",
@@ -3511,12 +3511,12 @@
         ],
         "reach": {
           "recentDays": 3,
-          "recentMissed": 1,
-          "days": 18,
-          "hit": 16,
-          "rate": 0.889,
-          "lastDay": "2026-11-07",
-          "lastV": 13.21,
+          "recentMissed": 0,
+          "days": 19,
+          "hit": 17,
+          "rate": 0.895,
+          "lastDay": "2026-11-08",
+          "lastV": 13.57,
           "medianV": 13.58
         },
         "floor": {
@@ -3547,16 +3547,16 @@
         "from": "2026-09-29",
         "to": "2026-11-09",
         "days": 17,
-        "tempC": 18.3,
+        "tempC": 18.1,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 19.8,
+      "pvPeakNowW": 19.9,
       "pvPeakInitialW": 20.2,
-      "loadWhPerDay": 69.9,
-      "genWhPerDay": 101.9,
+      "loadWhPerDay": 70.8,
+      "genWhPerDay": 103.4,
       "vminFrom": "2026-09-11",
       "vminDays": [
         11.92,
@@ -3634,13 +3634,13 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 74,
-      "mvPerAhNow": 14,
+      "mvPerAhNow": 13.5,
       "mvPerAhPrev": null,
-      "nightNights": 11,
+      "nightNights": 10,
       "nightGenMaxWh": 103,
       "capKeptFull": false,
       "degrade": {
-        "score": 8.6,
+        "score": 8.7,
         "grade": "good",
         "gradeLabel": "良好",
         "confidence": "高",
@@ -3652,9 +3652,9 @@
           {
             "key": "charge",
             "label": "満充電への到達",
-            "score": 9.9,
-            "value": 0.944,
-            "text": "晴れた18日中17日で13V到達(直近3日で0日届かず・日中最高の中央値 13.95V)"
+            "score": 10,
+            "value": 0.947,
+            "text": "晴れた19日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.95V)"
           },
           {
             "key": "floor",
@@ -3667,11 +3667,11 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 17,
-          "rate": 0.944,
-          "lastDay": "2026-11-07",
-          "lastV": 13.16,
+          "days": 19,
+          "hit": 18,
+          "rate": 0.947,
+          "lastDay": "2026-11-08",
+          "lastV": 13.54,
           "medianV": 13.95
         },
         "floor": {
@@ -3696,22 +3696,22 @@
       "enduranceH": 19.3,
       "usableAh": 18.73,
       "capacityInitialAh": null,
-      "capacityNowAh": 47.2,
+      "capacityNowAh": 47.3,
       "degradePct": null,
       "capWindow": {
         "from": "2026-09-23",
         "to": "2026-11-09",
         "days": 22,
-        "tempC": 19.6,
+        "tempC": 19.4,
         "whole": false,
         "placeholder": false
       },
       "initialWindow": null,
       "spanDays": 150,
-      "pvPeakNowW": 30.3,
+      "pvPeakNowW": 30.4,
       "pvPeakInitialW": 30.1,
-      "loadWhPerDay": 104.7,
-      "genWhPerDay": 148.6,
+      "loadWhPerDay": 104.6,
+      "genWhPerDay": 147.9,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.15,
@@ -3789,7 +3789,7 @@
       "capDaysAfterSwap": 49,
       "mvSpansSwap": false,
       "ratedAh": 50,
-      "sohPct": 94,
+      "sohPct": 95,
       "mvPerAhNow": 11.1,
       "mvPerAhPrev": null,
       "nightNights": 12,
@@ -3808,9 +3808,9 @@
           {
             "key": "charge",
             "label": "満充電への到達",
-            "score": 9.9,
-            "value": 0.944,
-            "text": "晴れた18日中17日で13V到達(直近3日で0日届かず・日中最高の中央値 13.58V)"
+            "score": 10,
+            "value": 0.947,
+            "text": "晴れた19日中18日で13V到達(直近3日で0日届かず・日中最高の中央値 13.57V)"
           },
           {
             "key": "floor",
@@ -3823,12 +3823,12 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 18,
-          "hit": 17,
-          "rate": 0.944,
-          "lastDay": "2026-11-07",
-          "lastV": 13.43,
-          "medianV": 13.58
+          "days": 19,
+          "hit": 18,
+          "rate": 0.947,
+          "lastDay": "2026-11-08",
+          "lastV": 13.57,
+          "medianV": 13.57
         },
         "floor": {
           "day": "2026-11-09",
@@ -3858,7 +3858,7 @@
         "from": "2026-10-27",
         "to": "2026-11-09",
         "days": 13,
-        "tempC": 17.3,
+        "tempC": 17.1,
         "whole": false,
         "placeholder": false
       },
@@ -3867,7 +3867,7 @@
       "pvPeakNowW": 30.6,
       "pvPeakInitialW": 30.2,
       "loadWhPerDay": 107.6,
-      "genWhPerDay": 131.6,
+      "genWhPerDay": 132.4,
       "vminFrom": "2026-09-11",
       "vminDays": [
         12.27,
@@ -3948,8 +3948,8 @@
       "ratedAh": 50,
       "sohPct": 86,
       "mvPerAhNow": 11.7,
-      "mvPerAhPrev": 14.9,
-      "nightNights": 26,
+      "mvPerAhPrev": 15.1,
+      "nightNights": 25,
       "nightGenMaxWh": 142,
       "capKeptFull": false,
       "degrade": {
@@ -3967,7 +3967,7 @@
             "label": "満充電への到達",
             "score": 10,
             "value": 1,
-            "text": "晴れた4日中4日で13V到達(直近3日で0日届かず・日中最高の中央値 13.35V)"
+            "text": "晴れた5日中5日で13V到達(直近3日で0日届かず・日中最高の中央値 13.24V)"
           },
           {
             "key": "floor",
@@ -3980,12 +3980,12 @@
         "reach": {
           "recentDays": 3,
           "recentMissed": 0,
-          "days": 4,
-          "hit": 4,
+          "days": 5,
+          "hit": 5,
           "rate": 1,
-          "lastDay": "2026-11-07",
-          "lastV": 13,
-          "medianV": 13.35
+          "lastDay": "2026-11-08",
+          "lastV": 13.24,
+          "medianV": 13.24
         },
         "floor": {
           "day": "2026-11-09",
