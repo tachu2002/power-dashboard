@@ -1047,6 +1047,12 @@ export async function run() {
       s.points = asOther(keep).concat([pt(40, 10.55, 15.3), pt(35, 10.546, 15.3), pt(30, 11.319, 2.0),
         pt(20, 11.36, 2.0), pt(10, 11.37, 2.0)]);
       out.afterCut = !!d.currentEmpty("cam14");
+      // 下限に達したときの負荷が記録に無くても、いま負荷が普通に動いていれば機器は動いている(停止中にしない)
+      s.points = asOther(keep).concat([pt(600, 10.55, null), pt(400, 10.9, null), pt(30, 11.2, 13), pt(20, 11.2, 13), pt(10, 11.2, 13)]);
+      out.runningNoRef = d.currentEmpty("cam14");
+      // 負荷が切れたままなら、従来どおり電池切れ
+      s.points = asOther(keep).concat([pt(600, 10.55, null), pt(400, 10.9, null), pt(30, 11.2, 1.5), pt(20, 11.2, 1.5), pt(10, 11.2, 1.5)]);
+      out.cutNoRef = !!d.currentEmpty("cam14");
     } finally { s.points = keep; }
     return out;
   });
@@ -1056,6 +1062,33 @@ export async function run() {
   r.check("f11-b 11.36Vは基準にしない(下限10.5Vの多呂樋管は11.25Vでも0%ではなく、電池ゲージと同じ値)",
     floorCheck.taro1125 > 30 && Math.abs(floorCheck.taro1125 - floorCheck.gauge1125) <= 1, floorCheck);
   r.check("f11-c 下限より上なら、11.36Vを下回っていても電池切れにしない", floorCheck.above === null, floorCheck.above);
+  r.check("f11-c2 いま負荷が動いていれば、下限に達した記録があっても「停止中(電池切れ)」にしない。負荷が切れたままなら電池切れ",
+    floorCheck.runningNoRef === null && floorCheck.cutNoRef === true, [floorCheck.runningNoRef, floorCheck.cutNoRef]);
+  // 0時の基準電圧に欠測(0V)が混ざって8Vなど異常値になっていても、残量は実測の0時前後の電圧から出す(多呂樋管で残量0%・あと0.2hと出た不具合)
+  const v0Glitch = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const MIN = 60000, now = Date.now(), HOUR = 3600000;
+    const j = new Date(now + 9 * HOUR);
+    const mid = Date.UTC(j.getUTCFullYear(), j.getUTCMonth(), j.getUTCDate()) - 9 * HOUR;
+    const key = j.getUTCFullYear() + "-" + String(j.getUTCMonth() + 1).padStart(2, "0") + "-" + String(j.getUTCDate()).padStart(2, "0");
+    const st = d.getPowerDailyState();
+    const had = st.days[key];
+    const s = d.siteStates.cam14, keep = s.points.slice();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const site = d.SITE_CATALOG.cam14;
+    try {
+      st.days[key] = Object.assign({}, had || {}, { cam14: { v0: 8.194, balWh: -30, nightA: 1.3 } });
+      s.points = keep.filter((p) => p.fetchedAt.getTime() < mid - HOUR).concat([
+        { fetchedAt: new Date(mid + 5 * MIN), pv: 0, bat: 12.30, loadW: 16, via: VIA },
+        { fetchedAt: new Date(mid + 15 * MIN), pv: 0, bat: -0.001, loadW: 0, via: VIA },
+        { fetchedAt: new Date(mid + 25 * MIN), pv: 0, bat: 12.29, loadW: 16, via: VIA }]);
+      const cur = d.currentSocFor(site, { socPct: 50 }, 37 * 12.5, 17);
+      return { mv: d.midnightMeasuredV("cam14"), soc: cur && Math.round(cur.soc), src: cur && cur.source,
+        v: cur && Math.round(d.voltageFromSoc(cur.soc) * 100) / 100 };
+    } finally { s.points = keep; if (had) st.days[key] = had; else delete st.days[key]; }
+  });
+  r.check("f11-c3 0時の基準電圧が異常値(8.19V)でも、実測の0時前後の電圧(12.3V)から残量を出す(残量0%にしない)",
+    v0Glitch.mv > 12.2 && v0Glitch.mv < 12.4 && v0Glitch.src === "balance" && v0Glitch.v > 12.0, v0Glitch);
   // 計測の丸めを見込んで、下限+0.05V以下に入った最初の時点を電池切れの始まりとする
   r.check("f11-d 実測の電圧が下限に達したら電池切れにする(下限+0.05V以下に入った時点から)",
     floorCheck.hit && floorCheck.hit.floor === 10.5 && floorCheck.hit.v <= 10.55 && floorCheck.hit.v > 10.5, floorCheck.hit);
@@ -1314,6 +1347,47 @@ export async function run() {
   });
   r.check("f14-c 週間天気が電圧の予測に効く(数日先が晴れか曇りかで予測の電圧が変わる)",
     weekly.sunny.v > weekly.cloudy.v + 0.1 && weekly.sunny.last >= 167, weekly);
+  const glitch = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const MIN = 60000, now = Date.now();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const s = d.siteStates.cam14, keep = s.points.slice();
+    try {
+      const pts = [];
+      for (let i = 60; i >= 0; i--) pts.push({ fetchedAt: new Date(now - i * 10 * MIN), pv: 0, bat: 12.2 - i * 0.001, loadW: 15, via: VIA });
+      pts.splice(30, 0, { fetchedAt: new Date(now - 295 * MIN), pv: 0, bat: -0.001, loadW: 0, via: VIA },
+        { fetchedAt: new Date(now - 285 * MIN), pv: 0, bat: 8.2, loadW: 0, via: VIA });
+      s.points = pts;
+      d.clearPredictionCache();
+      const ok = [d.isPlausibleBat("cam14", 12.3), d.isPlausibleBat("cam14", 10.46), d.isPlausibleBat("cam14", 9.6), d.isPlausibleBat("cam14", 0),
+        d.isPlausibleBat("cam14", -0.001), d.isPlausibleBat("cam03", 8.6), d.isPlausibleBat("cam03", 8.4)];
+      const pred = d.predictBatterySeries(d.SITE_CATALOG.cam14);
+      const prof = d.batteryDiurnalProfile(s.points, "cam14");
+      return { ok, predMin: Math.min.apply(null, pred.map((p) => p.value)), n: pred.length, fallback: prof.fallback };
+    } finally { s.points = keep; d.clearPredictionCache(); }
+  });
+  const glitchSvg = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const MIN = 60000, now = Date.now();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const s = d.siteStates.cam14, keep = s.points.slice();
+    try {
+      const pts = [];
+      for (let i = 60; i >= 0; i--) pts.push({ fetchedAt: new Date(now - i * 10 * MIN), pv: 0, bat: i === 20 || i === 21 ? -0.001 : 12.2 - i * 0.001, loadW: 15, via: VIA });
+      s.points = pts;
+      d.clearPredictionCache();
+      d.refreshPowerCard(d.SITE_CATALOG.cam14);
+      const svg = document.querySelector("#pchart-bat-cam14 svg");
+      const ticks = Array.from(svg.querySelectorAll("text")).map((t) => parseFloat(t.textContent)).filter((v) => isFinite(v) && /^\d+\.\d{2}$/.test(String(v.toFixed(2))));
+      const yl = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent).filter((t) => /^-?\d+\.\d{2}$/.test(t)).map(Number);
+      return { minTick: Math.min.apply(null, yl), n: yl.length };
+    } finally { s.points = keep; d.clearPredictionCache(); d.refreshPowerCard(d.SITE_CATALOG.cam14); }
+  });
+  r.check("f15-c 0Vの欠測が混ざっても、電圧グラフの縦軸は0Vまで伸びない", glitchSvg.n > 0 && glitchSvg.minTick > 9, glitchSvg);
+  r.check("f15-a 下限より1V以上低い値(0V・欠測)は電圧として扱わない(下限10.5Vの拠点は9.5V未満、北沢9.5Vは8.5V未満)",
+    glitch.ok.join() === "true,true,true,false,false,true,false", glitch.ok);
+  r.check("f15-b 0Vの欠測が混ざっていても、電圧の予測は引きずられない",
+    glitch.n === 0 || glitch.predMin > 9.4, glitch);
   await page4.close();
 
   r.check("f7-r ページ例外にはならない", page3.errMsgs().length === 0, page3.errMsgs());

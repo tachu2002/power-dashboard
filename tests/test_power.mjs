@@ -452,9 +452,8 @@ export async function run() {
     hidden: !document.getElementById("rankCard").classList.contains("show"),
     btn: document.getElementById("rankBtn").textContent
   }));
-  r.check("p9-a ランキングは既定では畳んである", rk0.hidden && rk0.btn === "交換ランキング", rk0);
+  r.check("p9-a ランキングは既定で表示してある", !rk0.hidden && rk0.btn === "ランキングを隠す", rk0);
   const rk = await pageRK.evaluate(() => {
-    document.getElementById("rankBtn").click();
     const rows = Array.from(document.querySelectorAll("#rankList .rk-row"));
     const txt = (el, sel) => { const n = el.querySelector(sel); return n ? n.textContent.trim() : null; };
     return {
@@ -473,18 +472,18 @@ export async function run() {
       widths: rows.map((x) => { const i = x.querySelector(".rk-gauge > i"); return i ? i.style.width : null; })
     };
   });
-  r.check("p9-b ボタンで開き、論外(晴れた日に13Vへ届かない拠点)が点数にかかわらず先頭、続いて点数の低い順",
-    rk.shown && rk.btn === "ランキングを隠す" && rk.order[0] === "cam13" && rk.order[1] === "cam09" && rk.order[2] === "cam11" && rk.order[3] === "cam03" && rk.order[4] === "cam04" && rk.order.length === 7 && rk.order[5] === "cam41" && rk.order[6] === "cam42", rk.order);
-  r.check("p9-c 順位は同点を同じ順位にする(1,2,3,4,5,順位なし2拠点)", rk.ranks.join() === "1,2,3,4,5,—,—", rk.ranks);
-  r.check("p9-d 点数は「8.2/10.0」の形で出す", rk.scores[0] === "3.0/10.0" && rk.scores[2] === "8.2/10.0" && rk.scores[3] === "2.1/10.0", rk.scores);
-  r.check("p9-e 区分は論外/論外/要交換/良好。論外の行は強調する",
-    rk.pills.join() === "論外,論外,まもなく底,要交換,良好,交換直後,測定中" && rk.fail.join() === "true,true,false,false,false,false,false", [rk.pills, rk.fail]);
+  r.check("p9-b 点数の低い順に並ぶ(同点は まもなく底 を上に)。採点できない2拠点は末尾",
+    rk.shown && rk.btn === "ランキングを隠す" && rk.order[0] === "cam03" && rk.order[1] === "cam13" && rk.order[2] === "cam09" && rk.order[3] === "cam11" && rk.order[4] === "cam04" && rk.order.length === 7 && rk.order[5] === "cam41" && rk.order[6] === "cam42", rk.order);
+  r.check("p9-c 順位は同点を同じ順位にする(1,2,3,4,4,順位なし2拠点)", rk.ranks.join() === "1,2,3,4,4,—,—", rk.ranks);
+  r.check("p9-d 点数は「8.2/10.0」の形で出す", rk.scores[0] === "2.1/10.0" && rk.scores[1] === "3.0/10.0" && rk.scores[3] === "8.2/10.0" && rk.scores[4] === "8.2/10.0", rk.scores);
+  r.check("p9-e 区分は要交換/論外/論外/まもなく底/良好。論外の行は強調する",
+    rk.pills.join() === "要交換,論外,論外,まもなく底,良好,交換直後,測定中" && rk.fail.join() === "false,true,true,false,false,false,false", [rk.pills, rk.fail]);
   r.check("p9-f 評価は「満充電への到達」と「下限までの放電」の2つだけ(容量・朝の回復は出さない)",
-    rk.parts[1].length === 2 && rk.parts[1][0].indexOf("満充電への到達") === 0 && rk.parts[1][1].indexOf("下限までの放電") === 0
-    && rk.parts[0].join("|").indexOf("下限までの放電 —") >= 0 && rk.parts.flat().every((t) => t.indexOf("容量") < 0 && t.indexOf("朝の回復") < 0), rk.parts);
+    rk.parts[2].length === 2 && rk.parts[2][0].indexOf("満充電への到達") === 0 && rk.parts[2][1].indexOf("下限までの放電") === 0
+    && rk.parts[1].join("|").indexOf("下限までの放電 —") >= 0 && rk.parts.flat().every((t) => t.indexOf("容量") < 0 && t.indexOf("朝の回復") < 0), rk.parts);
   r.check("p9-g 論外の理由(直近の晴れた日の届かなかった日数)と確度を出す",
-    rk.sub[1].indexOf("満充電(13V)へ届かない（直近3日中2日）") >= 0 && rk.sub[0].indexOf("直近3日中3日") >= 0
-    && rk.sub[0].indexOf("確度 中") >= 0 && rk.sub[3].indexOf("満充電(13V)へ届かない") < 0 && rk.sub[2].indexOf("下限まであと") >= 0, rk.sub);
+    rk.sub[2].indexOf("満充電(13V)へ届かない（直近3日中2日）") >= 0 && rk.sub[1].indexOf("直近3日中3日") >= 0
+    && rk.sub[1].indexOf("確度 中") >= 0 && rk.sub[0].indexOf("満充電(13V)へ届かない") < 0 && rk.sub[3].indexOf("下限まであと") >= 0, rk.sub);
   r.check("p9-g2 各行に「健全性の一覧」の状態を添え、観点の違いを解説に書く(ランキング=電池の傷み具合／一覧=今すぐ持つか)",
     rk.sub.every((t) => /一覧の状態: (要対応|注意|良好)/.test(t)) && rk.howto.indexOf("観点が違います") >= 0, [rk.sub, rk.howto.slice(0, 40)]);
   r.check("p9-g3 交換直後の拠点も採点して順位に載せ、「交換直後（交換後4日）」と確度「低」を添える",
@@ -497,7 +496,7 @@ export async function run() {
   r.check("p9-j 算出方法を明記する(満充電は必須・論外は先頭・下限は拠点ごと・目安)",
     rk.howto.indexOf("満充電への到達（必須）") >= 0 && rk.howto.indexOf("論外") >= 0 && rk.howto.indexOf("止まる前に") >= 0 && rk.howto.indexOf("まもなく底") >= 0
     && rk.howto.indexOf("下限電圧") >= 0 && rk.howto.indexOf("目安") >= 0 && rk.howto.indexOf("容量") < 0, rk.howto.slice(0, 80));
-  r.check("p9-k ゲージは点数に比例する(3.0→30%)", rk.widths[0] === "30%" && rk.widths[2] === "82%", rk.widths);
+  r.check("p9-k ゲージは点数に比例する(3.0→30%)", rk.widths[0] === "21%" && rk.widths[1] === "30%" && rk.widths[3] === "82%", rk.widths);
   await pageRK.setViewportSize({ width: 390, height: 800 });
   await pageRK.waitForTimeout(300);
   const rkMobile = await pageRK.evaluate(() => ({ sw: document.documentElement.scrollWidth, iw: window.innerWidth }));

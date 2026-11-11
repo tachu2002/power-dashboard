@@ -793,6 +793,11 @@ export async function run() {
   r.check("s21-d 日次集計に交換の時刻と前後の電圧を持つ",
     sum.cam03 && sum.cam03.swapAt === at(16, 3).toISOString() && sum.cam03.swapVAfter === 12.3
     && sum.cam03.swapChecked === 3, sum.cam03);
+  // 欠測(-0.001V)が混ざっても、0時電圧の平均や最低電圧に入れない(多呂樋管で0時電圧が8.2Vになった不具合)
+  const glitchRows = [row(0, 3, 12.30, 0), row(0, 8, 12.29, 0), row(0, 13, -0.001, 0), row(0, 18, 12.28, 0), row(0, 23, 12.27, 0)];
+  const gsum = M.summarizePowerDay(glitchRows).cam03;
+  r.check("s21-d2 日次集計は欠測(0V付近)を0時電圧・最低電圧に入れない",
+    gsum && gsum.v0 > 12.27 && gsum.v0 < 12.31 && gsum.vmin > 12.2, gsum);
   // 昨日の午後に載せ替えた拠点: 日次の段差だけなら3日待つが、5分データで見つけたらすぐ確定する
   const swapStore = { days: {} };
   for (let back = 40; back >= 1; back--) {
