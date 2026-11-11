@@ -875,7 +875,7 @@
               <button id="refreshBtn">全拠点を今すぐ更新</button>
               <button id="powerSortBtn" type="button" aria-pressed="false">並び：河川順</button>
               <button id="healthTableBtn">健全性の一覧</button>
-              <button id="rankBtn" type="button">交換ランキング</button>
+              <button id="rankBtn" type="button">ランキングを隠す</button>
               <button id="tableBtn">表で表示</button>
             </div>
           </div>
@@ -935,7 +935,7 @@
 
         <div class="grid-power" id="sitesGrid"></div>
 
-        <div class="card rank-card" id="rankCard">
+        <div class="card rank-card show" id="rankCard">
           <div class="site-card-header">
             <div class="site-title-wrap">
               <h2>バッテリー交換ランキング</h2>
@@ -946,7 +946,7 @@
           <div class="rk-other" id="rankOther"></div>
           <div class="health-note" id="rankHowto">
             <b>このランキングの目的</b> … 電池が底を尽きると機器が止まります。<b>止まる前に、劣化の早い電池を見つけて交換する</b>ための順位です。評価は「いま付いている電池」だけで行い、交換前の電池の値は使いません（交換した電池が新品とは限らないため）。全拠点を必ず採点します。<br>
-            <b>並び順</b>（上ほど先に交換）… ①電池切れで停止中 → ②論外（晴れた日に満充電へ届かない） → ③まもなく底（下限まであと12時間未満） → ④点数の低い順。<br>
+            <b>並び順</b>（上ほど先に交換）… 点数の低い順です。同点のときだけ、電池切れで停止中 → 論外（晴れた日に満充電へ届かない） → まもなく底（下限まであと12時間未満）の順に上へ並べます。この3つは並びとは別に、赤いラベルで目立たせます。<br>
             <b>点数</b>（10.0が良好・低いほど交換が近い）は、次の2つの平均です。<br>
             ・<b>満充電への到達（必須）</b>… 日中が晴れた日に、電池が満充電（端子電圧13V以上）まで届いたか。<b>届かないのは論外で、劣化がかなり進んでいる</b>ものとして扱います。全拠点は同じ地域で日射が共通なので、全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とします（曇りの日と、曇りが続いた直後の最初の晴れ間は、深く放電した電池が1日では戻りきれないので数えません）。<b>直近の晴れた3日のうち2日以上13Vに届かなかった拠点は「論外」</b>とし、点数も最大3.9に抑えます。点数は、晴れた日に届いた割合（95%以上で10.0、40%以下で0）です。<br>
             ・<b>下限までの放電</b>… 直近の夜（0:00〜4:00）の電圧降下の速さのまま下がり続けたとき、0時の電圧から<b>その拠点の下限電圧</b>（北沢アンダーパス9.5V／多呂樋管・梅名樋管2号・芝橋・中村橋10.5V／既定11.5V）まで何時間かかるか。48時間以上で10.0、12時間以下で0です。<br>
@@ -1413,6 +1413,13 @@
     cam43: 10.5,  // 芝橋
     cam52: 10.5   // 中村橋(大場川 / 佐野)。2026-10-28 利用者の指定で既定11.5Vから変更
   };
+  /* 電圧グラフ・予測に使う電圧として妥当か。拠点ごとに下限電圧があり、機器は下限で停止するので、
+     下限より1V以上低い値(作業中・通信不良の0Vなど)は欠測として扱い、グラフに載せない。
+     載せると縦軸が0Vまで伸びて、本来の波形が潰れて見えなくなる。 */
+  var BAT_GLITCH_MARGIN_V = 1.0;
+  function isPlausibleBat(siteId, v) {
+    return typeof v === "number" && isFinite(v) && v >= batteryEmptyVoltageFor(siteId) - BAT_GLITCH_MARGIN_V;
+  }
   function batteryEmptyVoltageFor(siteId) {
     var v = BATTERY_EMPTY_VOLTAGE_OVERRIDE[siteId];
     return typeof v === "number" ? v : BATTERY_EMPTY_VOLTAGE_DEFAULT;
@@ -2329,6 +2336,7 @@
     var rated = ids.filter(function (id) { return typeof batteryHealthState.sites[id].capacityAh === "number"; }).length;
     var mains = ids.filter(function (id) { return batteryHealthState.sites[id].mains; }).length;
     if (!rated) {
+      if (document.getElementById("rankCard").classList.contains("show")) renderRankCard();
       note.textContent = "実効容量は「1日の収支（発電−消費）」と「翌日の0時基準電圧の変化」の回帰から出します。"
         + "日数がたまるまで（目安10日以上）値が出ません"
         + (batteryHealthState.days ? "（現在 " + batteryHealthState.days + "日分）" : "") + "。";
@@ -2474,20 +2482,23 @@
     });
     var scored = rows.filter(function (r) { return typeof r.d.score === "number"; });
     // 機器が止まる前に交換するためのランキング。優先度の高い順に
-    //  0 停止中(電池切れ) → 1 論外(晴れた日に満充電へ届かない) → 2 まもなく底(下限まで12時間未満) → 3 点数の低い順。
+    //  優先度(ラベル用): 0 停止中(電池切れ) → 1 論外(晴れた日に満充電へ届かない) → 2 まもなく底(下限まで12時間未満) → 3 通常。
     scored.forEach(function (r) {
       var cut = cutOf[r.id];
       var h = hoursOf[r.id];
       r.tier = (cut && cut.kind === "empty") ? 0 : r.d.fail13 ? 1 : (h < RANK_SOON_HOURS ? 2 : 3);
     });
     var missOf = function (r) { return r.d.fail13 && r.d.reach ? r.d.reach.recentMissed : 0; };
+    // 並びは「画面に出ている点数の低い順」。表示の1桁目で比べ、同点は優先度(停止中→論外→まもなく底)、
+    // 次に下限までの時間が短い順。優先度は並びではなく、赤いラベルで示す。
+    var shown = function (r) { return Math.round(r.d.score * 10) / 10; };
     scored.sort(function (a, b) {
-      return (a.tier - b.tier) || (missOf(b) - missOf(a)) || (a.d.score - b.d.score) || (hoursOf[a.id] - hoursOf[b.id]);
+      return (shown(a) - shown(b)) || (a.tier - b.tier) || (missOf(b) - missOf(a)) || (hoursOf[a.id] - hoursOf[b.id]);
     });
     var rank = 0;
     scored.forEach(function (r, i) {
       var prev = scored[i - 1];
-      if (i === 0 || r.d.score !== prev.d.score || r.tier !== prev.tier) rank = i + 1;
+      if (i === 0 || shown(r) !== shown(prev)) rank = i + 1;
       r.rank = rank;
     });
     return {
@@ -3765,12 +3776,18 @@
     else if (diff < 0) target.classList.add("down");
   }
 
+  function lastPlausibleBat(siteId, points) {
+    for (var i = points.length - 1; i >= 0; i--) {
+      if (isPlausibleBat(siteId, points[i].bat)) return points[i];
+    }
+    return null;
+  }
   function refreshPowerCard(site) {
     var s = siteStates[site.id];
     if (!site.hasPower || !s.powerCardEl) return;
     if (!s.points.length) return;
     var lastPv = lastPointWith(s.points, "pv");
-    var lastBat = lastPointWith(s.points, "bat");
+    var lastBat = lastPlausibleBat(site.id, s.points);
     if (!lastPv && !lastBat) return;
     if (lastPv) {
       s.pvValueEl.innerHTML = lastPv.pv.toFixed(2) + '<span class="unit">W</span>';
@@ -3789,7 +3806,7 @@
     var batForecast = cachedPrediction(site, "bat");
     // 予測を表示する場合は、過去2日＋先7日の範囲で描く(日付つきの時刻ラベル)。
     var batWindow = batForecast.length ? BAT_CHART_PAST_WINDOW_MS : undefined;
-    var batSel = selectRecentForChart(s.points, function (p) { return typeof p.bat === "number"; }, batWindow);
+    var batSel = selectRecentForChart(s.points, function (p) { return isPlausibleBat(site.id, p.bat); }, batWindow);
     s.batChart.setData(buildSeriesWithForecast(batSel.points, "bat", batForecast, fmtMdHm));
     // 残量の見通しは実測(発電W)を使うため、新しい実測が入ったら「持ち」の表示も出し直す。
     // (これが無いと、起動直後にまだ実測が無くて見通しを出せなかった表示のままになる。)
@@ -6067,6 +6084,10 @@
         if (last.loadW >= loadRef * LOAD_CUT_RATIO) return null;      // 負荷が戻った=復帰
       } else if (last.bat >= floor + EMPTY_RECOVER_V) {
         return null;                                                  // 充電で十分戻った
+      } else if (typeof last.loadW === "number" && last.loadW >= LOAD_CUT_MIN_BEFORE_W) {
+        // 下限に達したときの負荷が記録に無くても、いま負荷(カメラ等)が普通に動いていれば機器は動いている。
+        // (中島樋管3号: 昨日の朝に下限へ達したが、いまは負荷が13W前後で動いているのに「停止中」のままだった)
+        return null;
       }
     }
     var cut = scanVoltageSteps(s.points, hit.fetchedAt.getTime()).cut;
@@ -6170,6 +6191,17 @@
      ・今日交換していれば、交換直後の電圧から出し直し、そこからの実測の発電−消費を足す
      ・そうでなければ、0時の電圧に中継サーバーの当日収支(発電Wh−消費Wh)を足す
      ・それも無ければ、0時の残量に実測の発電を積分して足す */
+  // 今日の0:00〜0:40(JST)の実測電圧の中央値。欠測(0V付近)は除く。無ければ null。
+  function midnightMeasuredV(siteId) {
+    var s = siteStates[siteId];
+    if (!s) return null;
+    var mid = jstMidnightMs(Date.now());
+    var vals = s.points.filter(function (p) {
+      var t = p.fetchedAt.getTime();
+      return t >= mid && t < mid + 40 * 60000 && typeof p.bat === "number" && p.bat >= DEEP_DISCHARGE_V;
+    }).map(function (p) { return p.bat; });
+    return vals.length ? medianOf(vals) : null;
+  }
   function currentSocFor(site, e, capWh, loadW) {
     var s = siteStates[site.id];
     var nowMs = Date.now();
@@ -6198,7 +6230,12 @@
     }
     var today = todayPowerDaily(site.id);
     if (today && typeof today.v0 === "number" && typeof today.balWh === "number") {
-      return { soc: socFromVoltage(today.v0) + today.balWh / capWh * 100, source: "balance", swap: null, today: today };
+      // 0時の基準電圧が物理的にあり得ない値(欠測0Vが平均に混ざって8Vなど)のときは使わず、
+      // 実測の0時前後の電圧から出し直す。無ければ残量の積み上げ(下の方式)に回す。
+      var v0use = today.v0 >= DEEP_DISCHARGE_V ? today.v0 : midnightMeasuredV(site.id);
+      if (typeof v0use === "number") {
+        return { soc: socFromVoltage(v0use) + today.balWh / capWh * 100, source: "balance", swap: null, today: today };
+      }
     }
     if (typeof e.socPct === "number" && s) {
       return { soc: integrate(e.socPct, jstMidnightMs(nowMs)), source: "pv", swap: null };
@@ -6516,8 +6553,8 @@
    * 拠点ごとの実測の時刻別傾向をそのまま将来へ当てはめる方式に変更している。
    * 実データでの検証(23拠点・直近5日・12時間先): 平均絶対誤差 0.32V → 0.20V。
    */
-  function batteryDiurnalProfile(points) {
-    var series = points.filter(function (p) { return typeof p.bat === "number"; })
+  function batteryDiurnalProfile(points, siteId) {
+    var series = points.filter(function (p) { return siteId ? isPlausibleBat(siteId, p.bat) : typeof p.bat === "number"; })
       .slice(-BAT_PROFILE_MAX_POINTS)
       .map(function (p) { return { t: p.fetchedAt.getTime(), v: p.bat, pv: typeof p.pv === "number" ? p.pv : null }; });
     var buckets = [], pvBuckets = [], all = [];
@@ -6571,10 +6608,10 @@
   function predictBatterySeriesFromProfile(site) {
     var s = siteStates[site.id];
     if (!s || !forecastState.hours.length) return [];
-    var pts = s.points.filter(function (p) { return typeof p.bat === "number"; });
+    var pts = s.points.filter(function (p) { return isPlausibleBat(site.id, p.bat); });
     if (!pts.length) return [];
     var last = pts[pts.length - 1];
-    var profile = batteryDiurnalProfile(s.points);
+    var profile = batteryDiurnalProfile(s.points, site.id);
     var normals = radiationNormalsByHour();
     var nowMs = last.fetchedAt.getTime();
     var hours = futureWeatherHours(nowMs, BAT_PREDICTION_HORIZON_MS);
@@ -7367,7 +7404,7 @@
     mergePowerHistory: mergePowerHistory, pollPowerSource: pollPowerSource,
     extractCsvFromJinaProxyText: extractCsvFromJinaProxyText,
     getPowerSourceState: function () { return powerSourceState; },
-    PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS, BAT_PREDICTION_HORIZON_MS: BAT_PREDICTION_HORIZON_MS, BAT_CHART_PAST_WINDOW_MS: BAT_CHART_PAST_WINDOW_MS,
+    isPlausibleBat: isPlausibleBat, PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS, BAT_PREDICTION_HORIZON_MS: BAT_PREDICTION_HORIZON_MS, BAT_CHART_PAST_WINDOW_MS: BAT_CHART_PAST_WINDOW_MS,
     CHART_PAST_WINDOW_WITH_FORECAST_MS: CHART_PAST_WINDOW_WITH_FORECAST_MS,
     GRAPHLIST_PAST_WINDOW_MS: GRAPHLIST_PAST_WINDOW_MS,
     GRAPHLIST_FORECAST_HORIZON_MS: GRAPHLIST_FORECAST_HORIZON_MS,
@@ -7428,7 +7465,7 @@
     cloudFactorFromForecast: cloudFactorFromForecast, pvCoefficient: pvCoefficient,
     voltageFromSoc: voltageFromSoc, socFromVoltage: socFromVoltage,
     batteryOutlook: batteryOutlook, computeBatteryOutlook: computeBatteryOutlook,
-    loadPowerDaily: loadPowerDaily, todayPowerDaily: todayPowerDaily,
+    loadPowerDaily: loadPowerDaily, todayPowerDaily: todayPowerDaily, getPowerDailyState: function () { return powerDailyState; }, midnightMeasuredV: midnightMeasuredV,
     nightDeclineCapacityAh: nightDeclineCapacityAh,
     getPowerDailyState: function () { return powerDailyState; },
     SERVER_POWER_DAILY_URL: SERVER_POWER_DAILY_URL,
