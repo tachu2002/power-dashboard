@@ -690,7 +690,9 @@ function summarizePowerDay(rows) {
     let vmin = null;
     seg.forEach(function (r) {
       const p = toJstParts(r.fetchedAt);
-      if (typeof r.bat === "number") {
+      // 作業中・通信不良の欠測(0V付近。多呂樋管で -0.001V が混ざった)は電圧として数えない。
+      // 混ざると 0時電圧の平均が 8.2V などになり、残量0%・「あと0.2h」と誤判定していた。
+      if (typeof r.bat === "number" && r.bat >= SWAP_MIN_VALID_V) {
         if (vmin === null || r.bat < vmin) vmin = r.bat;
         if (p.h === 0 && p.mi < BATTERY_V0_WINDOW_MIN) v0s.push(r.bat);
       }
@@ -712,7 +714,7 @@ function summarizePowerDay(rows) {
     // 夜間の電圧降下の速さ[V/h]。最小二乗の傾きで出す(端点2点の引き算だとノイズが乗るため)。
     // 「充電されない夜間に実際どれだけ電圧が落ちるか」で、持ち時間の見通しを実測に合わせるのに使う。
     let vPerH = null;
-    const vs = nights.filter(function (r) { return typeof r.bat === "number"; });
+    const vs = nights.filter(function (r) { return typeof r.bat === "number" && r.bat >= SWAP_MIN_VALID_V; });
     if (vs.length >= 10) {
       const n2 = vs.length;
       const mx = vs.reduce(function (a, r) { return a + r.fetchedAt.getTime(); }, 0) / n2;
@@ -762,6 +764,8 @@ async function updatePowerDailyFile(todayRows) {
     const ids = Object.keys(day);
     if (!ids.length) return false;                       // データ自体が無い日は空のまま
     // nightVPerH(夜間の電圧降下)・swapChecked(当日の載せ替え検出)を持たない古い形式の日は取り直す
+    // 欠測(0V付近)が混ざって最低電圧が異常値になっている日も取り直す。
+    if (ids.some(function (id) { return typeof day[id].vmin === "number" && day[id].vmin < SWAP_MIN_VALID_V; })) return true;
     return ids.every(function (id) {
       return day[id].nightVPerH === undefined || !(Number(day[id].swapChecked) >= SWAP_CHECK_VERSION);
     });
