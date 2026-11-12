@@ -3717,15 +3717,30 @@
   // 戻り値のexpandedがtrueの場合、呼び出し側で「24時間より広い範囲を表示中」である旨を示せる。
   // windowMs: 表示範囲(省略時はCHART_WINDOW_MS=24時間)。未来予測を併記する場合は、
   // 現在時刻がグラフの中央に来るよう過去側も予測と同じ長さ(12時間)を指定する。
-  function selectRecentForChart(points, filterFn, windowMs) {
+  // maxPoints: 表示する点数の上限(既定はMAX_CHART_POINTS)。窓が長いグラフ(電圧の過去2日)は、
+  // 5分間隔のデータだと1日で約288点になり、既定の上限では1日分しか出なかったため、大きい値を渡す。
+  // 上限を超える場合は、新しい側(最新点)を残しながら等間隔に間引く。
+  // 等間隔に間引いて cap 点以内にする。最新の点は必ず残す。
+  function decimateKeepLast(list, cap) {
+    var n = list.length;
+    if (n <= cap) return list;
+    var out = [];
+    for (var i = 0; i < cap; i++) out.push(list[Math.round(i * (n - 1) / (cap - 1))]);
+    return out;
+  }
+  function selectRecentForChart(points, filterFn, windowMs, maxPoints) {
+    var cap = typeof maxPoints === "number" ? maxPoints : MAX_CHART_POINTS;
     var cutoff = Date.now() - (typeof windowMs === "number" ? windowMs : CHART_WINDOW_MS);
     var windowed = points.filter(function (p) { return p.fetchedAt.getTime() >= cutoff && filterFn(p); });
     if (windowed.length >= MIN_MEANINGFUL_CHART_POINTS) {
-      if (windowed.length > MAX_CHART_POINTS) windowed = windowed.slice(windowed.length - MAX_CHART_POINTS);
+      if (windowed.length > cap) {
+        if (typeof maxPoints === "number") windowed = decimateKeepLast(windowed, cap);
+        else windowed = windowed.slice(windowed.length - cap);
+      }
       return { points: windowed, expanded: false };
     }
     var all = points.filter(filterFn);
-    if (all.length > MAX_CHART_POINTS) all = all.slice(all.length - MAX_CHART_POINTS);
+    if (all.length > cap) all = typeof maxPoints === "number" ? decimateKeepLast(all, cap) : all.slice(all.length - cap);
     return { points: all, expanded: all.length > windowed.length };
   }
 
@@ -3837,7 +3852,7 @@
     var batForecast = cachedPrediction(site, "bat");
     // 予測を表示する場合は、過去2日＋先7日の範囲で描く(日付つきの時刻ラベル)。
     var batWindow = batForecast.length ? BAT_CHART_PAST_WINDOW_MS : undefined;
-    var batSel = selectRecentForChart(s.points, function (p) { return isPlausibleBat(site.id, p.bat); }, batWindow);
+    var batSel = selectRecentForChart(s.points, function (p) { return isPlausibleBat(site.id, p.bat); }, batWindow, batForecast.length ? BAT_CHART_MAX_POINTS : undefined);
     s.batChart.setData(buildSeriesWithForecast(batSel.points, "bat", batForecast, fmtMdHm));
     // 残量の見通しは実測(発電W)を使うため、新しい実測が入ったら「持ち」の表示も出し直す。
     // (これが無いと、起動直後にまだ実測が無くて見通しを出せなかった表示のままになる。)
@@ -5694,6 +5709,7 @@
   // グラフは過去2日＋先7日。先の12時間までは10分刻み、それ以降は1時間刻みに間引く。
   var BAT_PREDICTION_HORIZON_MS = 7 * 24 * 60 * 60 * 1000;
   var BAT_CHART_PAST_WINDOW_MS = 2 * 24 * 60 * 60 * 1000;
+  var BAT_CHART_MAX_POINTS = 600;   // 過去2日ぶん(5分間隔で約580点)を間引かずに出せる上限
   var PREDICTION_CACHE_MS = 5 * 60 * 1000;
   var HOUR_MS = 60 * 60 * 1000;
   // 実測から係数を推定できない場合の既定値(控えめな値だが、降雨時に水位が全く動かない
@@ -7435,7 +7451,7 @@
     mergePowerHistory: mergePowerHistory, pollPowerSource: pollPowerSource,
     extractCsvFromJinaProxyText: extractCsvFromJinaProxyText,
     getPowerSourceState: function () { return powerSourceState; },
-    isPlausibleBat: isPlausibleBat, PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS, BAT_PREDICTION_HORIZON_MS: BAT_PREDICTION_HORIZON_MS, BAT_CHART_PAST_WINDOW_MS: BAT_CHART_PAST_WINDOW_MS,
+    isPlausibleBat: isPlausibleBat, PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS, BAT_PREDICTION_HORIZON_MS: BAT_PREDICTION_HORIZON_MS, BAT_CHART_PAST_WINDOW_MS: BAT_CHART_PAST_WINDOW_MS, BAT_CHART_MAX_POINTS: BAT_CHART_MAX_POINTS,
     CHART_PAST_WINDOW_WITH_FORECAST_MS: CHART_PAST_WINDOW_WITH_FORECAST_MS,
     GRAPHLIST_PAST_WINDOW_MS: GRAPHLIST_PAST_WINDOW_MS,
     GRAPHLIST_FORECAST_HORIZON_MS: GRAPHLIST_FORECAST_HORIZON_MS,
