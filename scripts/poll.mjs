@@ -1290,21 +1290,18 @@ function computeBatteryEndurance(store, longTerm) {
   return sites;
 }
 
-/* 劣化スコア(10.0満点・高いほど良好)と交換ランキング(2026-10-30 利用者の指示で作り直し)
+/* 劣化スコア(10.0満点・高いほど良好)と交換ランキング(2026-11-12 利用者の指示で「前夜の電圧降下だけ」に変更)
  * -----------------------------------------------------------------------
- * 評価するのは次の2つだけ(容量・朝の回復は使わない)。
- *   ① 満充電への到達(必須) … 日中が晴れた日に、電池が満充電(端子電圧13V以上)まで届いたか。
- *      届かないのは論外で、劣化がかなり進んでいる。全拠点は同じ地域で日射が共通なので、
- *      全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とする(曇りの日と、曇りが続いた直後の
- *      最初の晴れ間は、深く放電した電池が1日では戻りきれないので数えない)。
- *      直近の晴れた3日のうち2日以上で届かなければ「論外」(fail13)。
- *      論外の拠点は点数にかかわらずランキングの先頭に置き、点数も最大3.9(要交換)に抑える。
- *   ② 下限までの放電 … 前夜(0:00〜4:00)の電圧降下の速さのまま下がり続けたとき、0時の電圧から
+ * 点数にするのは次の1つだけ(容量・朝の回復・満充電への到達は点数に入れない)。
+ *   下限までの放電 … 前夜(0:00〜4:00)の電圧降下の速さのまま下がり続けたとき、0時の電圧から
  *      その拠点の下限電圧(北沢9.5V／多呂・梅名2号・芝橋・中村橋10.5V／既定11.5V)まで何時間かかるか。
  *      48時間以上=10点、12時間以下=0点。
- * 点数 = ①と②の平均(片方しか測れなければその1つ)。**全拠点を必ず採点する**(2026-10-30 利用者の指示)。
- * 評価はいまの電池だけで行い、交換前の電池の値は一切使わない。交換後の実測が少ないうちは確度を「低」にし、
- * 交換後の夜がまだ無ければ、消費電流と全拠点の標準的な放電の速さから②を見込む。
+ * 「論外」(fail13)は点数ではなく目印: 晴れた日の日中に、一度も満充電(端子電圧13V以上)へ届いていない電池。
+ *      全拠点は同じ地域で日射が共通なので、全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とする
+ *      (曇りの日と、曇りが続いた直後の最初の晴れ間は、深く放電した電池が1日では戻りきれないので数えない)。
+ *      直近の晴れた3日のうち1日でも13Vに届いていれば論外にしない(利用者の指示)。点数は下げない。
+ * **全拠点を必ず採点する**(2026-10-30 利用者の指示)。評価はいまの電池だけで行い、交換前の電池の値は一切使わない。
+ * 交換後の実測が少ないうちは確度を「低」にし、交換後の夜がまだ無ければ、消費電流と全拠点の標準的な放電の速さから見込む。
  * 電池が底を尽きると機器が止まるので、止まる前に劣化の早い電池を見つけて交換するためのランキング。 */
 const BATTERY_FLOOR_DEFAULT_V = 11.5;
 const BATTERY_FLOOR_OVERRIDE_V = { cam03: 9.5, cam14: 10.5, cam09: 10.5, cam43: 10.5, cam52: 10.5 };   // index.html の BATTERY_EMPTY_VOLTAGE_OVERRIDE と同じ
@@ -1312,9 +1309,7 @@ const DEGRADE_REACH_V = 13.0;
 const DEGRADE_REACH_WINDOW_DAYS = 30;    // 数える日数(当日は途中なので入れない)
 const DEGRADE_REACH_MIN_DAYS = 8;        // 晴れた日が何日あれば割合で採点するか
 const DEGRADE_REACH_FULL = 0.95, DEGRADE_REACH_ZERO = 0.40;   // 届いた割合: 95%以上=10点、40%以下=0点
-const DEGRADE_REACH_RECENT = 3;          // 直近の晴れた何日で「論外」を判定するか
-const DEGRADE_REACH_FAIL_DAYS = 2;       // そのうち何日届かなければ論外か
-const DEGRADE_FAIL_MAX = 3.9;            // 論外の拠点の点数の上限
+const DEGRADE_REACH_RECENT = 3;          // 直近の晴れた何日の中で、一度も13Vに届かなければ「論外」か
 const DEGRADE_FLOOR_FULL_H = 48, DEGRADE_FLOOR_ZERO_H = 12;
 const DEGRADE_NIGHT_LOOKBACK_DAYS = 14;  // 「前夜」として探す日数(直近に夜間の実測が無い拠点でも採点するため、新しい順に最大14日)
 const DEGRADE_FRESH_DAYS = 14;           // 交換してからこの日数に満たなければ「交換直後」
@@ -1374,7 +1369,7 @@ function attachDegradation(sites, dayMap, days) {
       // ① 満充電への到達(交換した拠点は交換後の日だけ)
       const own = sunnyDays.filter(function (day) { return !(!ignoreSwap && e.lastSwapAt && day < e.lastSwapAt); })
         .map(function (day) { return { day: day, v: vmaxOf(day, id) }; }).filter(function (x) { return x.v !== null; });
-      let charge = null;
+      // 論外の判定(点数には入れない): 直近の晴れた3日のうち1日でも13Vに届いていれば論外にしない
       if (own.length >= 1) {
         const recent = own.slice(0, DEGRADE_REACH_RECENT);                  // 新しい順
         const missed = recent.filter(function (x) { return x.v < DEGRADE_REACH_V; }).length;
@@ -1383,13 +1378,7 @@ function attachDegradation(sites, dayMap, days) {
         deg.reach = { recentDays: recent.length, recentMissed: missed, days: own.length, hit: hit,
           rate: Math.round(rate * 1000) / 1000, lastDay: own[0].day, lastV: Math.round(own[0].v * 100) / 100,
           medianV: Math.round(medianOf(own.map(function (x) { return x.v; })) * 100) / 100 };
-        deg.fail13 = recent.length >= 2 && missed >= DEGRADE_REACH_FAIL_DAYS;
-        // 割合が出せる日数があれば割合で、無ければ直近の3日で点数にする
-        const r = own.length >= DEGRADE_REACH_MIN_DAYS ? rate : (recent.length - missed) / recent.length;
-        charge = Math.round(clamp01((r - DEGRADE_REACH_ZERO) / (DEGRADE_REACH_FULL - DEGRADE_REACH_ZERO)) * 100) / 10;
-        deg.parts.push({ key: "charge", label: "満充電への到達", score: charge, value: deg.reach.rate,
-          text: "晴れた" + own.length + "日中" + hit + "日で13V到達(直近" + recent.length + "日で" + missed + "日届かず・日中最高の中央値 "
-            + deg.reach.medianV.toFixed(2) + "V)" });
+        deg.fail13 = recent.length >= 2 && missed === recent.length;
       }
       // ② 下限までの放電: 前夜の降下の速さのまま下がると、0時の電圧から下限まで何時間か
       let floor = null;
@@ -1430,13 +1419,12 @@ function attachDegradation(sites, dayMap, days) {
     }
     const got = deg.parts.map(function (p) { return p.score; });
     deg.score = Math.round(got.reduce(function (a, b) { return a + b; }, 0) / got.length * 10) / 10;
-    if (deg.fail13 && deg.score > DEGRADE_FAIL_MAX) { deg.score = DEGRADE_FAIL_MAX; deg.cappedBy = "charge"; }
     const g = degradeGradeOf(deg.score);
     deg.grade = g.key;
     deg.gradeLabel = deg.fail13 ? "論外" : g.label;
     // 交換直後は交換後の日数が短く、実測が少ないので確度は低くする
     deg.estimated = deg.parts.some(function (q) { return q.estimated; });
-    deg.confidence = (fresh || deg.estimated) ? "低" : got.length === 2 ? "高" : "中";
+    deg.confidence = (fresh || deg.estimated) ? "低" : "高";
   });
 }
 async function updateBatteryHealthFile() {
