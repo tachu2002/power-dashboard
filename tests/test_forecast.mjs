@@ -1384,6 +1384,22 @@ export async function run() {
     } finally { s.points = keep; d.clearPredictionCache(); d.refreshPowerCard(d.SITE_CATALOG.cam14); }
   });
   r.check("f15-c 0Vの欠測が混ざっても、電圧グラフの縦軸は0Vまで伸びない", glitchSvg.n > 0 && glitchSvg.minTick > 9, glitchSvg);
+  const smoothT = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const vals = [1.0, 1.4, 2.0, 1.2, 0.9, 1.1, 1.8, 1.6];
+    const pts = vals.map((v, i) => ({ value: v, predicted: i >= 6 }));
+    const xs = vals.map((_, i) => 10 + i * 20), yAt = (v) => 100 - v * 30;
+    const straight = d.buildSplitPathData(pts, xs, yAt);
+    const smooth = d.buildSplitPathData(pts, xs, yAt, true);
+    // 3次ベジェの制御点のy座標が、実測の範囲(最大・最小)をはみ出さないこと
+    const nums = (str) => (str.match(/-?\d+(?:\.\d+)?/g) || []).map(Number);
+    const ysAll = [];
+    [smooth.solid, smooth.dashed].forEach((p) => { const a = nums(p); for (let i = 1; i < a.length; i += 2) ysAll.push(a[i]); });
+    return { straightL: /^M[^C]*$/.test(straight.solid) && straight.solid.indexOf("C") < 0, smoothC: smooth.solid.indexOf("C") > 0 && smooth.dashed.indexOf("C") > 0,
+      minY: Math.min.apply(null, ysAll), maxY: Math.max.apply(null, ysAll), lo: yAt(2.0), hi: yAt(0.9), boundary: smooth.boundaryIndex };
+  });
+  r.check("f16-a 水位の折れ線は折り返しを丸めた曲線で描く(山や谷の値を超えて膨らまない)。既定(電圧など)は直線のまま",
+    smoothT.straightL && smoothT.smoothC && smoothT.minY >= smoothT.lo - 0.01 && smoothT.maxY <= smoothT.hi + 0.01 && smoothT.boundary === 6, smoothT);
   r.check("f15-a 下限より1V以上低い値(0V・欠測)は電圧として扱わない(下限10.5Vの拠点は9.5V未満、北沢9.5Vは8.5V未満)",
     glitch.ok.join() === "true,true,true,false,false,true,false", glitch.ok);
   r.check("f15-b 0Vの欠測が混ざっていても、電圧の予測は引きずられない",

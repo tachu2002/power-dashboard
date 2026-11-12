@@ -478,12 +478,13 @@ export async function run() {
   r.check("p9-d 点数は「8.2/10.0」の形で出す", rk.scores[0] === "2.1/10.0" && rk.scores[1] === "3.0/10.0" && rk.scores[3] === "8.2/10.0" && rk.scores[4] === "8.2/10.0", rk.scores);
   r.check("p9-e 区分は要交換/論外/論外/まもなく底/良好。論外の行は強調する",
     rk.pills.join() === "要交換,論外,論外,まもなく底,良好,交換直後,測定中" && rk.fail.join() === "false,true,true,false,false,false,false", [rk.pills, rk.fail]);
-  r.check("p9-f 評価は「満充電への到達」と「下限までの放電」の2つだけ(容量・朝の回復は出さない)",
-    rk.parts[2].length === 2 && rk.parts[2][0].indexOf("満充電への到達") === 0 && rk.parts[2][1].indexOf("下限までの放電") === 0
-    && rk.parts[1].join("|").indexOf("下限までの放電 —") >= 0 && rk.parts.flat().every((t) => t.indexOf("容量") < 0 && t.indexOf("朝の回復") < 0), rk.parts);
-  r.check("p9-g 論外の理由(直近の晴れた日の届かなかった日数)と確度を出す",
-    rk.sub[2].indexOf("満充電(13V)へ届かない（直近3日中2日）") >= 0 && rk.sub[1].indexOf("直近3日中3日") >= 0
-    && rk.sub[1].indexOf("確度 中") >= 0 && rk.sub[0].indexOf("満充電(13V)へ届かない") < 0 && rk.sub[3].indexOf("下限まであと") >= 0, rk.sub);
+  r.check("p9-f 点数の評価は「前夜の電圧降下(下限までの放電)」だけ(満充電への到達・容量・朝の回復は出さない)",
+    rk.parts.every((p) => p.length === 1 && p[0].indexOf("前夜の電圧降下") === 0)
+    && rk.parts.flat().every((t) => t.indexOf("満充電への到達") < 0 && t.indexOf("容量") < 0 && t.indexOf("朝の回復") < 0)
+    && rk.parts[1].join("|").indexOf("—") >= 0, rk.parts);
+  r.check("p9-g 論外の理由(直近の晴れた日に一度も13Vへ届いていない)と確度を出す。論外でない拠点には出さない",
+    rk.sub[2].indexOf("一度も満充電(13V)へ届いていない") >= 0 && rk.sub[1].indexOf("一度も満充電(13V)へ届いていない") >= 0
+    && rk.sub[1].indexOf("確度 中") >= 0 && rk.sub[0].indexOf("満充電(13V)へ届") < 0 && rk.sub[3].indexOf("下限まであと") >= 0, rk.sub);
   r.check("p9-g2 各行に「健全性の一覧」の状態を添え、観点の違いを解説に書く(ランキング=電池の傷み具合／一覧=今すぐ持つか)",
     rk.sub.every((t) => /一覧の状態: (要対応|注意|良好)/.test(t)) && rk.howto.indexOf("観点が違います") >= 0, [rk.sub, rk.howto.slice(0, 40)]);
   r.check("p9-g3 交換直後の拠点も採点して順位に載せ、「交換直後（交換後4日）」と確度「低」を添える",
@@ -493,8 +494,8 @@ export async function run() {
     rk.other.indexOf("順位なし") >= 0 && rk.other.indexOf("入れ替わ") >= 0 && rk.scores[5] === "—/10.0" && rk.sub[5].indexOf("実測がまだ無い") >= 0, [rk.other, rk.scores, rk.sub]);
   r.check("p9-i 要約に、論外の拠点数と交換を検討したい拠点数を出す",
     rk.note.indexOf("「論外」の拠点が 2拠点") >= 0 && rk.note.indexOf("交換を検討したい拠点が 3拠点") >= 0 && rk.note.indexOf("10.0が良好") >= 0 && rk.note.indexOf("全7拠点のうち採点 5拠点") >= 0, rk.note);
-  r.check("p9-j 算出方法を明記する(満充電は必須・論外は先頭・下限は拠点ごと・目安)",
-    rk.howto.indexOf("満充電への到達（必須）") >= 0 && rk.howto.indexOf("論外") >= 0 && rk.howto.indexOf("止まる前に") >= 0 && rk.howto.indexOf("まもなく底") >= 0
+  r.check("p9-j 算出方法を明記する(点数は前夜の電圧降下だけ・論外は一度も13Vに届かない目印・下限は拠点ごと・目安)",
+    rk.howto.indexOf("前夜の電圧降下だけ") >= 0 && rk.howto.indexOf("一度も届いていない") >= 0 && rk.howto.indexOf("論外") >= 0 && rk.howto.indexOf("止まる前に") >= 0 && rk.howto.indexOf("まもなく底") >= 0
     && rk.howto.indexOf("下限電圧") >= 0 && rk.howto.indexOf("目安") >= 0 && rk.howto.indexOf("容量") < 0, rk.howto.slice(0, 80));
   r.check("p9-k ゲージは点数に比例する(3.0→30%)", rk.widths[0] === "21%" && rk.widths[1] === "30%" && rk.widths[3] === "82%", rk.widths);
   await pageRK.setViewportSize({ width: 390, height: 800 });
