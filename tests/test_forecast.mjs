@@ -1400,6 +1400,27 @@ export async function run() {
   });
   r.check("f16-a 水位の折れ線は折り返しを丸めた曲線で描く(山や谷の値を超えて膨らまない)。既定(電圧など)は直線のまま",
     smoothT.straightL && smoothT.smoothC && smoothT.minY >= smoothT.lo - 0.01 && smoothT.maxY <= smoothT.hi + 0.01 && smoothT.boundary === 6, smoothT);
+  const twoDays = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const MIN = 60000, now = Date.now(), DAY = 86400000;
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const s = d.siteStates.cam14, keep = s.points.slice();
+    try {
+      // 5分間隔で3日分(約864点)。従来の上限288点だと過去1日しか出なかった
+      const pts = [];
+      for (let i = 3 * 288; i >= 0; i--) pts.push({ fetchedAt: new Date(now - i * 5 * MIN), pv: 0, bat: 12.2 + 0.2 * Math.sin(i / 40), loadW: 15, via: VIA });
+      s.points = pts;
+      d.clearPredictionCache();
+      const sel = d.selectRecentForChart(pts, (p) => typeof p.bat === "number", d.BAT_CHART_PAST_WINDOW_MS, d.BAT_CHART_MAX_POINTS);
+      const spanH = (sel.points[sel.points.length - 1].fetchedAt - sel.points[0].fetchedAt) / 3600000;
+      const old = d.selectRecentForChart(pts, (p) => typeof p.bat === "number", d.BAT_CHART_PAST_WINDOW_MS);
+      const oldSpanH = (old.points[old.points.length - 1].fetchedAt - old.points[0].fetchedAt) / 3600000;
+      return { n: sel.points.length, spanH: Math.round(spanH), oldSpanH: Math.round(oldSpanH),
+        lastIsNewest: sel.points[sel.points.length - 1] === pts[pts.length - 1] };
+    } finally { s.points = keep; d.clearPredictionCache(); }
+  });
+  r.check("f17-a 電圧グラフは過去2日ぶんを出す(5分間隔でも1日で切れない)。点数が多いときは間引いて最新点を残す",
+    twoDays.spanH >= 46 && twoDays.n <= 600 && twoDays.lastIsNewest && twoDays.oldSpanH < 30, twoDays);
   r.check("f15-a 下限より1V以上低い値(0V・欠測)は電圧として扱わない(下限10.5Vの拠点は9.5V未満、北沢9.5Vは8.5V未満)",
     glitch.ok.join() === "true,true,true,false,false,true,false", glitch.ok);
   r.check("f15-b 0Vの欠測が混ざっていても、電圧の予測は引きずられない",
