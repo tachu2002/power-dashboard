@@ -946,13 +946,13 @@
           <div class="rk-other" id="rankOther"></div>
           <div class="health-note" id="rankHowto">
             <b>このランキングの目的</b> … 電池が底を尽きると機器が止まります。<b>止まる前に、劣化の早い電池を見つけて交換する</b>ための順位です。評価は「いま付いている電池」だけで行い、交換前の電池の値は使いません（交換した電池が新品とは限らないため）。全拠点を必ず採点します。<br>
-            <b>並び順</b>（上ほど先に交換）… 点数の低い順です。同点のときだけ、電池切れで停止中 → 論外（晴れた日に満充電へ届かない） → まもなく底（下限まであと12時間未満）の順に上へ並べます。この3つは並びとは別に、赤いラベルで目立たせます。<br>
-            <b>点数</b>（10.0が良好・低いほど交換が近い）は、次の2つの平均です。<br>
-            ・<b>満充電への到達（必須）</b>… 日中が晴れた日に、電池が満充電（端子電圧13V以上）まで届いたか。<b>届かないのは論外で、劣化がかなり進んでいる</b>ものとして扱います。全拠点は同じ地域で日射が共通なので、全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とします（曇りの日と、曇りが続いた直後の最初の晴れ間は、深く放電した電池が1日では戻りきれないので数えません）。<b>直近の晴れた3日のうち2日以上13Vに届かなかった拠点は「論外」</b>とし、点数も最大3.9に抑えます。点数は、晴れた日に届いた割合（95%以上で10.0、40%以下で0）です。<br>
-            ・<b>下限までの放電</b>… 直近の夜（0:00〜4:00）の電圧降下の速さのまま下がり続けたとき、0時の電圧から<b>その拠点の下限電圧</b>（北沢アンダーパス9.5V／多呂樋管・梅名樋管2号・芝橋・中村橋10.5V／既定11.5V）まで何時間かかるか。48時間以上で10.0、12時間以下で0です。<br>
+            <b>並び順</b>（上ほど先に交換）… 点数の低い順です。同点のときだけ、電池切れで停止中 → 論外（晴れた日に一度も満充電へ届かない） → まもなく底（下限まであと12時間未満）の順に上へ並べます。この3つは並びとは別に、赤いラベルで目立たせます。<br>
+            <b>点数</b>（10.0が良好・低いほど交換が近い）は、<b>前夜の電圧降下だけ</b>で決めます。<br>
+            ・<b>前夜の電圧降下（下限までの放電）</b>… 直近の夜（0:00〜4:00）の電圧降下の速さのまま下がり続けたとき、0時の電圧から<b>その拠点の下限電圧</b>（北沢アンダーパス9.5V／多呂樋管・梅名樋管2号・芝橋・中村橋10.5V／既定11.5V）まで何時間かかるか。48時間以上で10.0、12時間以下で0です。<br>
+            ・<b>「論外」は点数ではなく目印</b>… 晴れた日の日中に、電池が満充電（端子電圧13V以上）へ<b>一度も届いていない</b>拠点です。直近の晴れた3日のうち1日でも13Vに届いていれば論外にしません。全拠点は同じ地域で日射が共通なので、全拠点の半分以上が13Vに届き、前日もそうだった日を「晴れた日」とします（曇りの日と、曇りが続いた直後の最初の晴れ間は数えません）。点数は下げず、赤いラベルで知らせます。<br>
             電池を交換したばかりで、交換後の夜の実測がまだ無い拠点は、消費電流と全拠点の標準的な放電の速さから見込んで採点します（確度「低」。実測の夜がそろえば自動で実測に置き換わります）。
             このランキングは「電池の傷み具合」の順で、「健全性の一覧」の状態（今すぐ持つか）とは見る観点が違います（各行に一覧の状態も添えています）。
-            満充電に届かない原因が電池ではなく、パネルの汚れ・日陰・負荷の大きさのこともあるため、<b>点数は順位をつけるための目安</b>です。ランキングは更新のたびに入れ替わります。
+            前夜の降下は天気（前日の発電）の影響を受けるため、<b>点数は順位をつけるための目安</b>です。ランキングは更新のたびに入れ替わります。
           </div>
         </div>
 
@@ -2452,7 +2452,7 @@
    * ここでは点数の低い順(=交換が近い順)に並べ直して見せるだけ。同点は同じ順位にする。
    * 採点できないものは順位をつけず、「測定中」「交換直後」として下に分ける。
    * --------------------------------------------------------------------- */
-  var RANK_PART_ORDER = [["charge", "満充電への到達"], ["floor", "下限までの放電"]];
+  var RANK_PART_ORDER = [["floor", "前夜の電圧降下(下限までの放電)"]];
   var RANK_SOON_HOURS = 12;   // 下限まであと何時間未満を「まもなく底」とするか
   var RANK_TIER_LABEL = ["停止中", "論外", "まもなく底"];
   var RANK_GRADE_CLASS = { good: "ok", watch: "watch", plan: "warn", replace: "bad" };
@@ -2482,7 +2482,7 @@
     });
     var scored = rows.filter(function (r) { return typeof r.d.score === "number"; });
     // 機器が止まる前に交換するためのランキング。優先度の高い順に
-    //  優先度(ラベル用): 0 停止中(電池切れ) → 1 論外(晴れた日に満充電へ届かない) → 2 まもなく底(下限まで12時間未満) → 3 通常。
+    //  優先度(ラベル用): 0 停止中(電池切れ) → 1 論外(晴れた日に一度も満充電へ届かない) → 2 まもなく底(下限まで12時間未満) → 3 通常。
     scored.forEach(function (r) {
       var cut = cutOf[r.id];
       var h = hoursOf[r.id];
@@ -2540,7 +2540,7 @@
       if (r.tier === 0) sub.push("電池切れで機器が止まっています。すぐ交換");
       if (r.tier === 2) sub.push("下限まであと" + fmtEndurance(res.hoursOf[r.id]) + "。止まる前に交換");
       if (d.fail13 && d.reach) {
-        sub.push("晴れた日に満充電(13V)へ届かない（直近" + d.reach.recentDays + "日中" + d.reach.recentMissed + "日）");
+        sub.push("論外: 直近の晴れた" + d.reach.recentDays + "日、日中に一度も満充電(13V)へ届いていない");
       }
       if (e.lastSwapAt) sub.push("最終交換 " + e.lastSwapAt.slice(5).replace("-", "/"));
       var h = res.hoursOf[r.id];
@@ -2570,7 +2570,7 @@
         + '<div class="rk-score"><span class="rk-num">—</span><span class="rk-max">/10.0</span></div>'
         + '<div class="rk-gauge"></div>'
         + '<div class="rk-pill"><span class="ht-pill watch">' + why + "</span></div>"
-        + '<div class="rk-parts"><span class="rk-part rk-none">満充電への到達 —</span><span class="rk-part rk-none">下限までの放電 —</span></div></li>';
+        + '<div class="rk-parts"><span class="rk-part rk-none">前夜の電圧降下(下限までの放電) —</span></div></li>';
     }).join("");
     list.innerHTML = rowHtml.join("") + unscoredHtml;
     other.innerHTML = unscored.length
@@ -2579,7 +2579,7 @@
     var urgent = res.scored.filter(function (r) { return r.d.grade === "replace" || r.d.grade === "plan"; });
     var stamp = batteryHealthState.generatedAt ? fmtOutlookWhen(batteryHealthState.generatedAt.getTime()) : "";
     var fails = res.scored.filter(function (r) { return r.d.fail13; });
-    note.textContent = (fails.length ? "晴れた日に満充電(13V)へ届かない「論外」の拠点が " + fails.length + "拠点あります。" : "")
+    note.textContent = (fails.length ? "晴れた日に一度も満充電(13V)へ届かない「論外」の拠点が " + fails.length + "拠点あります。" : "")
       + (urgent.length
       ? "交換を検討したい拠点が " + urgent.length + "拠点あります。"
       : "いま交換を急ぐ拠点はありません。")
@@ -2870,20 +2870,49 @@
     }
     return times.map(function (t) { return marginLeft + ((t - times[0]) / span) * plotW; });
   }
+  /* 折れ線をなめらかにする(水位グラフ用)。山や谷の折り返しに丸みを付ける。
+     単調3次補間(Fritsch–Carlson法)なので、実測値の範囲を超えて膨らまない
+     (山の頂点は実測の最大値のまま、谷は最小値のまま、尖りだけが丸くなる)。 */
+  function monotoneTangents(xs, ys) {
+    var n = xs.length, d = [], m = [], i;
+    for (i = 0; i < n - 1; i++) {
+      var dx = xs[i + 1] - xs[i];
+      d.push(dx > 0 ? (ys[i + 1] - ys[i]) / dx : 0);
+    }
+    m[0] = d[0] || 0; m[n - 1] = d[n - 2] || 0;
+    for (i = 1; i < n - 1; i++) m[i] = (d[i - 1] * d[i] <= 0) ? 0 : (d[i - 1] + d[i]) / 2;
+    for (i = 0; i < n - 1; i++) {
+      if (d[i] === 0) { m[i] = 0; m[i + 1] = 0; continue; }
+      var a = m[i] / d[i], b = m[i + 1] / d[i], h = a * a + b * b;
+      if (h > 9) { var t = 3 / Math.sqrt(h); m[i] = t * a * d[i]; m[i + 1] = t * b * d[i]; }
+    }
+    return m;
+  }
   // 実測区間は実線、予測区間(p.predicted===true)は点線で描く。境界は連続させる。
-  function buildSplitPathData(points, xs, yAt) {
+  // smooth=true のときは、折り返しを丸めたなめらかな曲線で結ぶ。
+  function buildSplitPathData(points, xs, yAt, smooth) {
     var solid = [], dashed = [];
     var boundary = -1;
     for (var i = 0; i < points.length; i++) { if (points[i].predicted) { boundary = i; break; } }
+    var ys = points.map(function (p) { return yAt(p.value); });
+    var tan = smooth && points.length > 2 ? monotoneTangents(xs, ys) : null;
+    var f2 = function (v) { return v.toFixed(2); };
+    // i-1 → i の線分。smoothなら3次ベジェ、そうでなければ直線。
+    var seg = function (i) {
+      if (!tan) return "L" + f2(xs[i]) + "," + f2(ys[i]);
+      var dx = (xs[i] - xs[i - 1]) / 3;
+      return "C" + f2(xs[i - 1] + dx) + "," + f2(ys[i - 1] + tan[i - 1] * dx) + " "
+        + f2(xs[i] - dx) + "," + f2(ys[i] - tan[i] * dx) + " " + f2(xs[i]) + "," + f2(ys[i]);
+    };
     points.forEach(function (p, i) {
-      var seg = (xs[i]).toFixed(2) + "," + yAt(p.value).toFixed(2);
-      if (boundary < 0 || i < boundary) solid.push((solid.length === 0 ? "M" : "L") + seg);
-      else dashed.push((dashed.length === 0 ? "M" : "L") + seg);
+      var first = f2(xs[i]) + "," + f2(ys[i]);
+      if (boundary < 0 || i < boundary) solid.push(solid.length === 0 ? "M" + first : seg(i));
+      else dashed.push(dashed.length === 0 ? "M" + first : seg(i));
     });
     // 実線の最終点から点線を始めることで、境界で線が途切れないようにする。
     if (boundary > 0 && dashed.length) {
-      dashed.unshift("M" + xs[boundary - 1].toFixed(2) + "," + yAt(points[boundary - 1].value).toFixed(2));
-      dashed[1] = "L" + dashed[1].slice(1);
+      dashed.unshift("M" + f2(xs[boundary - 1]) + "," + f2(ys[boundary - 1]));
+      dashed[1] = seg(boundary);
     }
     return { solid: solid.join(" "), dashed: dashed.join(" "), boundaryIndex: boundary };
   }
@@ -3213,7 +3242,7 @@
         });
         legendEl.style.display = (hasRain || hasPredicted || lastThresholds.length) ? "" : "none";
       }
-      var waterSplit = buildSplitPathData(points, xs, yAt);
+      var waterSplit = buildSplitPathData(points, xs, yAt, true);
       if (waterSplit.boundaryIndex > 0) {
         var nowX2 = xAt(waterSplit.boundaryIndex - 1);
         svg.appendChild(el("line", { x1: nowX2, x2: nowX2, y1: marginTop, y2: marginTop + plotH, stroke: pal.baseline, "stroke-width": 1, "stroke-dasharray": "2 2", opacity: 0.7 }));
@@ -3312,7 +3341,9 @@
       var pad = (vMax - vMin) * 0.2; vMin -= pad; vMax += pad;
       function xAt(i) { return n <= 1 ? marginLeft + plotW / 2 : marginLeft + (i / (n - 1)) * plotW; }
       function yAt(v) { return marginTop + plotH - ((v - vMin) / (vMax - vMin)) * plotH; }
-      var d = vals.map(function (v, i) { return (i === 0 ? "M" : "L") + xAt(i).toFixed(2) + "," + yAt(v).toFixed(2); }).join(" ");
+      // 折り返し(山・谷)に丸みを付けたなめらかな線で描く
+      var d = buildSplitPathData(vals.map(function (v) { return { value: v }; }),
+        vals.map(function (_, i) { return xAt(i); }), yAt, true).solid;
       svg.appendChild(el("path", { d: d, fill: "none", stroke: pal.water, "stroke-width": 2, "stroke-linecap": "round", "stroke-linejoin": "round" }));
       var lastIdx = n - 1;
       svg.appendChild(el("circle", { cx: xAt(lastIdx), cy: yAt(vals[lastIdx]), r: 3, fill: pal.water, stroke: pal.surface, "stroke-width": 1.5 }));
