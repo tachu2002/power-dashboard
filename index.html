@@ -3851,8 +3851,8 @@
     updateBatteryGauge(site, lastBat ? lastBat.bat : null);
     var batForecast = cachedPrediction(site, "bat");
     // 予測を表示する場合は、過去2日＋先7日の範囲で描く(日付つきの時刻ラベル)。
-    var batWindow = batForecast.length ? BAT_CHART_PAST_WINDOW_MS : undefined;
-    var batSel = selectRecentForChart(s.points, function (p) { return isPlausibleBat(site.id, p.bat); }, batWindow, batForecast.length ? BAT_CHART_MAX_POINTS : undefined);
+    // 予報が取れていない間(通信失敗など)も、過去2日の表示は変えない。
+    var batSel = selectRecentForChart(s.points, function (p) { return isPlausibleBat(site.id, p.bat); }, BAT_CHART_PAST_WINDOW_MS, BAT_CHART_MAX_POINTS);
     s.batChart.setData(buildSeriesWithForecast(batSel.points, "bat", batForecast, fmtMdHm));
     // 残量の見通しは実測(発電W)を使うため、新しい実測が入ったら「持ち」の表示も出し直す。
     // (これが無いと、起動直後にまだ実測が無くて見通しを出せなかった表示のままになる。)
