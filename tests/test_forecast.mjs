@@ -1421,6 +1421,27 @@ export async function run() {
   });
   r.check("f17-a 電圧グラフは過去2日ぶんを出す(5分間隔でも1日で切れない)。点数が多いときは間引いて最新点を残す",
     twoDays.spanH >= 46 && twoDays.n <= 600 && twoDays.lastIsNewest && twoDays.oldSpanH < 30, twoDays);
+  const twoDaysNoFc = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const MIN = 60000, now = Date.now();
+    const VIA = "サーバー(mini.lhlab-vps.net 電源CSV)";
+    const s = d.siteStates.cam14, keep = s.points.slice();
+    const fs = d.getForecastState(), keepHours = fs.hours;
+    try {
+      fs.hours = []; // 天気予報が取れていない状態(通信失敗など)
+      const pts = [];
+      for (let i = 3 * 288; i >= 0; i--) pts.push({ fetchedAt: new Date(now - i * 5 * MIN), pv: 0, bat: 12.2 + 0.2 * Math.sin(i / 40), loadW: 15, via: VIA });
+      s.points = pts;
+      d.clearPredictionCache();
+      d.refreshPowerCard(d.SITE_CATALOG.cam14);
+      const svg = document.querySelector("#pchart-bat-cam14 svg");
+      const labs = Array.from(svg.querySelectorAll("text")).map((t) => t.textContent).filter((t) => /^\d+\/\d+ \d+:\d+$/.test(t));
+      const md = (t) => { const m = t.match(/^(\d+)\/(\d+)/); return new Date(2026, +m[1] - 1, +m[2]).getTime(); };
+      const days = labs.length ? Math.round((md(labs[labs.length - 1]) - md(labs[0])) / 86400000) : -1;
+      return { labs, days };
+    } finally { fs.hours = keepHours; s.points = keep; d.clearPredictionCache(); d.refreshPowerCard(d.SITE_CATALOG.cam14); }
+  });
+  r.check("f17-b 天気予報が取れていなくても、電圧グラフは過去2日ぶんを出す(1日表示に戻らない)", twoDaysNoFc.days >= 2, twoDaysNoFc);
   r.check("f15-a 下限より1V以上低い値(0V・欠測)は電圧として扱わない(下限10.5Vの拠点は9.5V未満、北沢9.5Vは8.5V未満)",
     glitch.ok.join() === "true,true,true,false,false,true,false", glitch.ok);
   r.check("f15-b 0Vの欠測が混ざっていても、電圧の予測は引きずられない",
