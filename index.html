@@ -470,7 +470,7 @@
   .health-scatter-card .chart-box { height: 280px; min-height: 160px; }
   .health-scatter-card h2 { font-size: 14px; margin: 0; }
   .health-scatter-card .subtitle { font-size: 11px; margin: 2px 0 0; }
-  /* バッテリー交換ランキング(「交換ランキング」ボタンで開閉)。10.0満点で、低いほど交換が近い。 */
+  /* バッテリー劣化ランキング(「劣化ランキング」ボタンで開閉)。10.0満点で、低いほど交換が近い。 */
   .rank-card { margin-bottom: 10px; display: none; padding: 14px 16px 12px; }
   .rank-card.show { display: block; }
   .rank-card h2 { font-size: 15px; margin: 0; }
@@ -938,7 +938,7 @@
         <div class="card rank-card show" id="rankCard">
           <div class="site-card-header">
             <div class="site-title-wrap">
-              <h2>バッテリー交換ランキング</h2>
+              <h2>バッテリー劣化ランキング</h2>
               <p class="subtitle" id="rankNote">算出中…</p>
             </div>
           </div>
@@ -1980,6 +1980,15 @@
       title = "この拠点は常時電源です（0時でも " +
         (typeof e.v0 === "number" ? e.v0.toFixed(2) + "V" : "13V超") +
         "）。バッテリー運用をしていないため持ち時間は出しません。";
+    } else if (hours === null && e.degrade && e.degrade.floor && isFinite(e.degrade.floor.hours) && e.degrade.floor.hours < 1e8) {
+      // 容量がまだ測れない拠点(電池を頻繁に載せ替える等)でも、前夜の電圧降下の速さから
+      // 「このまま日射が無ければ下限まであと何時間か」は出せる。「測定中」のまま止めない。
+      var fh = e.degrade.floor.hours;
+      text = fmtEndurance(fh); cls = enduranceClass(fh); sub = "夜の降下から概算";
+      title = "バッテリーの持ち(概算): 容量がまだ測れていないため、前夜の電圧降下の速さから出しています。\n" +
+        "前夜の降下 " + (e.degrade.floor.vPerH * 1000).toFixed(1) + "mV/h のままなら、" +
+        e.degrade.floor.v0 + "V → 下限" + e.degrade.floor.floorV + "Vまで約" + fh + "時間(日射なしの場合)。\n" +
+        "容量が測れ次第、日射予報を加味した見通しに切り替わります。";
     } else if (hours === null) {
       text = "測定中"; cls = "muted";
       // 日数は足りているのにばらつきで確定しない場合と、そもそも日数が足りない場合を書き分ける
@@ -2447,7 +2456,7 @@
     return ["良好", "ok"];
   }
   /* ---------------------------------------------------------------------
-   * 交換ランキング(「交換ランキング」ボタンで開閉)
+   * 劣化ランキング(「劣化ランキング」ボタンで開閉)
    * 劣化スコアは scripts/poll.mjs が battery_health.json の degrade に書き出す(10.0満点・高いほど良好)。
    * ここでは点数の低い順(=交換が近い順)に並べ直して見せるだけ。同点は同じ順位にする。
    * 採点できないものは順位をつけず、「測定中」「交換直後」として下に分ける。
@@ -6832,7 +6841,7 @@
   document.getElementById("rankBtn").addEventListener("click", function () {
     var card = document.getElementById("rankCard");
     var showing = card.classList.toggle("show");
-    this.textContent = showing ? "ランキングを隠す" : "交換ランキング";
+    this.textContent = showing ? "ランキングを隠す" : "劣化ランキング";
     if (showing) renderRankCard();
   });
   document.getElementById("tableBtn").addEventListener("click", function () {
