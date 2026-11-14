@@ -966,6 +966,23 @@ export async function run() {
   }
   // 曇りが続いた直後の最初の晴れ間は、深く放電した電池が戻りきれないので「届かなかった」と数えない
   {
+    // 電池を約10日ごとに載せ替える拠点: 組が9つでも、当てはまりが良ければ容量を出す(測定中のままにしない)
+    const mk = (noise) => {
+      const ser = []; let v = 12.0;
+      const bal = [-60, 70, -50, 80, -70, 60, -55, 90, -65, 45];
+      for (let i = 0; i < 10; i++) {
+        ser.push({ day: dayKey(now - (12 - i) * 24 * HOUR), d: { v0: Math.round(v * 1000) / 1000, balWh: bal[i] } });
+        const rnd = [0.9, -0.7, 0.2, -0.95, 0.6, -0.1, 0.8, -0.5, 0.3, -0.85][i];   // 収支と無関係なばらつき
+        v += (noise ? 0 : bal[i] / 400) + noise * rnd;
+      }
+      return ser;
+    };
+    const good = M.capacityFromSeries(mk(0), null);
+    const bad = M.capacityFromSeries(mk(0.45), null);
+    r.check("s22-g 組が10に満たなくても、当てはまりが非常に良ければ容量を出す。悪ければ出さない",
+      !!good && good.pairs < M.BATTERY_MIN_DAYS && good.r >= 0.85 && !bad, { good: good && { pairs: good.pairs, r: good.r }, bad });
+  }
+  {
     const sitesC = { a: {}, b: {}, c: {}, d: {}, x: {} };
     Object.values(sitesC).forEach((o) => Object.assign(o, { mains: false, lastSwapAt: null, capDaysAfterSwap: null }));
     const dm = {}, dd = [];

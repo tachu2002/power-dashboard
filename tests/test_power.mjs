@@ -218,6 +218,18 @@ export async function run() {
     health.mains.text === "常時" && health.mains.sub === "常時電源" && health.mains.cls === "ok", health.mains);
   r.check("p8-j 日数が足りない拠点は「測定中」",
     health.pending.text === "測定中" && health.pending.cls === "muted", health.pending);
+  const fallback = await pageH.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const e = d.getBatteryHealthState().sites.cam13, keep = e.degrade;
+    try {
+      e.degrade = { score: 0.2, floor: { v0: 11.87, floorV: 11.5, vPerH: 0.0286, hours: 12.8 } };
+      d.updateBatteryHealth(d.SITE_CATALOG.cam13);
+      const s = d.siteStates.cam13;
+      return { text: s.healthValueEl.textContent, sub: s.healthSubEl.textContent, cls: s.healthValueEl.className };
+    } finally { e.degrade = keep; d.updateBatteryHealth(d.SITE_CATALOG.cam13); }
+  });
+  r.check("p8-j2 容量が測れなくても、前夜の電圧降下から出した持ち時間を出す(「測定中」のまま止めない)",
+    fallback.text === "13h" && fallback.sub === "夜の降下から概算" && /critical|warn/.test(fallback.cls), fallback);
   r.check("p8-k 指標に出ていない拠点は「—」",
     health.none.text === "—" && health.none.cls === "muted" && health.none.sub === "データなし", health.none);
   r.check("p8-m 算出根拠(容量・夜間電流・残量・下限電圧)をtitleに出す",
@@ -412,7 +424,7 @@ export async function run() {
   r.check("p8-h14 ページ例外にはならない", pageHT.errMsgs().length === 0, pageHT.errMsgs());
   await pageHT.close();
 
-  /* ===== 交換ランキング(「交換ランキング」ボタン) =====
+  /* ===== 劣化ランキング(「劣化ランキング」ボタン) =====
      劣化スコアは poller が書き出す(10.0満点・高いほど良好)。評価は「満充電(13V)への到達(必須)」と
      「前夜の降下で下限まで何時間か」だけ。晴れた日に13Vへ届かない拠点は「論外」で、点数にかかわらず先頭。
      同点は同じ順位、採点できない拠点(交換直後・測定中)は順位をつけず下に分ける。 */
@@ -452,6 +464,8 @@ export async function run() {
     hidden: !document.getElementById("rankCard").classList.contains("show"),
     btn: document.getElementById("rankBtn").textContent
   }));
+  const rkTitle = await pageRK.evaluate(() => document.querySelector("#rankCard h2").textContent);
+  r.check("p9-title ランキングの名称は「バッテリー劣化ランキング」", rkTitle === "バッテリー劣化ランキング", rkTitle);
   r.check("p9-a ランキングは既定で表示してある", !rk0.hidden && rk0.btn === "ランキングを隠す", rk0);
   const rk = await pageRK.evaluate(() => {
     const rows = Array.from(document.querySelectorAll("#rankList .rk-row"));
