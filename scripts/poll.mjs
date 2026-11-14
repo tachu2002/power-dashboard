@@ -913,6 +913,8 @@ function mergeDailyStores(store, longTerm) {
    黒字の日で、翌日0時の電圧が満充電の水準(BATTERY_FULL_REST_V)以上の組は、入りきらなかった分が
    捨てられているので使わない。使える組が減るぶん、直近から数えて BATTERY_WINDOW_DAYS 組まで、
    最大 BATTERY_WINDOW_SEARCH_DAYS 日さかのぼって集める。 */
+const BATTERY_SHORT_FIT_MIN_DAYS = 6;    // 組が少なくても容量を出す最小の組数
+const BATTERY_SHORT_FIT_MIN_R = 0.85;    // その場合に必要な当てはまり(通常は0.6)
 const BATTERY_FULL_REST_V = 12.30;
 const BATTERY_WINDOW_SEARCH_DAYS = 90;
 function capacityPairs(series, tempC, keepFull) {
@@ -931,9 +933,13 @@ function capacityFromSeries(series, tempC, keepFull) {
   const pts = capacityPairs(series, tempC, !!keepFull).slice(-BATTERY_WINDOW_DAYS);
   const keptFull = !!keepFull;
   const temps = pts.map(function (p) { return p.t; }).filter(function (t) { return t !== null; });
-  if (pts.length < BATTERY_MIN_DAYS) return null;
+  if (pts.length < BATTERY_SHORT_FIT_MIN_DAYS) return null;
   const fit = fitLine(pts);
   if (!fit || !(fit.b > 1e-6)) return null;
+  // 組が少ない(BATTERY_MIN_DAYS未満の)ときは、当てはまりがとても良い場合だけ採用する。
+  // 交換を繰り返す拠点(清住緑地: 約10日ごとに載せ替え)は、どの電池の区間も10組に届かず、
+  // 「測定中」のまま持ち時間がずっと出なかった。
+  if (pts.length < BATTERY_MIN_DAYS && !(fit.r >= BATTERY_SHORT_FIT_MIN_R)) return null;
   const vs = series.map(function (p) { return p.d.v0; })
     .filter(function (v) { return typeof v === "number"; });
   if (!vs.length) return null;
