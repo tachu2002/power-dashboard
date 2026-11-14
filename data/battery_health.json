@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-14T16:01:05.822Z",
+  "generatedAt": "2026-11-14T17:10:07.063Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -100,7 +100,7 @@
         12.168,
         12.176,
         12.154,
-        12.264
+        12.247
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -120,7 +120,7 @@
       "nightGenMaxWh": 125,
       "capKeptFull": false,
       "degrade": {
-        "score": 8.2,
+        "score": 8.1,
         "grade": "good",
         "gradeLabel": "良好",
         "confidence": "高",
@@ -132,9 +132,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 8.2,
-            "value": 41.5,
-            "text": "直近の夜(11/14)の降下 17.8mV/hのままなら、12.24V → 下限11.5Vまで約42時間"
+            "score": 8.1,
+            "value": 41.3,
+            "text": "前夜の降下 18.8mV/hのままなら、12.28V → 下限11.5Vまで約41時間"
           }
         ],
         "reach": {
@@ -148,11 +148,11 @@
           "medianV": 13.63
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.238,
+          "day": "2026-11-15",
+          "v0": 12.276,
           "floorV": 11.5,
-          "vPerH": 0.0178,
-          "hours": 41.5
+          "vPerH": 0.0188,
+          "hours": 41.3
         }
       }
     },
@@ -246,7 +246,7 @@
         12.234,
         12.181,
         12.159,
-        12.19
+        12.172
       ],
       "swaps": [
         "2026-11-04",
@@ -263,15 +263,15 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 91,
-      "mvPerAhNow": 11.6,
+      "mvPerAhNow": 11.9,
       "mvPerAhPrev": null,
-      "nightNights": 12,
+      "nightNights": 13,
       "nightGenMaxWh": 126,
       "capKeptFull": false,
       "degrade": {
-        "score": 10,
-        "grade": "good",
-        "gradeLabel": "良好",
+        "score": 7.7,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
         "confidence": "低",
         "fresh": true,
         "estimated": false,
@@ -281,9 +281,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 10,
-            "value": 57.4,
-            "text": "直近の夜(11/14)の降下 12.9mV/hのままなら、12.24V → 下限11.5Vまで約57時間"
+            "score": 7.7,
+            "value": 39.9,
+            "text": "前夜の降下 17.6mV/hのままなら、12.20V → 下限11.5Vまで約40時間"
           }
         ],
         "reach": {
@@ -297,11 +297,11 @@
           "medianV": 13.6
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.238,
+          "day": "2026-11-15",
+          "v0": 12.203,
           "floorV": 11.5,
-          "vPerH": 0.0129,
-          "hours": 57.4
+          "vPerH": 0.0176,
+          "hours": 39.9
         }
       }
     },
@@ -395,7 +395,7 @@
         12.453,
         12.418,
         12.396,
-        12.471
+        12.449
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -428,8 +428,8 @@
             "key": "floor",
             "label": "下限までの放電",
             "score": 10,
-            "value": 75.8,
-            "text": "直近の夜(11/14)の降下 12.7mV/hのままなら、12.46V → 下限11.5Vまで約76時間"
+            "value": 51.5,
+            "text": "前夜の降下 19.1mV/hのままなら、12.48V → 下限11.5Vまで約52時間"
           }
         ],
         "reach": {
@@ -443,11 +443,11 @@
           "medianV": 13.86
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.461,
+          "day": "2026-11-15",
+          "v0": 12.482,
           "floorV": 11.5,
-          "vPerH": 0.0127,
-          "hours": 75.8
+          "vPerH": 0.0191,
+          "hours": 51.5
         }
       }
     },
@@ -456,7 +456,7 @@
       "mains": false,
       "v0": 12.311,
       "socPct": 65,
-      "nightA": 0.945,
+      "nightA": 0.946,
       "vmin": 12.18,
       "capacityAh": 47.9,
       "fitR": 0.919,
@@ -541,7 +541,7 @@
         12.278,
         12.247,
         12.212,
-        12.278
+        12.26
       ],
       "swaps": [
         "2026-10-27"
@@ -563,9 +563,9 @@
       "nightGenMaxWh": 159,
       "capKeptFull": false,
       "degrade": {
-        "score": 10,
-        "grade": "good",
-        "gradeLabel": "良好",
+        "score": 5,
+        "grade": "plan",
+        "gradeLabel": "交換を検討",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
@@ -575,9 +575,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 10,
-            "value": 49.3,
-            "text": "直近の夜(11/14)の降下 16.2mV/hのままなら、12.30V → 下限11.5Vまで約49時間"
+            "score": 5,
+            "value": 29.9,
+            "text": "前夜の降下 27.1mV/hのままなら、12.31V → 下限11.5Vまで約30時間"
           }
         ],
         "reach": {
@@ -591,11 +591,11 @@
           "medianV": 13.49
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.299,
+          "day": "2026-11-15",
+          "v0": 12.311,
           "floorV": 11.5,
-          "vPerH": 0.0162,
-          "hours": 49.3
+          "vPerH": 0.0271,
+          "hours": 29.9
         }
       }
     },
@@ -689,7 +689,7 @@
         11.75,
         11.741,
         11.71,
-        11.838
+        11.82
       ],
       "swaps": [
         "2026-09-10",
@@ -707,12 +707,12 @@
       "ratedAh": 50,
       "sohPct": 68,
       "mvPerAhNow": 13.2,
-      "mvPerAhPrev": 17.6,
-      "nightNights": 24,
+      "mvPerAhPrev": 17.9,
+      "nightNights": 25,
       "nightGenMaxWh": 163,
       "capKeptFull": false,
       "degrade": {
-        "score": 9.6,
+        "score": 10,
         "grade": "good",
         "gradeLabel": "良好",
         "confidence": "高",
@@ -724,9 +724,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 9.6,
-            "value": 46.6,
-            "text": "直近の夜(11/14)の降下 29.1mV/hのままなら、11.85V → 下限10.5Vまで約47時間"
+            "score": 10,
+            "value": 65.2,
+            "text": "前夜の降下 20.8mV/hのままなら、11.86V → 下限10.5Vまで約65時間"
           }
         ],
         "reach": {
@@ -740,11 +740,11 @@
           "medianV": 13.21
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 11.854,
+          "day": "2026-11-15",
+          "v0": 11.856,
           "floorV": 10.5,
-          "vPerH": 0.0291,
-          "hours": 46.6
+          "vPerH": 0.0208,
+          "hours": 65.2
         }
       }
     },
@@ -838,7 +838,7 @@
         12.216,
         12.212,
         12.194,
-        12.256
+        12.242
       ],
       "swaps": [
         "2026-07-03"
@@ -873,8 +873,8 @@
             "key": "floor",
             "label": "下限までの放電",
             "score": 10,
-            "value": 48,
-            "text": "直近の夜(11/14)の降下 15.8mV/hのままなら、12.26V → 下限11.5Vまで約48時間"
+            "value": 65.5,
+            "text": "前夜の降下 11.7mV/hのままなら、12.27V → 下限11.5Vまで約65時間"
           }
         ],
         "reach": {
@@ -888,11 +888,11 @@
           "medianV": 13.4
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.261,
+          "day": "2026-11-15",
+          "v0": 12.266,
           "floorV": 11.5,
-          "vPerH": 0.0158,
-          "hours": 48
+          "vPerH": 0.0117,
+          "hours": 65.5
         }
       }
     },
@@ -979,7 +979,7 @@
         11.688,
         11.776,
         11.728,
-        11.851
+        11.812
       ],
       "swaps": [
         "2026-07-04",
@@ -999,12 +999,12 @@
       "ratedAh": null,
       "sohPct": null,
       "mvPerAhNow": 10.7,
-      "mvPerAhPrev": 10.2,
-      "nightNights": 20,
+      "mvPerAhPrev": 10.5,
+      "nightNights": 21,
       "nightGenMaxWh": 172,
       "capKeptFull": false,
       "degrade": {
-        "score": 0.3,
+        "score": 0.1,
         "grade": "replace",
         "gradeLabel": "要交換",
         "confidence": "低",
@@ -1016,9 +1016,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 0.3,
-            "value": 13.1,
-            "text": "直近の夜(11/14)の降下 27.4mV/hのままなら、11.86V → 下限11.5Vまで約13時間"
+            "score": 0.1,
+            "value": 12.4,
+            "text": "前夜の降下 29.5mV/hのままなら、11.87V → 下限11.5Vまで約12時間"
           }
         ],
         "reach": {
@@ -1032,11 +1032,11 @@
           "medianV": 13.23
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 11.859,
+          "day": "2026-11-15",
+          "v0": 11.866,
           "floorV": 11.5,
-          "vPerH": 0.0274,
-          "hours": 13.1
+          "vPerH": 0.0295,
+          "hours": 12.4
         }
       }
     },
@@ -1130,7 +1130,7 @@
         11.935,
         12.058,
         12.009,
-        12.194
+        12.172
       ],
       "swaps": [
         "2026-11-04"
@@ -1146,15 +1146,15 @@
       "mvSpansSwap": true,
       "ratedAh": 50,
       "sohPct": 107,
-      "mvPerAhNow": 9.5,
-      "mvPerAhPrev": 14.5,
-      "nightNights": 19,
+      "mvPerAhNow": 10.6,
+      "mvPerAhPrev": 14.3,
+      "nightNights": 20,
       "nightGenMaxWh": 148,
       "capKeptFull": false,
       "degrade": {
-        "score": 4.7,
-        "grade": "plan",
-        "gradeLabel": "交換を検討",
+        "score": 8.8,
+        "grade": "good",
+        "gradeLabel": "良好",
         "confidence": "低",
         "fresh": true,
         "estimated": false,
@@ -1164,9 +1164,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 4.7,
-            "value": 29,
-            "text": "直近の夜(11/14)の降下 21.3mV/hのままなら、12.12V → 下限11.5Vまで約29時間"
+            "score": 8.8,
+            "value": 43.6,
+            "text": "前夜の降下 16.1mV/hのままなら、12.20V → 下限11.5Vまで約44時間"
           }
         ],
         "reach": {
@@ -1180,11 +1180,11 @@
           "medianV": 13.54
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.118,
+          "day": "2026-11-15",
+          "v0": 12.202,
           "floorV": 11.5,
-          "vPerH": 0.0213,
-          "hours": 29
+          "vPerH": 0.0161,
+          "hours": 43.6
         }
       }
     },
@@ -1193,7 +1193,7 @@
       "mains": false,
       "v0": 12.377,
       "socPct": 71,
-      "nightA": 1.254,
+      "nightA": 1.253,
       "vmin": 12.35,
       "capacityAh": 48.9,
       "fitR": 0.892,
@@ -1278,7 +1278,7 @@
         12.291,
         12.282,
         12.26,
-        12.365
+        12.33
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1298,9 +1298,9 @@
       "nightGenMaxWh": 136,
       "capKeptFull": false,
       "degrade": {
-        "score": 8.5,
-        "grade": "good",
-        "gradeLabel": "良好",
+        "score": 6.4,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
@@ -1310,9 +1310,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 8.5,
-            "value": 42.5,
-            "text": "直近の夜(11/14)の降下 20.1mV/hのままなら、12.36V → 下限11.5Vまで約43時間"
+            "score": 6.4,
+            "value": 35.1,
+            "text": "前夜の降下 25.0mV/hのままなら、12.38V → 下限11.5Vまで約35時間"
           }
         ],
         "reach": {
@@ -1326,11 +1326,11 @@
           "medianV": 13.63
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.355,
+          "day": "2026-11-15",
+          "v0": 12.377,
           "floorV": 11.5,
-          "vPerH": 0.0201,
-          "hours": 42.5
+          "vPerH": 0.025,
+          "hours": 35.1
         }
       }
     },
@@ -1340,7 +1340,7 @@
       "v0": 12.436,
       "socPct": 75,
       "nightA": 0.345,
-      "vmin": 12.414,
+      "vmin": 12.41,
       "capacityAh": 17.9,
       "fitR": 0.96,
       "whPerV": 167,
@@ -1424,7 +1424,7 @@
         12.326,
         12.33,
         12.304,
-        12.414
+        12.383
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1444,9 +1444,9 @@
       "nightGenMaxWh": 62,
       "capKeptFull": false,
       "degrade": {
-        "score": 10,
-        "grade": "good",
-        "gradeLabel": "良好",
+        "score": 7.4,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
@@ -1456,9 +1456,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 10,
-            "value": 50.1,
-            "text": "直近の夜(11/14)の降下 18.0mV/hのままなら、12.40V → 下限11.5Vまで約50時間"
+            "score": 7.4,
+            "value": 38.7,
+            "text": "前夜の降下 24.2mV/hのままなら、12.44V → 下限11.5Vまで約39時間"
           }
         ],
         "reach": {
@@ -1472,11 +1472,11 @@
           "medianV": 13.61
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.403,
+          "day": "2026-11-15",
+          "v0": 12.436,
           "floorV": 11.5,
-          "vPerH": 0.018,
-          "hours": 50.1
+          "vPerH": 0.0242,
+          "hours": 38.7
         }
       }
     },
@@ -1485,12 +1485,12 @@
       "mains": false,
       "v0": 12.183,
       "socPct": 56,
-      "nightA": 0.975,
+      "nightA": 0.974,
       "vmin": 12.18,
       "capacityAh": 41.3,
       "fitR": 0.882,
       "whPerV": 375,
-      "enduranceH": 15.2,
+      "enduranceH": 15.3,
       "usableAh": 14.86,
       "capacityInitialAh": null,
       "capacityNowAh": 43.4,
@@ -1570,7 +1570,7 @@
         12.071,
         12.08,
         12.062,
-        12.168
+        12.132
       ],
       "swaps": [
         "2026-09-10",
@@ -1587,9 +1587,9 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 87,
-      "mvPerAhNow": 13.7,
+      "mvPerAhNow": 13.8,
       "mvPerAhPrev": null,
-      "nightNights": 11,
+      "nightNights": 12,
       "nightGenMaxWh": 138,
       "capKeptFull": false,
       "degrade": {
@@ -1606,8 +1606,8 @@
             "key": "floor",
             "label": "下限までの放電",
             "score": 10,
-            "value": 119.1,
-            "text": "直近の夜(11/14)の降下 22.5mV/hのままなら、12.18V → 下限9.5Vまで約119時間"
+            "value": 97.2,
+            "text": "前夜の降下 27.6mV/hのままなら、12.18V → 下限9.5Vまで約97時間"
           }
         ],
         "reach": {
@@ -1621,11 +1621,11 @@
           "medianV": 13.46
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.18,
+          "day": "2026-11-15",
+          "v0": 12.183,
           "floorV": 9.5,
-          "vPerH": 0.0225,
-          "hours": 119.1
+          "vPerH": 0.0276,
+          "hours": 97.2
         }
       }
     },
@@ -1634,7 +1634,7 @@
       "mains": false,
       "v0": 12.282,
       "socPct": 63,
-      "nightA": 1.372,
+      "nightA": 1.371,
       "vmin": 12.21,
       "capacityAh": 35.2,
       "fitR": 0.816,
@@ -1719,7 +1719,7 @@
         12.225,
         12.185,
         12.168,
-        12.269
+        12.234
       ],
       "swaps": [
         "2026-07-02",
@@ -1758,8 +1758,8 @@
             "key": "floor",
             "label": "下限までの放電",
             "score": 10,
-            "value": 89,
-            "text": "直近の夜(11/14)の降下 19.9mV/hのままなら、12.27V → 下限10.5Vまで約89時間"
+            "value": 66.6,
+            "text": "前夜の降下 26.7mV/hのままなら、12.28V → 下限10.5Vまで約67時間"
           }
         ],
         "reach": {
@@ -1773,11 +1773,11 @@
           "medianV": 13.61
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.268,
+          "day": "2026-11-15",
+          "v0": 12.282,
           "floorV": 10.5,
-          "vPerH": 0.0199,
-          "hours": 89
+          "vPerH": 0.0267,
+          "hours": 66.6
         }
       }
     },
@@ -1786,7 +1786,7 @@
       "mains": false,
       "v0": 12.403,
       "socPct": 73,
-      "nightA": 0.797,
+      "nightA": 0.796,
       "vmin": 12.49,
       "capacityAh": 44.1,
       "fitR": 0.892,
@@ -1871,7 +1871,7 @@
         12.234,
         12.313,
         12.304,
-        12.392
+        12.361
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -1891,7 +1891,7 @@
       "nightGenMaxWh": 139,
       "capKeptFull": false,
       "degrade": {
-        "score": 6.8,
+        "score": 6.9,
         "grade": "watch",
         "gradeLabel": "経過観察",
         "confidence": "高",
@@ -1903,9 +1903,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 6.8,
+            "score": 6.9,
             "value": 36.7,
-            "text": "直近の夜(11/14)の降下 24.9mV/hのままなら、12.41V → 下限11.5Vまで約37時間"
+            "text": "前夜の降下 24.6mV/hのままなら、12.40V → 下限11.5Vまで約37時間"
           }
         ],
         "reach": {
@@ -1919,10 +1919,10 @@
           "medianV": 13.61
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.412,
+          "day": "2026-11-15",
+          "v0": 12.403,
           "floorV": 11.5,
-          "vPerH": 0.0249,
+          "vPerH": 0.0246,
           "hours": 36.7
         }
       }
@@ -1932,7 +1932,7 @@
       "mains": false,
       "v0": 12.208,
       "socPct": 58,
-      "nightA": 0.799,
+      "nightA": 0.8,
       "vmin": 12.229,
       "capacityAh": 37.5,
       "fitR": 0.875,
@@ -2017,7 +2017,7 @@
         12.018,
         12.023,
         11.996,
-        12.203
+        12.172
       ],
       "swaps": [
         "2026-10-01"
@@ -2033,13 +2033,13 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 78,
-      "mvPerAhNow": 14.3,
-      "mvPerAhPrev": null,
-      "nightNights": 15,
+      "mvPerAhNow": 14.4,
+      "mvPerAhPrev": 11.8,
+      "nightNights": 16,
       "nightGenMaxWh": 125,
       "capKeptFull": false,
       "degrade": {
-        "score": 5.2,
+        "score": 5.5,
         "grade": "plan",
         "gradeLabel": "交換を検討",
         "confidence": "高",
@@ -2051,9 +2051,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 5.2,
-            "value": 30.9,
-            "text": "直近の夜(11/14)の降下 19.3mV/hのままなら、12.10V → 下限11.5Vまで約31時間"
+            "score": 5.5,
+            "value": 31.7,
+            "text": "前夜の降下 22.3mV/hのままなら、12.21V → 下限11.5Vまで約32時間"
           }
         ],
         "reach": {
@@ -2067,11 +2067,11 @@
           "medianV": 13.24
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.096,
+          "day": "2026-11-15",
+          "v0": 12.208,
           "floorV": 11.5,
-          "vPerH": 0.0193,
-          "hours": 30.9
+          "vPerH": 0.0223,
+          "hours": 31.7
         }
       }
     },
@@ -2268,7 +2268,7 @@
         12.067,
         12.023,
         12.04,
-        12.141
+        12.119
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2283,14 +2283,14 @@
       "ratedAh": 50,
       "sohPct": 98,
       "mvPerAhNow": 7.6,
-      "mvPerAhPrev": 16.5,
-      "nightNights": 22,
+      "mvPerAhPrev": 15.1,
+      "nightNights": 23,
       "nightGenMaxWh": 115,
       "capKeptFull": false,
       "degrade": {
-        "score": 5.6,
-        "grade": "plan",
-        "gradeLabel": "交換を検討",
+        "score": 7.2,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
@@ -2300,9 +2300,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 5.6,
-            "value": 32.2,
-            "text": "直近の夜(11/14)の降下 19.9mV/hのままなら、12.14V → 下限11.5Vまで約32時間"
+            "score": 7.2,
+            "value": 37.9,
+            "text": "前夜の降下 17.2mV/hのままなら、12.15V → 下限11.5Vまで約38時間"
           }
         ],
         "reach": {
@@ -2316,11 +2316,11 @@
           "medianV": 13.59
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.141,
+          "day": "2026-11-15",
+          "v0": 12.153,
           "floorV": 11.5,
-          "vPerH": 0.0199,
-          "hours": 32.2
+          "vPerH": 0.0172,
+          "hours": 37.9
         }
       }
     },
@@ -2329,7 +2329,7 @@
       "mains": false,
       "v0": 11.952,
       "socPct": 39,
-      "nightA": 1.576,
+      "nightA": 1.577,
       "vmin": 11.85,
       "capacityAh": 40,
       "fitR": 0.749,
@@ -2414,7 +2414,7 @@
         11.601,
         11.776,
         11.772,
-        11.926
+        11.904
       ],
       "swaps": [
         "2026-09-10",
@@ -2434,8 +2434,8 @@
       "ratedAh": 50,
       "sohPct": 85,
       "mvPerAhNow": 10.2,
-      "mvPerAhPrev": 11,
-      "nightNights": 16,
+      "mvPerAhPrev": 14.2,
+      "nightNights": 17,
       "nightGenMaxWh": 145,
       "capKeptFull": false,
       "degrade": {
@@ -2452,8 +2452,8 @@
             "key": "floor",
             "label": "下限までの放電",
             "score": 10,
-            "value": 49.2,
-            "text": "直近の夜(11/14)の降下 28.9mV/hのままなら、11.92V → 下限10.5Vまで約49時間"
+            "value": 57.3,
+            "text": "前夜の降下 25.4mV/hのままなら、11.95V → 下限10.5Vまで約57時間"
           }
         ],
         "reach": {
@@ -2467,11 +2467,11 @@
           "medianV": 13.3
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 11.921,
+          "day": "2026-11-15",
+          "v0": 11.952,
           "floorV": 10.5,
-          "vPerH": 0.0289,
-          "hours": 49.2
+          "vPerH": 0.0254,
+          "hours": 57.3
         }
       }
     },
@@ -2481,7 +2481,7 @@
       "v0": 12.326,
       "socPct": 67,
       "nightA": 1.262,
-      "vmin": 12.295,
+      "vmin": 12.29,
       "capacityAh": 44.5,
       "fitR": 0.926,
       "whPerV": 411,
@@ -2565,7 +2565,7 @@
         12.212,
         12.22,
         12.203,
-        12.313
+        12.282
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2585,7 +2585,7 @@
       "nightGenMaxWh": 138,
       "capKeptFull": false,
       "degrade": {
-        "score": 7,
+        "score": 6.1,
         "grade": "watch",
         "gradeLabel": "経過観察",
         "confidence": "高",
@@ -2597,9 +2597,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 7,
-            "value": 37.2,
-            "text": "直近の夜(11/14)の降下 21.8mV/hのままなら、12.31V → 下限11.5Vまで約37時間"
+            "score": 6.1,
+            "value": 34,
+            "text": "前夜の降下 24.3mV/hのままなら、12.33V → 下限11.5Vまで約34時間"
           }
         ],
         "reach": {
@@ -2613,11 +2613,11 @@
           "medianV": 13.58
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.311,
+          "day": "2026-11-15",
+          "v0": 12.326,
           "floorV": 11.5,
-          "vPerH": 0.0218,
-          "hours": 37.2
+          "vPerH": 0.0243,
+          "hours": 34
         }
       }
     },
@@ -2626,7 +2626,7 @@
       "mains": false,
       "v0": 12.217,
       "socPct": 58,
-      "nightA": 1.245,
+      "nightA": 1.246,
       "vmin": 12.31,
       "capacityAh": 44.5,
       "fitR": 0.946,
@@ -2711,7 +2711,7 @@
         12.075,
         12.102,
         12.084,
-        12.198
+        12.172
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2725,13 +2725,13 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 92,
-      "mvPerAhNow": 10.5,
+      "mvPerAhNow": 12.2,
       "mvPerAhPrev": null,
-      "nightNights": 14,
+      "nightNights": 15,
       "nightGenMaxWh": 141,
       "capKeptFull": false,
       "degrade": {
-        "score": 5.1,
+        "score": 4.3,
         "grade": "plan",
         "gradeLabel": "交換を検討",
         "confidence": "高",
@@ -2743,9 +2743,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 5.1,
-            "value": 30.3,
-            "text": "直近の夜(11/14)の降下 23.1mV/hのままなら、12.20V → 下限11.5Vまで約30時間"
+            "score": 4.3,
+            "value": 27.5,
+            "text": "前夜の降下 26.1mV/hのままなら、12.22V → 下限11.5Vまで約28時間"
           }
         ],
         "reach": {
@@ -2759,11 +2759,11 @@
           "medianV": 13.54
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.198,
+          "day": "2026-11-15",
+          "v0": 12.217,
           "floorV": 11.5,
-          "vPerH": 0.0231,
-          "hours": 30.3
+          "vPerH": 0.0261,
+          "hours": 27.5
         }
       }
     },
@@ -2772,7 +2772,7 @@
       "mains": false,
       "v0": 12.107,
       "socPct": 50,
-      "nightA": 1.764,
+      "nightA": 1.765,
       "vmin": 12.132,
       "capacityAh": 54.2,
       "fitR": 0.941,
@@ -2857,7 +2857,7 @@
         11.68,
         11.847,
         11.917,
-        12.093
+        12.062
       ],
       "swaps": [
         "2026-09-13",
@@ -2871,16 +2871,16 @@
       "capStale": false,
       "capPlaceholder": false,
       "capDaysAfterSwap": 20,
-      "mvSpansSwap": false,
+      "mvSpansSwap": true,
       "ratedAh": 50,
       "sohPct": 114,
       "mvPerAhNow": 8.8,
-      "mvPerAhPrev": null,
-      "nightNights": 15,
+      "mvPerAhPrev": 9.3,
+      "nightNights": 16,
       "nightGenMaxWh": 191,
       "capKeptFull": false,
       "degrade": {
-        "score": 2.5,
+        "score": 3.8,
         "grade": "replace",
         "gradeLabel": "要交換",
         "confidence": "高",
@@ -2892,9 +2892,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 2.5,
-            "value": 20.9,
-            "text": "直近の夜(11/14)の降下 26.6mV/hのままなら、12.06V → 下限11.5Vまで約21時間"
+            "score": 3.8,
+            "value": 25.6,
+            "text": "前夜の降下 23.7mV/hのままなら、12.11V → 下限11.5Vまで約26時間"
           }
         ],
         "reach": {
@@ -2908,11 +2908,11 @@
           "medianV": 13.4
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.056,
+          "day": "2026-11-15",
+          "v0": 12.107,
           "floorV": 11.5,
-          "vPerH": 0.0266,
-          "hours": 20.9
+          "vPerH": 0.0237,
+          "hours": 25.6
         }
       }
     },
@@ -3315,7 +3315,7 @@
         12.049,
         11.987,
         11.943,
-        12.093
+        12.062
       ],
       "swaps": [
         "2026-09-10"
@@ -3331,9 +3331,9 @@
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 79,
-      "mvPerAhNow": 12.9,
-      "mvPerAhPrev": 12.5,
-      "nightNights": 24,
+      "mvPerAhNow": 13.3,
+      "mvPerAhPrev": 12.4,
+      "nightNights": 25,
       "nightGenMaxWh": 138,
       "capKeptFull": false,
       "degrade": {
@@ -3350,8 +3350,8 @@
             "key": "floor",
             "label": "下限までの放電",
             "score": 10,
-            "value": 97.8,
-            "text": "直近の夜(11/14)の降下 15.6mV/hのままなら、12.02V → 下限10.5Vまで約98時間"
+            "value": 92.4,
+            "text": "前夜の降下 17.3mV/hのままなら、12.10V → 下限10.5Vまで約92時間"
           }
         ],
         "reach": {
@@ -3365,11 +3365,11 @@
           "medianV": 13.57
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.023,
+          "day": "2026-11-15",
+          "v0": 12.099,
           "floorV": 10.5,
-          "vPerH": 0.0156,
-          "hours": 97.8
+          "vPerH": 0.0173,
+          "hours": 92.4
         }
       }
     },
@@ -3378,12 +3378,12 @@
       "mains": false,
       "v0": 12.166,
       "socPct": 55,
-      "nightA": 0.145,
+      "nightA": 0.516,
       "vmin": 12.41,
       "capacityAh": 35.5,
       "fitR": 0.899,
       "whPerV": 331,
-      "enduranceH": 85.6,
+      "enduranceH": 24.1,
       "usableAh": 12.41,
       "capacityInitialAh": null,
       "capacityNowAh": 37.2,
@@ -3463,7 +3463,7 @@
         11.948,
         12.036,
         12.049,
-        12.15
+        12.137
       ],
       "swaps": [
         "2026-09-29"
@@ -3481,13 +3481,13 @@
       "sohPct": 74,
       "mvPerAhNow": 12.9,
       "mvPerAhPrev": null,
-      "nightNights": 10,
+      "nightNights": 11,
       "nightGenMaxWh": 104,
       "capKeptFull": false,
       "degrade": {
-        "score": 5.4,
-        "grade": "plan",
-        "gradeLabel": "交換を検討",
+        "score": 6.9,
+        "grade": "watch",
+        "gradeLabel": "経過観察",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
@@ -3497,9 +3497,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 5.4,
-            "value": 31.5,
-            "text": "直近の夜(11/14)の降下 20.5mV/hのままなら、12.15V → 下限11.5Vまで約32時間"
+            "score": 6.9,
+            "value": 36.9,
+            "text": "前夜の降下 18.1mV/hのままなら、12.17V → 下限11.5Vまで約37時間"
           }
         ],
         "reach": {
@@ -3513,11 +3513,11 @@
           "medianV": 13.71
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.146,
+          "day": "2026-11-15",
+          "v0": 12.166,
           "floorV": 11.5,
-          "vPerH": 0.0205,
-          "hours": 31.5
+          "vPerH": 0.0181,
+          "hours": 36.9
         }
       }
     },
@@ -3611,7 +3611,7 @@
         11.908,
         12.102,
         12.115,
-        12.251
+        12.238
       ],
       "swaps": [
         "2026-09-11",
@@ -3634,9 +3634,9 @@
       "nightGenMaxWh": 147,
       "capKeptFull": false,
       "degrade": {
-        "score": 7.3,
-        "grade": "watch",
-        "gradeLabel": "経過観察",
+        "score": 5.6,
+        "grade": "plan",
+        "gradeLabel": "交換を検討",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
@@ -3646,9 +3646,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 7.3,
-            "value": 38.4,
-            "text": "直近の夜(11/14)の降下 20.3mV/hのままなら、12.28V → 下限11.5Vまで約38時間"
+            "score": 5.6,
+            "value": 32.3,
+            "text": "前夜の降下 24.3mV/hのままなら、12.28V → 下限11.5Vまで約32時間"
           }
         ],
         "reach": {
@@ -3662,11 +3662,11 @@
           "medianV": 13.46
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.277,
+          "day": "2026-11-15",
+          "v0": 12.283,
           "floorV": 11.5,
-          "vPerH": 0.0203,
-          "hours": 38.4
+          "vPerH": 0.0243,
+          "hours": 32.3
         }
       }
     },
@@ -3760,7 +3760,7 @@
         11.904,
         11.987,
         12.045,
-        12.159
+        12.128
       ],
       "swaps": [
         "2026-09-11",
@@ -3779,14 +3779,14 @@
       "ratedAh": 50,
       "sohPct": 76,
       "mvPerAhNow": 11.7,
-      "mvPerAhPrev": 17.5,
-      "nightNights": 23,
+      "mvPerAhPrev": 16.5,
+      "nightNights": 24,
       "nightGenMaxWh": 143,
       "capKeptFull": false,
       "degrade": {
-        "score": 5.7,
-        "grade": "plan",
-        "gradeLabel": "交換を検討",
+        "score": 3.8,
+        "grade": "replace",
+        "gradeLabel": "要交換",
         "confidence": "高",
         "fresh": false,
         "estimated": false,
@@ -3796,9 +3796,9 @@
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 5.7,
-            "value": 32.4,
-            "text": "直近の夜(11/14)の降下 21.1mV/hのままなら、12.18V → 下限11.5Vまで約32時間"
+            "score": 3.8,
+            "value": 25.7,
+            "text": "前夜の降下 26.1mV/hのままなら、12.17V → 下限11.5Vまで約26時間"
           }
         ],
         "reach": {
@@ -3812,11 +3812,11 @@
           "medianV": 13.24
         },
         "floor": {
-          "day": "2026-11-14",
-          "v0": 12.184,
+          "day": "2026-11-15",
+          "v0": 12.172,
           "floorV": 11.5,
-          "vPerH": 0.0211,
-          "hours": 32.4
+          "vPerH": 0.0262,
+          "hours": 25.7
         }
       }
     }
