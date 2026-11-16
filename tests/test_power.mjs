@@ -466,6 +466,17 @@ export async function run() {
   }));
   const rkTitle = await pageRK.evaluate(() => document.querySelector("#rankCard h2").textContent);
   r.check("p9-title ランキングの名称は「バッテリー劣化ランキング」", rkTitle === "バッテリー劣化ランキング", rkTitle);
+  const inst = await pageRK.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const j = (x) => JSON.stringify(x);
+    return { c02: j(d.batteryInstallInfo("cam02", 8)), c53: j(d.batteryInstallInfo("cam53", 8)), c55: j(d.batteryInstallInfo("cam55", 8)),
+      c46: j(d.batteryInstallInfo("cam46", 8)), none: d.batteryInstallInfo("cam99", 8),
+      rows: Array.from(document.querySelectorAll("#rankList .rk-row .rk-inst")).map((e) => e.textContent) };
+  });
+  r.check("p9-inst 設置・交換年度: 初回設置と同じ年度の交換は数えない。今年度までは交換済み、先は次回予定",
+    inst.c02 === '{"init":1,"done":[6,8],"next":10}' && inst.c53 === '{"init":6,"done":[],"next":9}' && inst.c55 === '{"init":7,"done":[],"next":10}'
+    && inst.c46 === '{"init":4,"done":[6],"next":9}' && inst.none === null, inst);
+  r.check("p9-inst2 ランキングの各行の右端に初期設置・交換の年度を出す", inst.rows.length >= 5 && inst.rows.every((t) => t.indexOf("初期設置") >= 0 || t.indexOf("未登録") >= 0), inst.rows);
   r.check("p9-a ランキングは既定で表示してある", !rk0.hidden && rk0.btn === "ランキングを隠す", rk0);
   const rk = await pageRK.evaluate(() => {
     const rows = Array.from(document.querySelectorAll("#rankList .rk-row"));
