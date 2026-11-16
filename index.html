@@ -476,7 +476,7 @@
   .rank-card h2 { font-size: 15px; margin: 0; }
   .rank-card .subtitle { font-size: 11px; margin: 2px 0 0; }
   .rk-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-  .rk-row { display: grid; grid-template-columns: 30px minmax(120px, 1.1fr) 92px minmax(90px, 0.9fr) 84px minmax(0, 2fr);
+  .rk-row { display: grid; grid-template-columns: 30px minmax(120px, 1.1fr) 92px minmax(90px, 0.9fr) 84px minmax(0, 2fr) minmax(110px, 0.9fr);
     gap: 4px 12px; align-items: center; padding: 8px 10px; border: 1px solid var(--gridline); border-radius: 8px;
     background: var(--surface-1); }
   .rk-row.rk-fail { border-width: 2px; }
@@ -497,12 +497,15 @@
   .rk-part b { color: var(--text-primary); }
   .rk-part.rk-low b { color: var(--critical-border); }
   .rk-part.rk-none { color: var(--text-muted); }
+  .rk-inst { font-size: 10.5px; line-height: 1.5; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+  .rk-inst b { color: var(--text-primary); font-weight: 600; }
+  .rk-inst .rk-next { color: var(--text-muted); }
   .ht-pill.watch { background: var(--surface-2); color: var(--text-secondary); border: 1px solid var(--gridline); }
   .rk-other { margin-top: 12px; font-size: 12px; line-height: 1.8; color: var(--text-secondary); }
   .rk-other b { color: var(--text-primary); }
   @media (max-width: 720px) {
     .rk-row { grid-template-columns: 26px 1fr auto; }
-    .rk-row .rk-gauge, .rk-row .rk-parts { grid-column: 1 / -1; }
+    .rk-row .rk-gauge, .rk-row .rk-parts, .rk-row .rk-inst { grid-column: 1 / -1; }
     .rk-row .rk-pill { grid-column: 2 / -1; justify-self: start; }
   }
   /* バッテリー健全性の一覧(「健全性の一覧」ボタンで開閉)。
@@ -1959,6 +1962,44 @@
         "／日の入り " + fmtOutlookWhen(o.sunset).replace(/^今日 /, "") + "\n" : "") +
       "10分ごとに計算し直しています。";
   }
+  /* バッテリーの設置・交換年度(令和)。利用者の「バッテリー設置・交換の計画表」(土木課・危機管理課・
+     みどりと水のまちづくり課・農と食のまちづくり課)から転記。init=初回設置、cols=BT交換の〇の年度。
+     初回設置と同じ年度の〇は交換として数えない(利用者の指示)。今年度までの〇は交換済み、
+     それより先の〇は今後の交換予定として「次回予定」に出す。 */
+  var BATTERY_INSTALL_YEARS = {
+    cam02: { init: 1, cols: [6, 8, 10] }, cam04: { init: 2, cols: [6, 10] }, cam03: { init: 2, cols: [6, 8, 11] },
+    cam14: { init: 3, cols: [6, 9, 12] }, cam13: { init: 3, cols: [6, 9, 12] }, cam12: { init: 3, cols: [6, 8, 11] },
+    cam36: { init: 4, cols: [8, 11] }, cam09: { init: 5, cols: [6, 9, 12] }, cam53: { init: 6, cols: [6, 9, 12] },
+    cam54: { init: 7, cols: [7, 10] }, cam01: { init: 2, cols: [6, 8, 11] }, cam11: { init: 3, cols: [6, 9, 12] },
+    cam40: { init: 4, cols: [8, 11] }, cam08: { init: 5, cols: [6, 9, 12] }, cam52: { init: 6, cols: [10] },
+    cam55: { init: 7, cols: [7, 10] }, cam41: { init: 4, cols: [9, 12] }, cam43: { init: 4, cols: [6, 10] },
+    cam44: { init: 4, cols: [8, 11] }, cam45: { init: 4, cols: [8, 11] }, cam46: { init: 4, cols: [6, 9, 12] },
+    cam42: { init: 4, cols: [6, 8, 11] }, cam47: { init: 4, cols: [6, 9, 12] }
+  };
+  // 今日の令和年度(4月始まり。令和1年度=2019年度)。日本時間で数える。
+  function reiwaFiscalYearNow() {
+    var jst = new Date(Date.now() + 9 * 3600000);
+    var y = jst.getUTCFullYear(), m = jst.getUTCMonth() + 1;
+    return (m >= 4 ? y : y - 1) - 2018;
+  }
+  function batteryInstallInfo(siteId, fy) {
+    var t = BATTERY_INSTALL_YEARS[siteId];
+    if (!t) return null;
+    var cur = typeof fy === "number" ? fy : reiwaFiscalYearNow();
+    var cols = t.cols.filter(function (y) { return y !== t.init; });
+    var done = cols.filter(function (y) { return y <= cur; });
+    var next = cols.filter(function (y) { return y > cur; });
+    return { init: t.init, done: done, next: next.length ? next[0] : null };
+  }
+  function batteryInstallHtml(siteId) {
+    var i = batteryInstallInfo(siteId);
+    if (!i) return '<div class="rk-inst" title="設置・交換年度は未登録です">設置年度 <b>未登録</b></div>';
+    return '<div class="rk-inst" title="バッテリーの設置・交換年度(令和)。初回設置と同じ年度の交換は数えていません。">'
+      + "初期設置 <b>R" + i.init + "</b><br>"
+      + "交換 <b>" + (i.done.length ? i.done.map(function (y) { return "R" + y; }).join("・") : "—") + "</b>"
+      + (i.next !== null ? '<br><span class="rk-next">次回予定 R' + i.next + "</span>" : "")
+      + "</div>";
+  }
   function updateBatteryHealth(site) {
     var s = siteStates[site.id];
     if (!s || !s.healthValueEl) return;
@@ -2532,6 +2573,7 @@
     }
     var rowHtml = res.scored.map(function (r) {
       var d = r.d, e = r.e;
+      var instHtml = batteryInstallHtml(r.id);
       var cls = RANK_GRADE_CLASS[d.grade] || "ok";
       var col = d.grade === "replace" ? "var(--critical-border)" : d.grade === "plan" ? "var(--warn-border)"
         : d.grade === "watch" ? "var(--text-muted)" : "var(--ok-border)";
@@ -2562,7 +2604,7 @@
         + '<div class="rk-score"><span class="rk-num">' + d.score.toFixed(1) + '</span><span class="rk-max">/10.0</span></div>'
         + '<div class="rk-gauge"><i style="width:' + Math.max(3, d.score * 10) + "%;background:" + col + '"></i></div>'
         + '<div class="rk-pill"><span class="ht-pill ' + (r.tier < 3 ? "bad" : cls) + '">' + (r.tier < 3 ? RANK_TIER_LABEL[r.tier] : d.gradeLabel) + "</span></div>"
-        + '<div class="rk-parts">' + parts + "</div></li>";
+        + '<div class="rk-parts">' + parts + "</div>" + instHtml + "</li>";
     });
     // 採点できない拠点(測定中・交換直後で実測が全く無い)も、順位なしで末尾に載せて全拠点を並べる
     var unscored = res.fresh.concat(res.pending);
@@ -2579,7 +2621,7 @@
         + '<div class="rk-score"><span class="rk-num">—</span><span class="rk-max">/10.0</span></div>'
         + '<div class="rk-gauge"></div>'
         + '<div class="rk-pill"><span class="ht-pill watch">' + why + "</span></div>"
-        + '<div class="rk-parts"><span class="rk-part rk-none">前夜の電圧降下(下限までの放電) —</span></div></li>';
+        + '<div class="rk-parts"><span class="rk-part rk-none">前夜の電圧降下(下限までの放電) —</span></div>' + batteryInstallHtml(r.id) + "</li>";
     }).join("");
     list.innerHTML = rowHtml.join("") + unscoredHtml;
     other.innerHTML = unscored.length
@@ -7460,7 +7502,7 @@
     mergePowerHistory: mergePowerHistory, pollPowerSource: pollPowerSource,
     extractCsvFromJinaProxyText: extractCsvFromJinaProxyText,
     getPowerSourceState: function () { return powerSourceState; },
-    isPlausibleBat: isPlausibleBat, PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS, BAT_PREDICTION_HORIZON_MS: BAT_PREDICTION_HORIZON_MS, BAT_CHART_PAST_WINDOW_MS: BAT_CHART_PAST_WINDOW_MS, BAT_CHART_MAX_POINTS: BAT_CHART_MAX_POINTS,
+    batteryInstallInfo: batteryInstallInfo, BATTERY_INSTALL_YEARS: BATTERY_INSTALL_YEARS,     isPlausibleBat: isPlausibleBat, PREDICTION_HORIZON_MS: PREDICTION_HORIZON_MS, BAT_PREDICTION_HORIZON_MS: BAT_PREDICTION_HORIZON_MS, BAT_CHART_PAST_WINDOW_MS: BAT_CHART_PAST_WINDOW_MS, BAT_CHART_MAX_POINTS: BAT_CHART_MAX_POINTS,
     CHART_PAST_WINDOW_WITH_FORECAST_MS: CHART_PAST_WINDOW_WITH_FORECAST_MS,
     GRAPHLIST_PAST_WINDOW_MS: GRAPHLIST_PAST_WINDOW_MS,
     GRAPHLIST_FORECAST_HORIZON_MS: GRAPHLIST_FORECAST_HORIZON_MS,
