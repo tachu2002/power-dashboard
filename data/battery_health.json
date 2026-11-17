@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-17T22:14:00.108Z",
+  "generatedAt": "2026-11-17T23:20:05.902Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -1667,7 +1667,7 @@
         "days": 16,
         "tempC": 15.4,
         "whole": false,
-        "placeholder": false
+        "placeholder": true
       },
       "initialWindow": null,
       "spanDays": 159,
@@ -1743,16 +1743,17 @@
         "2026-09-11",
         "2026-10-01",
         "2026-10-30",
-        "2026-11-02"
+        "2026-11-02",
+        "2026-11-19"
       ],
-      "lastSwapAt": "2026-11-02",
-      "lastSwapTime": "2026-10-31T23:26:11.000Z",
-      "lastSwapVBefore": 12.286,
-      "lastSwapVAfter": 12.893,
-      "capAfterSwap": true,
-      "capStale": false,
-      "capPlaceholder": false,
-      "capDaysAfterSwap": 17,
+      "lastSwapAt": "2026-11-19",
+      "lastSwapTime": "2026-11-17T23:04:44.000Z",
+      "lastSwapVBefore": 12.031,
+      "lastSwapVAfter": 12.625,
+      "capAfterSwap": false,
+      "capStale": true,
+      "capPlaceholder": true,
+      "capDaysAfterSwap": 0,
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 79,
@@ -1765,9 +1766,9 @@
         "score": 10,
         "grade": "good",
         "gradeLabel": "良好",
-        "confidence": "高",
-        "fresh": false,
-        "estimated": false,
+        "confidence": "低",
+        "fresh": true,
+        "estimated": true,
         "fail13": false,
         "cappedBy": null,
         "parts": [
@@ -1775,26 +1776,19 @@
             "key": "floor",
             "label": "下限までの放電",
             "score": 10,
-            "value": 130,
-            "text": "前夜の降下 10.5mV/hのままなら、11.86V → 下限10.5Vまで約130時間"
+            "value": 131.1,
+            "estimated": true,
+            "text": "交換後の夜の実測がまだ無いため見込み: 消費 1.37A × 標準の降下 12mV/Ah で、12.63V → 下限10.5Vまで約131時間"
           }
         ],
-        "reach": {
-          "recentDays": 3,
-          "recentMissed": 0,
-          "days": 5,
-          "hit": 5,
-          "rate": 1,
-          "lastDay": "2026-11-14",
-          "lastV": 13.6,
-          "medianV": 13.6
-        },
+        "reach": null,
         "floor": {
-          "day": "2026-11-18",
-          "v0": 11.86,
+          "day": null,
+          "v0": 12.625,
           "floorV": 10.5,
-          "vPerH": 0.0105,
-          "hours": 130
+          "vPerH": 0.0162,
+          "hours": 131.1,
+          "estimated": true
         }
       }
     },
@@ -3227,7 +3221,7 @@
         13.605,
         13.601,
         13.605,
-        13.614
+        13.61
       ],
       "swaps": [],
       "lastSwapAt": null,
