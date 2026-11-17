@@ -5783,6 +5783,30 @@
   var forecastState = { hours: [], fetchedAt: null, error: null };
   var predictionCache = {};
 
+  /* 予報の取得が一時的に失敗しても(携帯回線・混雑など)、次の1時間更新まで予測なしのままにしない。
+     失敗したら短い間隔で取り直し(15秒→45秒→2分→5分→10分…)、成功したら直近の予報を端末に控えて、
+     次に開いたとき取得を待つ間もそれで予測を出す(12時間以内のものだけ)。 */
+  var FORECAST_RETRY_MS = [15000, 45000, 120000, 300000, 600000];
+  var FORECAST_CACHE_KEY = "mishima-forecast-v1";
+  var FORECAST_CACHE_MAX_AGE_MS = 12 * 3600000;
+  var forecastRetryN = 0, forecastRetryTimer = null;
+  function saveForecastCache(hours) {
+    try { localStorage.setItem(FORECAST_CACHE_KEY, JSON.stringify({ at: Date.now(), hours: hours })); } catch (e) { /* 保存できなくても動く */ }
+  }
+  function restoreForecastCache() {
+    try {
+      var raw = localStorage.getItem(FORECAST_CACHE_KEY);
+      if (!raw) return false;
+      var c = JSON.parse(raw);
+      if (!c || !Array.isArray(c.hours) || !c.hours.length || Date.now() - c.at > FORECAST_CACHE_MAX_AGE_MS) return false;
+      if (forecastState.hours.length) return false;
+      forecastState.hours = c.hours;
+      forecastState.fetchedAt = new Date(c.at);
+      predictionCache = {};
+      outlookCache = {};
+      return true;
+    } catch (e) { return false; }
+  }
   function loadForecastHourly() {
     return fetch(FORECAST_API_URL, { cache: "no-store" })
       .then(function (res) { if (!res.ok) throw new Error("HTTP " + res.status); return res.json(); })
@@ -5804,6 +5828,8 @@
         forecastState.hours = hours;
         forecastState.fetchedAt = new Date();
         forecastState.error = null;
+        forecastRetryN = 0;
+        saveForecastCache(hours);
         predictionCache = {};
         outlookCache = {};          // 予報が変わったので残量の見通しも作り直す
         refreshAllPredictionCharts();
@@ -5813,6 +5839,11 @@
       .catch(function (err) {
         forecastState.error = err && err.message ? err.message : String(err);
         console.warn("予報データ(Open-Meteo)を取得できませんでした:", forecastState.error);
+        if (!forecastRetryTimer) {
+          var wait = FORECAST_RETRY_MS[Math.min(forecastRetryN, FORECAST_RETRY_MS.length - 1)];
+          forecastRetryN++;
+          forecastRetryTimer = setTimeout(function () { forecastRetryTimer = null; loadForecastHourly(); }, wait);
+        }
         return 0;
       });
   }
@@ -7416,6 +7447,7 @@
   pollPowerSource({ tail: false });
   setInterval(function () { pollPowerSource({ tail: true }); }, FETCH_INTERVAL_MS);
   // 未来予測に使う1時間ごとの気象データ(実績+予報)を読み込む。
+  restoreForecastCache();
   loadForecastHourly();
   setInterval(loadForecastHourly, FORECAST_REFRESH_MS);
   // 日付(JST)が変わったら、1時間の更新を待たずに予報を取り直して予測を作り直す。
@@ -7513,7 +7545,7 @@
     waterDeltaColorVar: waterDeltaColorVar, fmtElapsedShort: fmtElapsedShort,
     updateGraphlistDelta: updateGraphlistDelta, WATER_DELTA_EPSILON_M: WATER_DELTA_EPSILON_M,
     buildGraphlistChartData: buildGraphlistChartData, refreshGraphlistCard: refreshGraphlistCard,
-    loadForecastHourly: loadForecastHourly, parseLocalHour: parseLocalHour,
+    loadForecastHourly: loadForecastHourly, FORECAST_RETRY_MS: FORECAST_RETRY_MS, restoreForecastCache: restoreForecastCache, FORECAST_CACHE_KEY: FORECAST_CACHE_KEY, parseLocalHour: parseLocalHour,
     getForecastState: function () { return forecastState; },
     predictWaterSeries: predictWaterSeries, predictBatterySeries: predictBatterySeries,
     predictPvSeries: predictPvSeries, cachedPrediction: cachedPrediction,
