@@ -1442,6 +1442,45 @@ export async function run() {
     } finally { fs.hours = keepHours; s.points = keep; d.clearPredictionCache(); d.refreshPowerCard(d.SITE_CATALOG.cam14); }
   });
   r.check("f17-b 天気予報が取れていなくても、電圧グラフは過去2日ぶんを出す(1日表示に戻らない)", twoDaysNoFc.days >= 2, twoDaysNoFc);
+  const retryT = await page3.evaluate(async () => {
+    const d = window.__dashboardDebug;
+    const fs = d.getForecastState();
+    const origFetch = window.fetch;
+    let failed = 0;
+    d.FORECAST_RETRY_MS[0] = 150;
+    window.fetch = function (u) {
+      if (String(u).indexOf("open-meteo.com") >= 0 && failed < 1) { failed++; return Promise.reject(new TypeError("Failed to fetch")); }
+      return origFetch.apply(this, arguments);
+    };
+    try {
+      fs.hours = []; fs.error = null;
+      await d.loadForecastHourly();                       // 1回目は失敗する
+      const errAfterFail = fs.error;
+      await new Promise((res) => setTimeout(res, 1500));  // 短い間隔で取り直して成功する
+      return { failed, errAfterFail, hours: fs.hours.length, errNow: fs.error };
+    } finally { window.fetch = origFetch; }
+  });
+  r.check("f18-a 予報の取得に失敗しても、次の1時間更新を待たずに短い間隔で取り直す",
+    retryT.failed === 1 && retryT.errAfterFail && retryT.hours > 0 && retryT.errNow === null, retryT);
+  const cacheT = await page3.evaluate(() => {
+    const d = window.__dashboardDebug;
+    const fs = d.getForecastState();
+    const keep = fs.hours;
+    try {
+      const saved = localStorage.getItem(d.FORECAST_CACHE_KEY);
+      fs.hours = [];
+      const ok = d.restoreForecastCache();
+      const restored = fs.hours.length;
+      // 古い控え(13時間前)は使わない
+      fs.hours = [];
+      localStorage.setItem(d.FORECAST_CACHE_KEY, JSON.stringify({ at: Date.now() - 13 * 3600000, hours: keep }));
+      const okOld = d.restoreForecastCache();
+      if (saved) localStorage.setItem(d.FORECAST_CACHE_KEY, saved);
+      return { ok, restored, okOld, had: !!saved };
+    } finally { fs.hours = keep; }
+  });
+  r.check("f18-b 直近の予報を端末に控え、取得を待つ間もそれで予測を出す(12時間より古い控えは使わない)",
+    cacheT.had && cacheT.ok && cacheT.restored > 0 && cacheT.okOld === false, cacheT);
   r.check("f15-a 下限より1V以上低い値(0V・欠測)は電圧として扱わない(下限10.5Vの拠点は9.5V未満、北沢9.5Vは8.5V未満)",
     glitch.ok.join() === "true,true,true,false,false,true,false", glitch.ok);
   r.check("f15-b 0Vの欠測が混ざっていても、電圧の予測は引きずられない",
