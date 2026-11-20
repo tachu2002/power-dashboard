@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-20T21:46:38.752Z",
+  "generatedAt": "2026-11-20T22:50:05.660Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -477,7 +477,7 @@
         "days": 22,
         "tempC": 15.9,
         "whole": false,
-        "placeholder": false
+        "placeholder": true
       },
       "initialWindow": null,
       "spanDays": 162,
@@ -549,17 +549,18 @@
         12.093
       ],
       "swaps": [
-        "2026-10-27"
+        "2026-10-27",
+        "2026-11-22"
       ],
-      "lastSwapAt": "2026-10-27",
-      "lastSwapTime": "2026-10-26T03:26:46.000Z",
-      "lastSwapVBefore": 11.882,
-      "lastSwapVAfter": 12.484,
-      "capAfterSwap": true,
-      "capStale": false,
-      "capPlaceholder": false,
-      "capDaysAfterSwap": 26,
-      "mvSpansSwap": true,
+      "lastSwapAt": "2026-11-22",
+      "lastSwapTime": "2026-11-20T22:45:32.000Z",
+      "lastSwapVBefore": 12.453,
+      "lastSwapVAfter": 12.84,
+      "capAfterSwap": false,
+      "capStale": true,
+      "capPlaceholder": true,
+      "capDaysAfterSwap": 0,
+      "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 102,
       "mvPerAhNow": 15.3,
@@ -568,39 +569,32 @@
       "nightGenMaxWh": 158,
       "capKeptFull": false,
       "degrade": {
-        "score": 4.5,
-        "grade": "plan",
-        "gradeLabel": "交換を検討",
-        "confidence": "高",
-        "fresh": false,
-        "estimated": false,
+        "score": 10,
+        "grade": "good",
+        "gradeLabel": "良好",
+        "confidence": "低",
+        "fresh": true,
+        "estimated": true,
         "fail13": false,
         "cappedBy": null,
         "parts": [
           {
             "key": "floor",
             "label": "下限までの放電",
-            "score": 4.5,
-            "value": 28.2,
-            "text": "前夜の降下 25.6mV/hのままなら、12.22V → 下限11.5Vまで約28時間"
+            "score": 10,
+            "value": 115.4,
+            "estimated": true,
+            "text": "交換後の夜の実測がまだ無いため見込み: 消費 0.94A × 標準の降下 12mV/Ah で、12.84V → 下限11.5Vまで約115時間"
           }
         ],
-        "reach": {
-          "recentDays": 3,
-          "recentMissed": 0,
-          "days": 10,
-          "hit": 10,
-          "rate": 1,
-          "lastDay": "2026-11-20",
-          "lastV": 13.5,
-          "medianV": 13.49
-        },
+        "reach": null,
         "floor": {
-          "day": "2026-11-21",
-          "v0": 12.221,
+          "day": null,
+          "v0": 12.84,
           "floorV": 11.5,
-          "vPerH": 0.0256,
-          "hours": 28.2
+          "vPerH": 0.0116,
+          "hours": 115.4,
+          "estimated": true
         }
       }
     },
