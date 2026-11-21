@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-21T22:30:07.229Z",
+  "generatedAt": "2026-11-21T23:40:05.578Z",
   "method": "endurance",
   "reserveSocPct": 20,
   "nightEndHourJst": 4,
@@ -1736,16 +1736,17 @@
         "2026-10-01",
         "2026-10-30",
         "2026-11-02",
-        "2026-11-19"
+        "2026-11-19",
+        "2026-11-23"
       ],
-      "lastSwapAt": "2026-11-19",
-      "lastSwapTime": "2026-11-17T23:04:44.000Z",
-      "lastSwapVBefore": 12.031,
-      "lastSwapVAfter": 12.625,
+      "lastSwapAt": "2026-11-23",
+      "lastSwapTime": "2026-11-21T22:31:10.000Z",
+      "lastSwapVBefore": 12.502,
+      "lastSwapVAfter": 12.853,
       "capAfterSwap": false,
       "capStale": true,
       "capPlaceholder": true,
-      "capDaysAfterSwap": 4,
+      "capDaysAfterSwap": 0,
       "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 79,
@@ -1760,7 +1761,7 @@
         "gradeLabel": "良好",
         "confidence": "低",
         "fresh": true,
-        "estimated": false,
+        "estimated": true,
         "fail13": false,
         "cappedBy": null,
         "parts": [
@@ -1768,26 +1769,19 @@
             "key": "floor",
             "label": "下限までの放電",
             "score": 10,
-            "value": 71,
-            "text": "前夜の降下 24.4mV/hのままなら、12.23V → 下限10.5Vまで約71時間"
+            "value": 134.4,
+            "estimated": true,
+            "text": "交換後の夜の実測がまだ無いため見込み: 消費 1.38A × 標準の降下 13mV/Ah で、12.85V → 下限10.5Vまで約134時間"
           }
         ],
-        "reach": {
-          "recentDays": 2,
-          "recentMissed": 0,
-          "days": 2,
-          "hit": 2,
-          "rate": 1,
-          "lastDay": "2026-11-20",
-          "lastV": 13.54,
-          "medianV": 13.51
-        },
+        "reach": null,
         "floor": {
-          "day": "2026-11-22",
-          "v0": 12.23,
+          "day": null,
+          "v0": 12.853,
           "floorV": 10.5,
-          "vPerH": 0.0244,
-          "hours": 71
+          "vPerH": 0.0175,
+          "hours": 134.4,
+          "estimated": true
         }
       }
     },
@@ -2168,7 +2162,7 @@
         13.381,
         13.385,
         13.385,
-        13.399
+        13.39
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -2431,17 +2425,18 @@
         "2026-09-30",
         "2026-10-28",
         "2026-11-01",
-        "2026-11-22"
+        "2026-11-22",
+        "2026-11-23"
       ],
-      "lastSwapAt": "2026-11-22",
-      "lastSwapTime": "2026-11-20T22:51:30.000Z",
-      "lastSwapVBefore": 12.119,
-      "lastSwapVAfter": 12.511,
+      "lastSwapAt": "2026-11-23",
+      "lastSwapTime": "2026-11-21T22:31:10.000Z",
+      "lastSwapVBefore": 12.326,
+      "lastSwapVAfter": 12.686,
       "capAfterSwap": false,
       "capStale": true,
       "capPlaceholder": true,
-      "capDaysAfterSwap": 1,
-      "mvSpansSwap": true,
+      "capDaysAfterSwap": 0,
+      "mvSpansSwap": false,
       "ratedAh": 50,
       "sohPct": 70,
       "mvPerAhNow": 11.4,
@@ -2455,7 +2450,7 @@
         "gradeLabel": "良好",
         "confidence": "低",
         "fresh": true,
-        "estimated": false,
+        "estimated": true,
         "fail13": false,
         "cappedBy": null,
         "parts": [
@@ -2463,17 +2458,19 @@
             "key": "floor",
             "label": "下限までの放電",
             "score": 10,
-            "value": 54.9,
-            "text": "前夜の降下 28.7mV/hのままなら、12.07V → 下限10.5Vまで約55時間"
+            "value": 108.9,
+            "estimated": true,
+            "text": "交換後の夜の実測がまだ無いため見込み: 消費 1.58A × 標準の降下 13mV/Ah で、12.69V → 下限10.5Vまで約109時間"
           }
         ],
         "reach": null,
         "floor": {
-          "day": "2026-11-22",
-          "v0": 12.075,
+          "day": null,
+          "v0": 12.686,
           "floorV": 10.5,
-          "vPerH": 0.0287,
-          "hours": 54.9
+          "vPerH": 0.0201,
+          "hours": 108.9,
+          "estimated": true
         }
       }
     },
@@ -3109,7 +3106,7 @@
         13.5,
         13.5,
         13.504,
-        13.508
+        13.504
       ],
       "swaps": [],
       "lastSwapAt": null,
@@ -3212,7 +3209,7 @@
         13.605,
         13.605,
         13.605,
-        13.618
+        13.61
       ],
       "swaps": [],
       "lastSwapAt": null,
